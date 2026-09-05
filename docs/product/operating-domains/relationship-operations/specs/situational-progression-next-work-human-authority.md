@@ -4,18 +4,19 @@
 > **Status:** **APPROVED — Product / Domain behavioral contract for S2**  
 > **Owner / decision owner:** Product / domain leadership  
 > **Contributors:** Product, domain, engineering, design, architecture  
-> **Initiative:** [Relationship Operations](../brief.md) — R1 Relationship Operations v1  
+> **Operating Domain:** Relationship Operations  
+> **Introduced in Roadmap Increment:** R1 — Relationship Operations v1  
 > **Parent product intent:** [Gu / Gu OS Product Requirements Document](../../../PRD.md)  
-> **Initiative Brief:** [Relationship Operations — Initiative Brief](../brief.md) — v0.9  
+> **Framing record (historical):** [R1 framing & product-decision record](../../../roadmap-increments/r1-relationship-operations-v1/framing-decision-record.md) — v0.9  
 > **S1 behavioral contract:** [Lead Opportunity Lifecycle & Responsibility](./lead-opportunity-lifecycle.md) — v0.3 approved  
-> **Companion discovery mapping:** [R1 Concept → Shared Kernel Mapping](../r1-concept-shared-kernel-mapping.md) — v0.9  
-> **Architecture Analysis:** [R1 Architecture Analysis](../architecture-analysis.md) — v0.12 complete  
-> **Legacy source audit:** [Traditional Gu Legacy Source Audit](../legacy-source-audit.md) — v0.1 complete for R1 Technical-Plan entry  
+> **Companion discovery mapping:** [R1 Concept → Shared Kernel Mapping](../../../roadmap-increments/r1-relationship-operations-v1/r1-concept-shared-kernel-mapping.md) — v0.9  
+> **Architecture Analysis:** [R1 Architecture Analysis](../../../roadmap-increments/r1-relationship-operations-v1/architecture-analysis.md) — v0.12 complete  
+> **Legacy source audit:** [Traditional Gu Legacy Source Audit](../../../roadmap-increments/r1-relationship-operations-v1/legacy-source-audit.md) — v0.1 complete for R1 Technical-Plan entry  
 > **Relevant ADRs:** ADR-106 Organization-Native Multi-seat Tenancy; ADR-107 Runtime / Conversation Authority; ADR-108 Versioned Organization Policy; ADR-109 Generic Case Relationships / Lineage; ADR-110 Resource Usage & Cost Attribution  
 > **Roadmap:** [Gu OS Evolution Roadmap](../../../../roadmap/gu-os-evolution-roadmap.md) — R1  
 > **Doctrine:** [Gu OS Principles & Design Doctrine](../../../../principles/gu-os-principles-and-design-doctrine.md)  
 > **Development method:** [Gu OS Agentic Product & Software Development Methodology](../../../../development/agentic-product-software-development-methodology.md)  
-> **Intended repo path:** `docs/product/initiatives/relationship-operations/specs/situational-progression-next-work-human-authority.md`  
+> **Intended repo path:** `docs/product/operating-domains/relationship-operations/specs/situational-progression-next-work-human-authority.md`  
 > **Artifact role:** Governing contract for how an admitted Lead Opportunity is reconsidered over time, how its Case Supervisor discovers and chooses useful work, how adaptive work may learn/replan, what work Gu may initiate autonomously, how research/Tools/artifacts and human contribution participate, how commitments/evidence gaps remain durable, how prospect-facing delivery is governed across channels, and how execution results feed the next decision. This Spec does not own exact schemas, queue/event mechanics, adapter endpoints, prompt/model selection, Work Item persistence details, channel-specific transport implementation, or future channel capability contracts.
 
 ---

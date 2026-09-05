@@ -1,14 +1,17 @@
-# Relationship Operations — Initiative Brief
+# R1 Relationship Operations v1 — Framing & Product-Decision Record
 
 > **Version:** v0.9  
-> **Status:** Approved for Feature / Business Spec and Architecture Analysis; P0 and P1-9 through P1-12 product directions approved  
-> **Intended repo path:** `docs/product/initiatives/relationship-operations/brief.md`  
-> **Roadmap increment:** R1 — Relationship Operations v1  
+> **Status:** **Historical / provenance — framing complete.** Its framing exit criterion (§20) is satisfied: P0-1…P0-8 and P1-9…P1-12 directions were approved and carried into the governing artifacts. This record is **not active governing framing** and must not be cited as authority for current behavior.  
+> **Intended repo path:** `docs/product/roadmap-increments/r1-relationship-operations-v1/framing-decision-record.md`  
+> **Roadmap Increment:** R1 — Relationship Operations v1  
+> **Operating Domain framed:** Relationship Operations  
 > **Parent product intent:** [`../../PRD.md`](../../PRD.md)  
 > **Roadmap:** [`../../../roadmap/gu-os-evolution-roadmap.md`](../../../roadmap/gu-os-evolution-roadmap.md) — R1  
 > **Doctrine:** [`../../../principles/gu-os-principles-and-design-doctrine.md`](../../../principles/gu-os-principles-and-design-doctrine.md)  
 > **Development method:** [`../../../development/agentic-product-software-development-methodology.md`](../../../development/agentic-product-software-development-methodology.md)  
-> **Artifact role:** Initiative framing only. This Brief does not own exact feature behavior, durable architecture decisions or implementation design.
+> **Artifact role:** Historical framing and product-decision record for R1. Current product / domain truth is owned by the Product PRD, the Roadmap, the approved Relationship Operations Specs and the accepted ADRs. This record preserves the provenance from framing questions and approved directions into those governing artifacts. It does not own feature behavior, durable architecture decisions or implementation design.
+
+*Naming note: this document was previously titled "Relationship Operations — Initiative Brief" and lived at `docs/product/initiatives/relationship-operations/brief.md`. Relationship Operations is an **Operating Domain**, not an Initiative, and R1 is the **Roadmap Increment** that first proves Relationship Operations; no distinct Initiative layer is in use. References to "this Initiative Brief" in the body below are preserved as written and should be read as historical self-reference.*
 
 ## 1. Decision this Brief asks for
 

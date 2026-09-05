@@ -1,12 +1,14 @@
-# R1 Relationship Operations — S4 Work Portfolio, Needs Attention & Multi-seat Supervisory Experience
+# Relationship Operations — S4 Work Portfolio, Needs Attention & Multi-seat Supervisory Experience
 
 > **Version:** v0.1  
 > **Status:** APPROVED — canonical Relationship Operations behavioral contract  
-> **Initiative:** R1 — Relationship Operations v1  
-> **Parent architecture:** `docs/product/initiatives/relationship-operations/architecture-analysis.md`  
+> **Operating Domain:** Relationship Operations  
+> **Introduced in Roadmap Increment:** R1 — Relationship Operations v1  
+> **Parent architecture:** `docs/product/roadmap-increments/r1-relationship-operations-v1/architecture-analysis.md`  
 > **Related specs:** S1 `lead-opportunity-lifecycle.md` · S2 `situational-progression-next-work-human-authority.md` · S3 `visit-progression-outcome-evidence-reconciliation.md`  
 > **Cross-domain Experience source:** `docs/manuals/gu-os-experience-architecture.md`  
-> **Intended repo path:** `docs/product/initiatives/relationship-operations/specs/work-portfolio-supervisory-experience.md`
+> **Intended repo path:** `docs/product/operating-domains/relationship-operations/specs/work-portfolio-supervisory-experience.md`
+> **Scope and authority:** This Spec is approved as **Relationship Operations** behavior. Cross-domain reuse of these supervisory concepts does not by itself extend this Spec's governing authority beyond Relationship Operations. Any future generalization or relocation of cross-cutting supervisory semantics requires a separate governed product / architecture decision.
 
 ---
 

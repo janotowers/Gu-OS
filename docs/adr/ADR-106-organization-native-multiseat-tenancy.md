@@ -3,7 +3,7 @@
 **Status:** Accepted direction  
 **Date:** 2026-08-26  
 **Supersedes:** [ADR-101 — Organization tenancy](ADR-101-organization-tenancy.md)  
-**Related:** [`../manuals/knowledge-scope-and-ownership.md`](../manuals/knowledge-scope-and-ownership.md), [`../product/initiatives/relationship-operations/architecture-analysis.md`](../product/initiatives/relationship-operations/architecture-analysis.md), [`../product/initiatives/relationship-operations/technical-plan.md`](../product/initiatives/relationship-operations/technical-plan.md), [`../product/initiatives/relationship-operations/specs/lead-opportunity-lifecycle.md`](../product/initiatives/relationship-operations/specs/lead-opportunity-lifecycle.md)
+**Related:** [`../manuals/knowledge-scope-and-ownership.md`](../manuals/knowledge-scope-and-ownership.md), [`../product/roadmap-increments/r1-relationship-operations-v1/architecture-analysis.md`](../product/roadmap-increments/r1-relationship-operations-v1/architecture-analysis.md), [`../product/roadmap-increments/r1-relationship-operations-v1/technical-plan.md`](../product/roadmap-increments/r1-relationship-operations-v1/technical-plan.md), [`../product/operating-domains/relationship-operations/specs/lead-opportunity-lifecycle.md`](../product/operating-domains/relationship-operations/specs/lead-opportunity-lifecycle.md)
 
 ## Context
 

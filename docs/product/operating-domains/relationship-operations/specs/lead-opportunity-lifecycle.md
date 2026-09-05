@@ -4,16 +4,17 @@
 > **Status:** Approved — governing S1 behavioral contract; R1 Architecture Analysis complete  
 > **Owner / decision owner:** Product / domain leadership  
 > **Contributors:** Product, domain, engineering, design, architecture  
-> **Initiative:** [Relationship Operations](../brief.md) — R1 Relationship Operations v1  
+> **Operating Domain:** Relationship Operations  
+> **Introduced in Roadmap Increment:** R1 — Relationship Operations v1  
 > **Parent product intent:** [Gu / Gu OS Product Requirements Document](../../../PRD.md)  
-> **Initiative Brief:** [Relationship Operations — Initiative Brief](../brief.md)  
-> **Companion discovery mapping:** [R1 Concept → Shared Kernel Mapping](../r1-concept-shared-kernel-mapping.md)  
-> **Legacy source audit:** [Traditional Gu Legacy Source Audit](../legacy-source-audit.md) — v0.1 complete for R1 Technical-Plan entry  
+> **Framing record (historical):** [R1 framing & product-decision record](../../../roadmap-increments/r1-relationship-operations-v1/framing-decision-record.md)  
+> **Companion discovery mapping:** [R1 Concept → Shared Kernel Mapping](../../../roadmap-increments/r1-relationship-operations-v1/r1-concept-shared-kernel-mapping.md)  
+> **Legacy source audit:** [Traditional Gu Legacy Source Audit](../../../roadmap-increments/r1-relationship-operations-v1/legacy-source-audit.md) — v0.1 complete for R1 Technical-Plan entry  
 > **Roadmap:** [Gu OS Evolution Roadmap](../../../../roadmap/gu-os-evolution-roadmap.md) — R1  
 > **Doctrine:** [Gu OS Principles & Design Doctrine](../../../../principles/gu-os-principles-and-design-doctrine.md)  
 > **Development method:** [Gu OS Agentic Product & Software Development Methodology](../../../../development/agentic-product-software-development-methodology.md)  
-> **Architecture Analysis / ADRs:** [R1 Architecture Analysis](../architecture-analysis.md) — v0.12 complete; ADR-101 was reevaluated and superseded by ADR-106. Relevant accepted cross-cutting directions include ADR-106, ADR-107, ADR-108, ADR-109 Generic Case Relationships / Lineage and ADR-110 Resource Usage & Cost Attribution.  
-> **Intended repo path:** `docs/product/initiatives/relationship-operations/specs/lead-opportunity-lifecycle.md`  
+> **Architecture Analysis / ADRs:** [R1 Architecture Analysis](../../../roadmap-increments/r1-relationship-operations-v1/architecture-analysis.md) — v0.12 complete; ADR-101 was reevaluated and superseded by ADR-106. Relevant accepted cross-cutting directions include ADR-106, ADR-107, ADR-108, ADR-109 Generic Case Relationships / Lineage and ADR-110 Resource Usage & Cost Attribution.  
+> **Intended repo path:** `docs/product/operating-domains/relationship-operations/specs/lead-opportunity-lifecycle.md`  
 > **Artifact role:** Governing contract for Lead Opportunity admission, identity/continuity, durable responsibility, business viability/progression, closure and reactivation. This Spec does not own implementation design, exact schemas, migration order, model/provider selection, API shapes, or storage mechanisms.
 
 ## 1. Summary and decision

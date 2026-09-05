@@ -2,15 +2,15 @@
 
 > **Version:** v0.3  
 > **Status:** Complete for R1 architecture/Technical-Plan entry — v0.2 full audit (2026-08-28) plus targeted drift revalidation (2026-08-31); source-verified legacy contracts and risks; exact adapter/API/schema mechanics remain Technical Design  
-> **Initiative:** R1 — Relationship Operations v1  
+> **Roadmap Increment:** R1 — Relationship Operations v1  
 > **Audit date:** 2026-08-28 (original full audit)  
 > **Targeted drift revalidation:** 2026-08-31 — targeted R1-relevant revalidation, **not** a full new audit; see §23  
 > **Gu OS repository:** `janotowers/10x-builders-agent`, `main`  
 > **Traditional Gu repositories audited (v0.2 baseline):** `UnggaMX/ungga-full`, `gcp/main` at `ae9f107a1d53c8bc25a327bece5701aac192ac49`; `UnggaMX/ungga-landing`, `main` at `77e3dc7fb562f9b249a5d5ec7f8f159e6f2ccdfa`  
 > **Revalidated through (2026-08-31):** `UnggaMX/ungga-full`, `gcp/main` at `c88792530152c0c91a1e74c59e26a416103e68ff`; `UnggaMX/ungga-landing`, `main` at `82cab192bec2f23a0709c57ce06204d21007a179`  
-> **Companion Architecture Analysis:** `docs/product/initiatives/relationship-operations/architecture-analysis.md`  
-> **S1 behavioral contract:** `docs/product/initiatives/relationship-operations/specs/lead-opportunity-lifecycle.md`  
-> **Shared-kernel mapping:** `docs/product/initiatives/relationship-operations/r1-concept-shared-kernel-mapping.md`  
+> **Companion Architecture Analysis:** `docs/product/roadmap-increments/r1-relationship-operations-v1/architecture-analysis.md`  
+> **S1 behavioral contract:** `docs/product/operating-domains/relationship-operations/specs/lead-opportunity-lifecycle.md`  
+> **Shared-kernel mapping:** `docs/product/roadmap-increments/r1-relationship-operations-v1/r1-concept-shared-kernel-mapping.md`  
 > **Relevant ADRs:** ADR-106 Organization-Native Multi-seat Tenancy; ADR-107 Runtime / Conversation Authority; ADR-108 Versioned Organization Policy; ADR-109 Generic Case Relationships / Lineage; ADR-110 Resource Usage & Cost Attribution  
 > **Artifact role:** Record source-verified Traditional Gu production contracts that R1 may depend on during brownfield migration, distinguish those contracts from Gu OS target semantics, and identify legacy risks that must not be inherited as Gu OS invariants.
 
