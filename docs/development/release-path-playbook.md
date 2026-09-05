@@ -120,7 +120,7 @@ There is **no default legacy environment**: one of the two Firestore projects is
 
 The Mongo variables carry no environment segment because **one Atlas cluster serves both Firestore projects**. That is the source topology, not an oversight, and it means a Mongo read is a production read whichever Firestore environment is declared.
 
-Key material is referenced **by path**, never inlined into an environment value; the key files and password files are git-ignored (`gu-os-sl1-reader.*.json`, `*.password.txt`). Because `git clean -fdx` removes ignored files, keep a copy outside the repo. Scope, containment and the retirement condition are recorded in [`../product/initiatives/relationship-operations/sl1-legacy-read-credentials.md`](../product/initiatives/relationship-operations/sl1-legacy-read-credentials.md).
+Key material is referenced **by path**, never inlined into an environment value; the key files and password files are git-ignored (`gu-os-sl1-reader.*.json`, `*.password.txt`). Because `git clean -fdx` removes ignored files, keep a copy outside the repo. Scope, containment and the retirement condition are recorded in [`../product/roadmap-increments/r1-relationship-operations-v1/sl1-legacy-read-credentials.md`](../product/roadmap-increments/r1-relationship-operations-v1/sl1-legacy-read-credentials.md).
 
 ## 5. Four verification layers — do not collapse them
 

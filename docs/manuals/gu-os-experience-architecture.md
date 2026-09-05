@@ -3,7 +3,7 @@
 > **Version:** v0.1  
 > **Status:** APPROVED — canonical target architecture; implementation remains incremental  
 > **Scope:** Cross-domain Gu OS Experience Architecture  
-> **Related:** `docs/principles/gu-os-principles-and-design-doctrine.md` · `docs/manuals/gu-os-cross-channel-continuity-architecture.md` · `docs/talk-to-gu/vision.md` · `docs/product/initiatives/relationship-operations/specs/work-portfolio-supervisory-experience.md`  
+> **Related:** `docs/principles/gu-os-principles-and-design-doctrine.md` · `docs/manuals/gu-os-cross-channel-continuity-architecture.md` · `docs/talk-to-gu/vision.md` · `docs/product/operating-domains/relationship-operations/specs/work-portfolio-supervisory-experience.md`  
 > **Intended repo path:** `docs/manuals/gu-os-experience-architecture.md`
 
 ---

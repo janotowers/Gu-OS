@@ -2,22 +2,32 @@
 
 > **Version:** v0.18  
 > **Status:** Architecture review complete — AC-1 through AC-10 accepted; Generic Case↔Case audit complete; ADR-109 and ADR-110 accepted; minimum Traditional Gu legacy source audit complete for Technical-Plan entry; behavioral Specs S1–S4 approved; S4 owns AC-9 behavioral semantics. Technical Design is complete and approved — see the governing Technical Plan below.  
-> **Initiative:** R1 — Relationship Operations v1  
+> **Roadmap Increment:** R1 — Relationship Operations v1  
 > **Parent product intent:** `docs/product/PRD.md`  
-> **Initiative Brief:** `docs/product/initiatives/relationship-operations/brief.md`  
-> **S1 behavioral contract:** `docs/product/initiatives/relationship-operations/specs/lead-opportunity-lifecycle.md` — v0.3 approved  
-> **S2 behavioral contract:** `docs/product/initiatives/relationship-operations/specs/situational-progression-next-work-human-authority.md` — v0.3 approved  
-> **S3 behavioral contract:** `docs/product/initiatives/relationship-operations/specs/visit-progression-outcome-evidence-reconciliation.md` — v0.2 approved  
-> **S4 behavioral contract:** `docs/product/initiatives/relationship-operations/specs/work-portfolio-supervisory-experience.md` — v0.1 approved  
+> **Framing record (historical):** `docs/product/roadmap-increments/r1-relationship-operations-v1/framing-decision-record.md`  
+> **S1 behavioral contract:** `docs/product/operating-domains/relationship-operations/specs/lead-opportunity-lifecycle.md` — v0.3 approved  
+> **S2 behavioral contract:** `docs/product/operating-domains/relationship-operations/specs/situational-progression-next-work-human-authority.md` — v0.3 approved  
+> **S3 behavioral contract:** `docs/product/operating-domains/relationship-operations/specs/visit-progression-outcome-evidence-reconciliation.md` — v0.2 approved  
+> **S4 behavioral contract:** `docs/product/operating-domains/relationship-operations/specs/work-portfolio-supervisory-experience.md` — v0.1 approved  
 > **Cross-domain Experience source:** `docs/manuals/gu-os-experience-architecture.md` — v0.1 approved  
-> **Shared-kernel mapping:** `docs/product/initiatives/relationship-operations/r1-concept-shared-kernel-mapping.md`  
-> **Legacy source audit:** `docs/product/initiatives/relationship-operations/legacy-source-audit.md` — v0.3 (v0.2 full audit + targeted drift revalidation 2026-08-31) complete for R1 Technical-Plan entry  
-> **Technical Plan:** `docs/product/initiatives/relationship-operations/technical-plan.md` — v1.4 approved; translates AC-1..AC-10 and S1–S4 into implementation design and slices SL-0..SL-13, and does not redefine this analysis  
+> **Shared-kernel mapping:** `docs/product/roadmap-increments/r1-relationship-operations-v1/r1-concept-shared-kernel-mapping.md`  
+> **Legacy source audit:** `docs/product/roadmap-increments/r1-relationship-operations-v1/legacy-source-audit.md` — v0.3 (v0.2 full audit + targeted drift revalidation 2026-08-31) complete for R1 Technical-Plan entry  
+> **Technical Plan:** `docs/product/roadmap-increments/r1-relationship-operations-v1/technical-plan.md` — v1.4 approved; translates AC-1..AC-10 and S1–S4 into implementation design and slices SL-0..SL-13, and does not redefine this analysis  
 > **Roadmap:** `docs/roadmap/gu-os-evolution-roadmap.md` — R1  
 > **Doctrine:** `docs/principles/gu-os-principles-and-design-doctrine.md`  
 > **Development method:** `docs/development/agentic-product-software-development-methodology.md`  
-> **Intended repo path:** `docs/product/initiatives/relationship-operations/architecture-analysis.md`  
+> **Intended repo path:** `docs/product/roadmap-increments/r1-relationship-operations-v1/architecture-analysis.md`  
 > **Artifact role:** Analyze the structural choices required to implement the approved Relationship Operations behavior as a specialization of the shared Gu OS durable-work kernel. This document compares boundaries and recommends decisions; accepted durable choices should be captured in ADRs where warranted, and implementation mechanics belong in a later Technical Plan.
+
+> **Relocation note (documentation-architecture migration).** This analysis is scoped to the R1 Roadmap Increment, and its location under `roadmap-increments/r1-relationship-operations-v1/` reflects that scope. Relocation does **not** limit or supersede any accepted architecture direction recorded here.
+>
+> Where an accepted ADR exists, it durably owns the cross-cutting decision it explicitly packages: **AC-3 → ADR-106**, **AC-4 → ADR-107**, **AC-5 → ADR-108**, **AC-6 → ADR-109**, **AC-10 → ADR-110** (§16).
+>
+> **AC-1 (Operational Access & Eventing) and AC-2 (SOR & Cross-System Effects) have no ADR owner and remain accepted architecture direction; they continue to bind target design and Slice traceability until explicitly superseded or promoted to an accepted ADR** (§16.3).
+>
+> **AC-7 through AC-9** remain accepted architecture directions under their existing ownership and boundary statements; this relocation does not change them.
+>
+> Promotion of AC-1/AC-2 is a separate architecture-governance change; relocating this document neither performs nor implies it.
 
 ---
 
@@ -1779,7 +1789,7 @@ Customer credits, subscriptions, wallets, outcome pricing and billing are a sepa
 
 # 16. ADR status and architecture packaging
 
-AC-1 through AC-10 are accepted at architecture-direction level. Durable cross-cutting decisions are captured in the architecture system rather than duplicated in initiative-local implementation prose.
+AC-1 through AC-10 are accepted at architecture-direction level. Durable cross-cutting decisions are captured in the architecture system rather than duplicated in increment-local implementation prose.
 
 ## 16.1 ADR-106 — Organization-native multi-seat tenancy and legacy identity bridge
 
@@ -1819,7 +1829,7 @@ The legacy source audit confirms the existing takeover/resume and provider-corre
 
 ## 16.3 AC-1 / AC-2 architecture packaging
 
-AC-1 and AC-2 remain accepted architecture direction in this analysis. Exact operational gateway, event-ingestion, idempotency, external-effect and reconciliation mechanics belong to the Technical Plan/Technical Design. If a separate cross-domain ADR is later useful for one of these mechanics, it should capture a durable shared decision rather than restating R1-specific implementation details.
+AC-1 and AC-2 remain accepted architecture direction in this analysis, and are **not superseded by this document's relocation** under `roadmap-increments/r1-relationship-operations-v1/` — they continue to bind until explicitly superseded or promoted to an accepted ADR. Exact operational gateway, event-ingestion, idempotency, external-effect and reconciliation mechanics belong to the Technical Plan/Technical Design. If a separate cross-domain ADR is later useful for one of these mechanics, it should capture a durable shared decision rather than restating R1-specific implementation details.
 
 ## 16.4 ADR-108 — Versioned organization policy
 

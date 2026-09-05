@@ -2,10 +2,10 @@
 
 > **Version:** v0.9  
 > **Status:** Discovery / architecture input — aligned with R1 Architecture Analysis v0.12, completed Generic Case↔Case audit, accepted ADR-109/ADR-110 and completed minimum Traditional Gu legacy source audit; not an ADR or Technical Plan  
-> **Initiative:** R1 — Relationship Operations v1  
-> **Companion Brief:** `docs/product/initiatives/relationship-operations/brief.md` — v0.9 approved for Feature / Business Spec and Architecture Analysis  
+> **Roadmap Increment:** R1 — Relationship Operations v1  
+> **Framing record (historical):** `docs/product/roadmap-increments/r1-relationship-operations-v1/framing-decision-record.md` — v0.9 approved for Feature / Business Spec and Architecture Analysis  
 > **Repository reviewed:** `janotowers/10x-builders-agent`, `main`  
-> **Legacy source audit:** `docs/product/initiatives/relationship-operations/legacy-source-audit.md` — v0.1 complete for R1 Technical-Plan entry  
+> **Legacy source audit:** `docs/product/roadmap-increments/r1-relationship-operations-v1/legacy-source-audit.md` — v0.1 complete for R1 Technical-Plan entry  
 > **Purpose:** Map the approved R1 product concepts to the Gu OS durable-work primitives that already exist, identify genuine gaps, and prevent Relationship Operations from becoming a domain-specific mini-runtime.
 
 ## 1. Decision this mapping supports

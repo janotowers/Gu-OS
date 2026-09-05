@@ -33,13 +33,13 @@ Before copying anything, be clear which truth the new document would own (Method
 
 **Place artifacts by the repository's documentation architecture, and connect them by links — not by adjacency.** Physical colocation of Specs, Technical Plans and Slice Plans is **not** a methodology requirement. It is often convenient, but artifacts with different lifetimes may legitimately live in different places: an enduring behavior Spec and an increment-specific plan are not obliged to share a directory.
 
-**Paths in this README are current Gu OS examples**, not universal methodology structure, and a directory name is **not** evidence of an artifact's semantic type. `docs/product/initiatives/relationship-operations/` currently holds artifacts for the Relationship Operations **Operating Domain** and the `R1` **Roadmap Increment** inside it — not a bounded Initiative. That path predates the clarified taxonomy and is documentation debt pending reconciliation; the method requires no particular filesystem hierarchy.
+**Paths in this README are current Gu OS examples**, not universal methodology structure, and a directory name is **not** evidence of an artifact's semantic type. Gu OS keeps durable Relationship Operations behavior Specs under `docs/product/operating-domains/relationship-operations/specs/` and R1 delivery, discovery and provenance artifacts under `docs/product/roadmap-increments/r1-relationship-operations-v1/`. **That is a Gu OS choice**: the method requires no particular filesystem hierarchy, and no product is obliged to adopt `operating-domains/` or `roadmap-increments/`.
 
 ## How to use the Feature / Business Spec template
 
 1. Copy `feature-business-spec-template.md` to wherever the repository's current documentation architecture places behavior contracts, and **link it to its governing and related artifacts**. Physical colocation with plans is *not* a methodology requirement.
 2. Rename it for the capability. Current Gu OS example path — an example, not prescribed structure:
-   `docs/product/initiatives/relationship-operations/specs/lead-opportunity-lifecycle.md`.
+   `docs/product/operating-domains/relationship-operations/specs/lead-opportunity-lifecycle.md`.
 3. Keep the filename normally unversioned. Use the document `Version` field plus Git history for routine evolution.
 4. Remove sections that are genuinely irrelevant rather than filling them with boilerplate.
 5. Add detail in proportion to business consequence, ambiguity, model judgment, authority, security, and failure cost.
@@ -49,7 +49,7 @@ Before copying anything, be clear which truth the new document would own (Method
 ## How to use the Slice Plan template
 
 1. Copy `slice-plan-template.md` in as `slice-plan.md`, placed according to the repository's current documentation architecture, and **link it to the artifacts that govern it**. Current Gu OS example path — an example, not prescribed structure:
-   `docs/product/initiatives/relationship-operations/slice-plan.md` — which serves the `R1` Roadmap Increment.
+   `docs/product/roadmap-increments/r1-relationship-operations-v1/slice-plan.md` — which serves the `R1` Roadmap Increment.
 2. **Keep one Slice Plan per Roadmap Increment** (or per bounded Initiative where one is genuinely the coordinated delivery unit). Do **not** create one per Spec, per ADR, per Architecture Analysis or per Technical Plan: one Slice is often governed by several of those at once, and dependencies, priority, the READY Horizon and Cycle planning need a single integrated view.
 3. Fill Slice contracts using rolling wave: the near-term Slices in full, later Slices at stub level. Detailed Tasks are never written here — the coding agent derives them at execution time.
 4. Maintain the **READY Horizon** (Methodology §10.5): keep enough elaborated READY work ahead of execution — roughly one to two Cycles of plausible capacity as an operating default — so work does not stall between Slices or Cycles. The horizon is **capacity-based, not a Slice count**, and replenishing it is the development system's proactive job, not a question the human should have to raise.
