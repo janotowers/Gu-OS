@@ -16,16 +16,26 @@ import type { DbClient } from "../client";
  *                            │  └──fail──► failed
  *                            └──lease expires──► reclaimable
  *
- * Three rules shape it:
+ * Four rules shape it:
  *
  *  1. **The insert is the dedup check.** `UNIQUE (organization_id, dedup_key)`
  *     rejects a redelivery, so there is no read-then-write race to lose.
  *  2. **A claim is conditional.** Every transition is an UPDATE with the
  *     expected prior state in its WHERE clause, so two racing workers produce
  *     one winner and one no-op rather than two processings.
- *  3. **Only `completed` carries a decision.** An unsettled row means "not
- *     decided yet" — never "decided not to admit". Nothing here invents an
- *     outcome for a row that has not settled.
+ *  3. **A claim is fenced.** Taking a claim bumps `claim_epoch`, and every write
+ *     a claim owner makes carries the epoch it was handed. A worker that stalls
+ *     past its lease cannot write anything once someone else has reclaimed: its
+ *     UPDATE matches zero rows. Ownership is a durable condition, never an
+ *     in-memory belief — the same compare-and-swap shape as
+ *     `operational_cases.version`.
+ *  4. **Only `completed` carries a settled decision.** An unsettled row means
+ *     "not decided yet" — never "decided not to admit".
+ *
+ * Every fenced write returns whether it actually applied, because "the row was
+ * not mine any more" and "the write succeeded" must never look alike to a
+ * caller: a silent no-op reported as success is how a stale worker convinces
+ * itself it finished.
  */
 
 /** Postgres unique-violation. A duplicate is an expected outcome here, not an error. */
@@ -73,10 +83,11 @@ export async function recordSourceEvent(
       external_lead_ref: input.externalLeadRef ?? null,
       payload_jsonb: input.payload ?? {},
       provenance_jsonb: input.provenance ?? {},
-      // Explicit rather than relying on the column default: `pending` is the
-      // first state of the processing machine, and the state machine should be
-      // legible at the point that starts it.
+      // Explicit rather than relying on the column defaults: `pending` at epoch
+      // 0 is the first state of the processing machine, and the state machine
+      // should be legible at the point that starts it.
       status: "pending",
+      claim_epoch: 0,
     })
     .select("*")
     .single();
@@ -157,12 +168,27 @@ export function isClaimExpired(
   return new Date(event.claim_expires_at).getTime() <= now.getTime();
 }
 
-type ClaimPatch = Record<string, unknown>;
+/**
+ * A held claim, carrying the epoch every subsequent write must present.
+ *
+ * The epoch — not the worker name — is the fence. Two attempts by the same
+ * worker id are still distinct owners, which matters because a caller may pass
+ * a stable `workerId` to make its claims attributable.
+ */
+export interface SourceEventClaim {
+  event: SourceEvent;
+  epoch: number;
+}
 
-function claimPatch(claimedBy: string, leaseSeconds: number): ClaimPatch {
+function claimPatch(
+  claimedBy: string,
+  leaseSeconds: number,
+  nextEpoch: number
+): Record<string, unknown> {
   const now = new Date();
   return {
     status: "processing",
+    claim_epoch: nextEpoch,
     claimed_at: now.toISOString(),
     claimed_by: claimedBy,
     claim_expires_at: new Date(
@@ -175,8 +201,9 @@ function claimPatch(claimedBy: string, leaseSeconds: number): ClaimPatch {
 /**
  * Takes the lease on a `pending` event.
  *
- * Conditional on the row still being `pending`, so two workers racing for the
- * same event produce one winner and one `null` rather than two processings.
+ * Conditional on the row still being `pending` AND on the epoch the caller
+ * observed, so two workers racing from the same observation produce one winner
+ * and one `null` rather than two processings.
  */
 export async function claimSourceEvent(
   db: DbClient,
@@ -184,21 +211,28 @@ export async function claimSourceEvent(
     organizationId: string;
     sourceEventId: string;
     claimedBy: string;
+    observedEpoch: number;
     leaseSeconds?: number;
   }
-): Promise<SourceEvent | null> {
+): Promise<SourceEventClaim | null> {
+  const nextEpoch = params.observedEpoch + 1;
   const { data, error } = await db
     .from("source_events")
     .update(
-      claimPatch(params.claimedBy, params.leaseSeconds ?? SOURCE_EVENT_LEASE_SECONDS)
+      claimPatch(
+        params.claimedBy,
+        params.leaseSeconds ?? SOURCE_EVENT_LEASE_SECONDS,
+        nextEpoch
+      )
     )
     .eq("id", params.sourceEventId)
     .eq("organization_id", params.organizationId)
     .eq("status", "pending")
+    .eq("claim_epoch", params.observedEpoch)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return (data as SourceEvent) ?? null;
+  return data ? { event: data as SourceEvent, epoch: nextEpoch } : null;
 }
 
 /**
@@ -207,8 +241,9 @@ export async function claimSourceEvent(
  *
  * Mirrors the work-plane stale-claim recovery (00069). A dead worker must not
  * poison a `dedup_key` forever, and reclaiming is how a retry becomes possible
- * without ever bypassing the single-owner rule — each UPDATE still carries the
- * expected prior state, so exactly one reclaimer wins.
+ * without ever bypassing the single-owner rule — each UPDATE carries the
+ * expected prior state and the observed epoch, so exactly one reclaimer wins
+ * and the previous owner is fenced out by the bump.
  *
  * Two narrow conditional updates rather than one disjunction: each is a plain
  * equality/comparison filter, which keeps the behaviour identical on PostgREST
@@ -223,76 +258,142 @@ export async function reclaimSourceEvent(
     organizationId: string;
     sourceEventId: string;
     claimedBy: string;
+    observedEpoch: number;
     leaseSeconds?: number;
   }
-): Promise<SourceEvent | null> {
+): Promise<SourceEventClaim | null> {
   const leaseSeconds = params.leaseSeconds ?? SOURCE_EVENT_LEASE_SECONDS;
+  const nextEpoch = params.observedEpoch + 1;
   const nowIso = new Date().toISOString();
+  const patch = claimPatch(params.claimedBy, leaseSeconds, nextEpoch);
 
   // (a) A processing row whose lease has run out.
   const expired = await db
     .from("source_events")
-    .update(claimPatch(params.claimedBy, leaseSeconds))
+    .update(patch)
     .eq("id", params.sourceEventId)
     .eq("organization_id", params.organizationId)
     .eq("status", "processing")
+    .eq("claim_epoch", params.observedEpoch)
     .lte("claim_expires_at", nowIso)
     .select("*")
     .maybeSingle();
   if (expired.error) throw expired.error;
-  if (expired.data) return expired.data as SourceEvent;
+  if (expired.data) {
+    return { event: expired.data as SourceEvent, epoch: nextEpoch };
+  }
 
   // (b) A previously failed attempt.
   const failed = await db
     .from("source_events")
-    .update(claimPatch(params.claimedBy, leaseSeconds))
+    .update(patch)
     .eq("id", params.sourceEventId)
     .eq("organization_id", params.organizationId)
     .eq("status", "failed")
+    .eq("claim_epoch", params.observedEpoch)
     .select("*")
     .maybeSingle();
   if (failed.error) throw failed.error;
-  return (failed.data as SourceEvent) ?? null;
+  return failed.data
+    ? { event: failed.data as SourceEvent, epoch: nextEpoch }
+    : null;
+}
+
+/** Common shape of every fenced write: did I still own the claim? */
+async function fencedUpdate(
+  db: DbClient,
+  params: {
+    organizationId: string;
+    sourceEventId: string;
+    epoch: number;
+    patch: Record<string, unknown>;
+  }
+): Promise<boolean> {
+  const { data, error } = await db
+    .from("source_events")
+    .update(params.patch)
+    .eq("id", params.sourceEventId)
+    .eq("organization_id", params.organizationId)
+    // `processing` as well as the epoch: a settled event must not be revertible
+    // by anyone, and an epoch alone would still allow a completed row to be
+    // rewritten by whoever last held the claim.
+    .eq("status", "processing")
+    .eq("claim_epoch", params.epoch)
+    .select("id");
+  if (error) throw error;
+  return Array.isArray(data) && data.length === 1;
 }
 
 /**
- * Records that this event materialised a Case, BEFORE the event is settled.
+ * Records the decision BEFORE any irreversible materialisation.
  *
- * The ordering is the recovery guarantee: a process that dies between Case
- * creation and settlement leaves a durable pointer, so the retry reconciles to
- * the existing Case rather than creating a second Opportunity (S1 §8.16).
+ * This ordering is what keeps the effective policy version attributable
+ * (ADR-108, SA-2.1). If the Case were created first and the decision recorded
+ * afterwards, a crash in between would leave an Opportunity whose governing
+ * policy version is unrecoverable, and a retry could only guess it or
+ * substitute whatever policy is effective at recovery time — rewriting the
+ * historical authority context of a consequential decision.
+ *
+ * Written while the row is still `processing`: it is a decision, not a
+ * settlement. Settling additionally requires that everything the decision owes
+ * has actually been written.
+ */
+export async function recordSourceEventDecision(
+  db: DbClient,
+  params: {
+    organizationId: string;
+    sourceEventId: string;
+    epoch: number;
+    decision: Record<string, unknown>;
+  }
+): Promise<boolean> {
+  return fencedUpdate(db, {
+    organizationId: params.organizationId,
+    sourceEventId: params.sourceEventId,
+    epoch: params.epoch,
+    patch: { decision_jsonb: params.decision },
+  });
+}
+
+/**
+ * Records that this event materialised a Case, before the event is settled.
+ *
+ * Fenced: a worker that lost its lease cannot repoint a link the new owner
+ * already established.
  */
 export async function linkAdmittedCase(
   db: DbClient,
   params: {
     organizationId: string;
     sourceEventId: string;
+    epoch: number;
     caseId: string;
   }
-): Promise<void> {
-  const { error } = await db
-    .from("source_events")
-    .update({ admitted_case_id: params.caseId })
-    .eq("id", params.sourceEventId)
-    .eq("organization_id", params.organizationId);
-  if (error) throw error;
+): Promise<boolean> {
+  return fencedUpdate(db, {
+    organizationId: params.organizationId,
+    sourceEventId: params.sourceEventId,
+    epoch: params.epoch,
+    patch: { admitted_case_id: params.caseId },
+  });
 }
 
 /**
- * Records the settled disposition on the inbox row and marks it complete.
+ * Marks the event settled — the answer every future duplicate receives.
  *
- * One statement, so an event can never be `completed` without the decision that
- * a redelivery will be answered with (AC-05).
+ * Fenced and `processing`-only, so a completed event can never be re-settled
+ * and only the current owner may settle at all.
  */
 export async function settleSourceEvent(
   db: DbClient,
   params: {
     organizationId: string;
     sourceEventId: string;
+    epoch: number;
     decision: Record<string, unknown>;
     admittedCaseId?: string | null;
   }
-): Promise<void> {
+): Promise<boolean> {
   const patch: Record<string, unknown> = {
     status: "completed",
     completed_at: new Date().toISOString(),
@@ -303,42 +404,49 @@ export async function settleSourceEvent(
   if (params.admittedCaseId !== undefined) {
     patch.admitted_case_id = params.admittedCaseId;
   }
-  const { error } = await db
-    .from("source_events")
-    .update(patch)
-    .eq("id", params.sourceEventId)
-    .eq("organization_id", params.organizationId);
-  if (error) throw error;
+  return fencedUpdate(db, {
+    organizationId: params.organizationId,
+    sourceEventId: params.sourceEventId,
+    epoch: params.epoch,
+    patch,
+  });
 }
 
+/**
+ * Releases a failed attempt so it can be reclaimed.
+ *
+ * Fenced and `processing`-only, which is the point: a stale worker whose lease
+ * expired must not be able to mark the NEW owner's row failed, and a completed
+ * event must not be revertible to failed at all.
+ */
 export async function failSourceEvent(
   db: DbClient,
   params: {
     organizationId: string;
     sourceEventId: string;
+    epoch: number;
     error: string;
   }
-): Promise<void> {
-  const { error } = await db
-    .from("source_events")
-    .update({
+): Promise<boolean> {
+  return fencedUpdate(db, {
+    organizationId: params.organizationId,
+    sourceEventId: params.sourceEventId,
+    epoch: params.epoch,
+    patch: {
       status: "failed",
       processing_error: params.error.slice(0, 500),
       claim_expires_at: null,
-    })
-    .eq("id", params.sourceEventId)
-    .eq("organization_id", params.organizationId);
-  if (error) throw error;
+    },
+  });
 }
 
 /**
- * Finds a Case this source event already materialised.
+ * Finds the Case this source event materialised.
  *
- * `admitted_case_id` covers everything after it is written; this covers the
- * narrow window between the `operational_cases` INSERT and that write, because
- * the executor stamps the source event id into the Case context. Two
- * independent ways to find an existing Case is what makes "never create a
- * second Opportunity" hold across an arbitrary crash point.
+ * `admitted_case_id` covers everything after the link lands; this covers the
+ * window between the `operational_cases` INSERT and that write, and is also how
+ * a worker that loses the materialisation race — its INSERT rejected by the
+ * unique index — finds the winner's Case.
  */
 export async function findCaseMaterialisedBySourceEvent(
   db: DbClient,

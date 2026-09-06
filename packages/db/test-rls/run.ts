@@ -35,6 +35,7 @@ const FORWARD_DIR = path.resolve(__dirname, "..", "forward", "supabase", "migrat
 const RLS_VIOLATION = "42501";
 const FK_VIOLATION = "23503";
 const UNIQUE_VIOLATION = "23505";
+const CHECK_VIOLATION = "23514";
 /** PL/pgSQL RAISE EXCEPTION without an explicit SQLSTATE. */
 const RAISE_EXCEPTION = "P0001";
 
@@ -183,6 +184,8 @@ interface Fixture {
    * Case whose cascade is empty to actually test the policy.
    */
   legacyCaseNoFacts: string;
+  /** Seeded by the SL-2 migration; needed by the materialisation-identity checks. */
+  leadOpportunityTypeId: string;
 }
 
 async function seed(client: Client): Promise<Fixture> {
@@ -274,11 +277,19 @@ async function seed(client: Client): Promise<Fixture> {
     [orgA, orgCaseA, orgCaseA2]
   );
 
+  const leadOpportunityTypeId = (
+    await client.query<{ id: string }>(
+      `select id from public.operational_case_types
+        where case_type = 'lead_opportunity' and user_id is null`
+    )
+  ).rows[0].id;
+
   return {
     orgA,
     orgB,
     caseType,
     caseTypeId,
+    leadOpportunityTypeId,
     orgCaseA,
     orgCaseA2,
     orgCaseB,
@@ -639,138 +650,302 @@ async function main(): Promise<void> {
     });
 
     // ---------------------------------------------------------------
-    // SL-2 processing invariants that only a real PostgreSQL can prove.
+    // SL-2 claim fencing — PostgreSQL semantics the FakeDb cannot prove.
     //
-    // The module selftests exercise the state machine through the real query
-    // helpers against an in-memory client, which is faithful for sequential
-    // behaviour but single-threaded: two conditional UPDATEs racing for one row
-    // is a PostgreSQL semantic, and simulating it would only prove the fake
-    // agrees with itself. Same reason this suite exists for RLS.
+    // The module selftests drive the real executor against an in-memory client,
+    // which is faithful for sequential behaviour but single-threaded: two
+    // conditional UPDATEs racing for one row, and a UNIQUE index rejecting the
+    // loser of a concurrent INSERT, are database properties. Simulating them
+    // would only prove the fake agrees with itself — the same reason this suite
+    // exists for RLS.
+    //
+    // Each statement below is the exact conditional write the query helpers
+    // issue, so what passes here is what the application does.
     // ---------------------------------------------------------------
-    console.log("\nSL-2 source_events — claim, lease and containment");
+    console.log("\nSL-2 source_events — claim fencing and lease ownership");
 
     const newEvent = async (organization: string, key: string) =>
       (
         await client.query<{ id: string }>(
           `insert into public.source_events
-             (organization_id, source_system, event_kind, dedup_key)
-           values ($1, 'traditional_gu', 'inbound_prospect_message', $2)
+             (organization_id, source_system, event_kind, dedup_key, status, claim_epoch)
+           values ($1, 'traditional_gu', 'inbound_prospect_message', $2, 'pending', 0)
            returning id`,
           [organization, key]
         )
       ).rows[0].id;
 
-    /** The exact conditional UPDATE claimSourceEvent issues. */
-    const claim = (eventId: string, worker: string, leaseSeconds: number) =>
+    /** claimSourceEvent: pending + observed epoch. */
+    const claim = (
+      eventId: string,
+      worker: string,
+      observedEpoch: number,
+      leaseSeconds: number
+    ) =>
       client.query(
         `update public.source_events
             set status = 'processing',
+                claim_epoch = $3 + 1,
                 claimed_at = now(),
                 claimed_by = $2,
-                claim_expires_at = now() + make_interval(secs => $3)
+                claim_expires_at = now() + make_interval(secs => $4)
           where id = $1
             and status = 'pending'
+            and claim_epoch = $3
+          returning claim_epoch`,
+        [eventId, worker, observedEpoch, leaseSeconds]
+      );
+
+    /** reclaimSourceEvent, expired-lease branch. */
+    const reclaim = (
+      eventId: string,
+      worker: string,
+      observedEpoch: number,
+      leaseSeconds: number
+    ) =>
+      client.query(
+        `update public.source_events
+            set status = 'processing',
+                claim_epoch = $3 + 1,
+                claimed_at = now(),
+                claimed_by = $2,
+                claim_expires_at = now() + make_interval(secs => $4)
+          where id = $1
+            and status = 'processing'
+            and claim_epoch = $3
+            and claim_expires_at <= now()
+          returning claim_epoch`,
+        [eventId, worker, observedEpoch, leaseSeconds]
+      );
+
+    /** Every fenced write: epoch + status = 'processing'. */
+    const fenced = (eventId: string, epoch: number, assignment: string) =>
+      client.query(
+        `update public.source_events
+            set ${assignment}
+          where id = $1
+            and status = 'processing'
+            and claim_epoch = $2
           returning id`,
-        [eventId, worker, leaseSeconds]
+        [eventId, epoch]
       );
 
     await t("two workers racing for one pending event produce one winner", async () => {
-      const eventId = await newEvent(f.orgA, "race:one");
-      // Both statements target the same row with the same precondition. The
-      // second sees status = 'processing' and updates nothing.
+      const eventId = await newEvent(f.orgA, "fence:race");
       const [first, second] = await Promise.all([
-        claim(eventId, "worker-a", 300),
-        claim(eventId, "worker-b", 300),
+        claim(eventId, "worker-a", 0, 300),
+        claim(eventId, "worker-b", 0, 300),
       ]);
       assert.equal(
         (first.rowCount ?? 0) + (second.rowCount ?? 0),
         1,
         "exactly one claim may win"
       );
-      const { rows } = await client.query<{ claimed_by: string }>(
-        "select claimed_by from public.source_events where id = $1",
+      const { rows } = await client.query<{ claim_epoch: number }>(
+        "select claim_epoch from public.source_events where id = $1",
         [eventId]
       );
-      assert.ok(["worker-a", "worker-b"].includes(rows[0].claimed_by));
+      assert.equal(rows[0].claim_epoch, 1, "the fence advanced exactly once");
     });
 
-    await t("a live claim cannot be stolen by a reclaim", async () => {
-      const eventId = await newEvent(f.orgA, "race:live");
-      await claim(eventId, "worker-a", 300);
-      // reclaimSourceEvent's expired-lease branch.
-      const stolen = await client.query(
-        `update public.source_events
-            set claimed_by = 'worker-b'
-          where id = $1
-            and status = 'processing'
-            and claim_expires_at <= now()`,
-        [eventId]
-      );
+    await t("a live claim cannot be reclaimed", async () => {
+      const eventId = await newEvent(f.orgA, "fence:live");
+      await claim(eventId, "worker-a", 0, 300);
+      const stolen = await reclaim(eventId, "worker-b", 1, 300);
       assert.equal(stolen.rowCount, 0, "a live lease is not reclaimable");
     });
 
-    await t("an expired claim is reclaimable, so a dead worker cannot poison the key", async () => {
-      const eventId = await newEvent(f.orgA, "race:expired");
-      // A zero-second lease is already expired when it is taken.
-      await claim(eventId, "worker-a", 0);
-      const reclaimed = await client.query(
-        `update public.source_events
-            set claimed_by = 'worker-b',
-                claim_expires_at = now() + make_interval(secs => 300)
-          where id = $1
-            and status = 'processing'
-            and claim_expires_at <= now()
-          returning id`,
+    await t("an expired claim is reclaimable and bumps the fence", async () => {
+      const eventId = await newEvent(f.orgA, "fence:expired");
+      await claim(eventId, "worker-a", 0, 0);
+      const reclaimed = await reclaim(eventId, "worker-b", 1, 300);
+      assert.equal(reclaimed.rowCount, 1);
+      assert.equal(reclaimed.rows[0].claim_epoch, 2);
+    });
+
+    /**
+     * The blocker: a stale owner resuming after losing the lease. Each of its
+     * durable writes must match zero rows.
+     */
+    const staleOwnerFixture = async (key: string) => {
+      const eventId = await newEvent(f.orgA, key);
+      await claim(eventId, "worker-a", 0, 0); // A owns epoch 1, already expired
+      await reclaim(eventId, "worker-b", 1, 300); // B owns epoch 2
+      return eventId;
+    };
+
+    await t("a stale owner cannot record a decision after reclaim", async () => {
+      const eventId = await staleOwnerFixture("fence:stale-decide");
+      const stale = await fenced(
+        eventId,
+        1,
+        `decision_jsonb = '{"disposition":"not_admitted"}'::jsonb`
+      );
+      assert.equal(stale.rowCount, 0);
+      const { rows } = await client.query<{ decision_jsonb: unknown }>(
+        "select decision_jsonb from public.source_events where id = $1",
         [eventId]
       );
-      assert.equal(reclaimed.rowCount, 1);
+      assert.equal(rows[0].decision_jsonb, null);
+    });
+
+    await t("a stale owner cannot link a Case after reclaim", async () => {
+      const eventId = await staleOwnerFixture("fence:stale-link");
+      const stale = await fenced(eventId, 1, `admitted_case_id = '${f.orgCaseA}'`);
+      assert.equal(stale.rowCount, 0);
+      const { rows } = await client.query<{ admitted_case_id: string | null }>(
+        "select admitted_case_id from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].admitted_case_id, null);
+    });
+
+    await t("a stale owner cannot settle after reclaim", async () => {
+      const eventId = await staleOwnerFixture("fence:stale-settle");
+      const stale = await fenced(
+        eventId,
+        1,
+        `status = 'completed', completed_at = now(),
+         decision_jsonb = '{"disposition":"not_admitted"}'::jsonb`
+      );
+      assert.equal(stale.rowCount, 0);
+      const { rows } = await client.query<{ status: string }>(
+        "select status from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].status, "processing", "B still owns a live claim");
+    });
+
+    await t("a stale owner cannot fail the new owner's row", async () => {
+      const eventId = await staleOwnerFixture("fence:stale-fail");
+      const stale = await fenced(
+        eventId,
+        1,
+        `status = 'failed', processing_error = 'stale worker'`
+      );
+      assert.equal(stale.rowCount, 0);
+      const { rows } = await client.query<{
+        status: string;
+        processing_error: string | null;
+      }>(
+        "select status, processing_error from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].status, "processing");
+      assert.equal(rows[0].processing_error, null);
+    });
+
+    await t("the new owner completes normally after the stale attempts", async () => {
+      const eventId = await staleOwnerFixture("fence:new-owner-wins");
+      await fenced(eventId, 1, `status = 'failed'`); // stale, no-op
+      const settled = await fenced(
+        eventId,
+        2,
+        `status = 'completed', completed_at = now(),
+         decision_jsonb = '{"disposition":"not_admitted"}'::jsonb`
+      );
+      assert.equal(settled.rowCount, 1, "the current owner's write applies");
+    });
+
+    await t("a completed event cannot be reverted by any worker", async () => {
+      const eventId = await staleOwnerFixture("fence:no-revert");
+      await fenced(
+        eventId,
+        2,
+        `status = 'completed', completed_at = now(),
+         decision_jsonb = '{"disposition":"not_admitted"}'::jsonb`
+      );
+      // Neither the stale epoch nor the settling epoch may reopen it: every
+      // fenced write also requires status = 'processing'.
+      for (const epoch of [1, 2]) {
+        const revert = await fenced(eventId, epoch, `status = 'failed'`);
+        assert.equal(revert.rowCount, 0, `epoch ${epoch} must not revert it`);
+      }
+      const { rows } = await client.query<{ status: string }>(
+        "select status from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].status, "completed");
+    });
+
+    await t("a completed event must carry its decision", async () => {
+      // Structural, so it holds for every service-role writer — including the
+      // C1 ingestion path that will write this same inbox later.
+      const eventId = await newEvent(f.orgA, "fence:settled-shape");
+      const code = await errorCode(() =>
+        client.query(
+          "update public.source_events set status = 'completed', completed_at = now() where id = $1",
+          [eventId]
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
+    });
+
+    await t("a completed ADMITTED event must carry its Case", async () => {
+      const eventId = await newEvent(f.orgA, "fence:settled-admitted");
+      const code = await errorCode(() =>
+        client.query(
+          `update public.source_events
+              set status = 'completed',
+                  completed_at = now(),
+                  decision_jsonb = '{"disposition":"admitted"}'::jsonb
+            where id = $1`,
+          [eventId]
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
+    });
+
+    await t("two workers cannot materialise two Cases for one source event", async () => {
+      // The fence stops a stale worker writing to the inbox, but not one that
+      // is already past it from INSERTing a Case. This index is what makes
+      // "one source event admits at most one Opportunity" structural.
+      const eventId = await newEvent(f.orgA, "fence:one-case");
+      const insertCase = () =>
+        client.query(
+          `insert into public.operational_cases
+             (user_id, case_type, case_type_id, organization_id, context_jsonb)
+           values ($1, 'lead_opportunity', $2, $3, jsonb_build_object('source_event_id', $4::text))`,
+          [f.creatorA, f.leadOpportunityTypeId, f.orgA, eventId]
+        );
+      await insertCase();
+      const code = await errorCode(insertCase);
+      assert.equal(code, UNIQUE_VIOLATION);
+
+      const { rowCount } = await client.query(
+        `select id from public.operational_cases
+          where organization_id = $1
+            and context_jsonb ->> 'source_event_id' = $2`,
+        [f.orgA, eventId]
+      );
+      assert.equal(rowCount, 1, "exactly one Opportunity survives");
+    });
+
+    await t("a different source event may still materialise its own Case", async () => {
+      const other = await newEvent(f.orgA, "fence:other-case");
+      await client.query(
+        `insert into public.operational_cases
+           (user_id, case_type, case_type_id, organization_id, context_jsonb)
+         values ($1, 'lead_opportunity', $2, $3, jsonb_build_object('source_event_id', $4::text))`,
+        [f.creatorA, f.leadOpportunityTypeId, f.orgA, other]
+      );
+      const { rowCount } = await client.query(
+        `select id from public.operational_cases
+          where organization_id = $1 and context_jsonb ? 'source_event_id'`,
+        [f.orgA]
+      );
+      assert.equal(rowCount, 2, "the index constrains the identity, not the type");
     });
 
     await t("a source event cannot point at another Organization's Case", async () => {
-      const eventId = await newEvent(f.orgA, "containment:cross-tenant");
+      const eventId = await newEvent(f.orgA, "fence:containment");
+      await claim(eventId, "worker-a", 0, 300);
       const code = await errorCode(() =>
-        client.query(
-          "update public.source_events set admitted_case_id = $2 where id = $1",
-          [eventId, f.orgCaseB]
-        )
+        fenced(eventId, 1, `admitted_case_id = '${f.orgCaseB}'`)
       );
       // Composite FK (admitted_case_id, organization_id), same shape as
       // case_relationships: a cross-tenant pointer is structurally impossible.
       assert.equal(code, FK_VIOLATION);
-    });
-
-    await t("a source event may point at its own Organization's Case", async () => {
-      const eventId = await newEvent(f.orgA, "containment:same-tenant");
-      await client.query(
-        "update public.source_events set admitted_case_id = $2 where id = $1",
-        [eventId, f.orgCaseA]
-      );
-      const { rows } = await client.query<{ admitted_case_id: string }>(
-        "select admitted_case_id from public.source_events where id = $1",
-        [eventId]
-      );
-      assert.equal(rows[0].admitted_case_id, f.orgCaseA);
-    });
-
-    await t("the reconciliation lookup finds a Case by its source event", async () => {
-      await client.query(
-        `update public.operational_cases
-            set context_jsonb = jsonb_build_object('source_event_id', 'evt-recon')
-          where id = $1`,
-        [f.orgCaseA]
-      );
-      const { rows } = await client.query<{ id: string }>(
-        `select id from public.operational_cases
-          where organization_id = $1
-            and context_jsonb ->> 'source_event_id' = 'evt-recon'`,
-        [f.orgA]
-      );
-      assert.equal(rows.length, 1);
-      assert.equal(rows[0].id, f.orgCaseA);
-      await client.query(
-        "update public.operational_cases set context_jsonb = '{}'::jsonb where id = $1",
-        [f.orgCaseA]
-      );
     });
 
     // ---------------------------------------------------------------

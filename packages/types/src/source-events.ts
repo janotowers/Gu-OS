@@ -52,6 +52,12 @@ export interface SourceEvent {
   payload_jsonb: Record<string, unknown>;
   provenance_jsonb: Record<string, unknown>;
   status: SourceEventStatus;
+  /**
+   * Fencing token. Bumped by every successful claim or reclaim; every write a
+   * claim owner makes is conditional on the epoch it was handed, so a worker
+   * that stalls past its lease is locked out the moment someone reclaims.
+   */
+  claim_epoch: number;
   claimed_at: string | null;
   claimed_by: string | null;
   claim_expires_at: string | null;

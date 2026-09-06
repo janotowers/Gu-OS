@@ -18,9 +18,11 @@
  *   6. interpretation   — only now does a model run
  *   7. exclusion        — a policy-excluded category is not auto-admitted,
  *                          however confident the judgment (SA-2.6)
- *   8. materialisation  — exactly one Opportunity Case, with provenance-bearing
+ *   8. **record the decision** — durably, before anything irreversible
+ *   9. materialisation  — exactly one Opportunity Case, with provenance-bearing
  *                          facts; nothing admitted means no Case at all
  *                          (SA-2.2, EC-01)
+ *  10. settlement       — only once everything the decision owes exists
  *
  * Steps 4, 5 and 7 are placed *around* step 6 deliberately. A model that ran
  * first, or whose output was consulted before the bounds, could argue its way
@@ -32,22 +34,40 @@
  * A duplicate delivery must never invent an outcome. The inbox row's processing
  * state — not merely its existence — decides what a duplicate gets:
  *
- *   * `completed`  — the settled decision is returned, and when it admitted, the
- *                    canonical Case id comes back with it. Same event, same
- *                    answer, forever.
+ *   * `completed`  — the settled decision comes back, and when it admitted, the
+ *                    canonical Case id with it. Same event, same answer, forever.
  *   * `processing` with a live claim — another worker owns it. The duplicate is
- *                    reported as **in flight**. It does not decide, does not
- *                    create, and does not fabricate `not_admitted`: an unsettled
- *                    event is "not decided yet", never "decided not to admit".
- *   * `processing` with an expired claim, or `failed`, or `pending` — abandoned.
- *                    The duplicate reclaims the lease and reconciles: if a Case
- *                    was already materialised it converges on that Case rather
- *                    than creating a second Opportunity, reconstructing the
- *                    decision from the durable admission fact already written.
+ *                    reported as **in flight**: it does not decide, does not
+ *                    create, and does not fabricate `not_admitted`, because an
+ *                    unsettled event is "not decided yet".
+ *   * `processing` with an expired claim, or `failed`, or `pending` — abandoned,
+ *                    so the duplicate reclaims and resumes.
  *
- * Materialisation therefore writes in a recovery-safe order: create the Case,
- * immediately link it to the inbox row, then the facts, then settle. Every crash
- * point leaves either no Case or a findable one.
+ * ## Why the decision is written before the Case (step 8)
+ *
+ * Creating the Case first and recording why afterwards leaves a window where an
+ * Opportunity exists whose governing policy version is unrecoverable. A retry
+ * could then only guess it, or substitute the policy effective at recovery time
+ * — rewriting the historical authority context of a consequential decision,
+ * which ADR-108 and SA-2.1 forbid. So the decision, with its effective policy
+ * attribution, is durable **before** any irreversible write. Recovery replays
+ * that decision; it never re-decides and never re-runs the model.
+ *
+ * ## Why resuming is safe (steps 9–10)
+ *
+ * Materialisation is idempotent and finishes what the decision owes: the Case
+ * (whose creation is structurally unique per source event), the inbox link,
+ * each admitting fact, the timeline event, and only then settlement. Every step
+ * checks what already exists, so a resume after a crash at any boundary
+ * converges on the one canonical materialisation rather than duplicating part
+ * of it — and the event is never settled while something it owes is missing.
+ *
+ * ## Fencing
+ *
+ * Ownership is durable, not remembered. Each claim carries an epoch, and every
+ * write this module makes to the inbox is conditional on it, so a worker that
+ * stalls past its lease is locked out the instant another reclaims. Losing the
+ * claim is reported, never silently treated as success.
  *
  * Shadow throughout: no prospect-facing effect is reachable from this module.
  * It writes Gu OS rows and nothing else — no send, no legacy write, no
@@ -63,6 +83,7 @@ import {
   getActiveMembership,
   getCurrentCaseFacts,
   getGlobalOperationalCaseTypeBySlug,
+  getRecentOperationalCaseEvents,
   getRelationshipAdmissionMode,
   getSourceEventById,
   insertCaseFact,
@@ -72,6 +93,7 @@ import {
   linkAdmittedCase,
   reclaimSourceEvent,
   recordSourceEvent,
+  recordSourceEventDecision,
   settleSourceEvent,
   type DbClient,
 } from "@agents/db";
@@ -99,6 +121,9 @@ import type {
   AdmissionInterpreterInput,
 } from "./interpreter";
 
+/** Postgres unique-violation: the materialisation race was lost. */
+const UNIQUE_VIOLATION = "23505";
+
 /** Why admission did nothing at all. Distinct from deciding not to admit. */
 export type AdmissionInertReason =
   | "relationship_ops_disabled"
@@ -108,8 +133,9 @@ export type AdmissionInertReason =
  * The result of one admission call.
  *
  * `in_flight` is a first-class outcome, not an error. It is what a duplicate
- * gets while the original delivery is still being processed, and inventing a
- * disposition there is precisely the defect this shape exists to prevent.
+ * gets while the original delivery is still being processed, and what a worker
+ * gets when it discovers mid-run that it no longer owns the claim. Inventing a
+ * disposition in either case is precisely what this shape prevents.
  */
 export type AdmissionResult =
   | { status: "inert"; reason: AdmissionInertReason }
@@ -118,6 +144,8 @@ export type AdmissionResult =
       sourceEventId: string;
       claimedBy: string | null;
       claimExpiresAt: string | null;
+      /** True when THIS call held the claim and lost it to a reclaimer. */
+      lostClaim: boolean;
     }
   | { status: "evaluated"; outcome: AdmissionOutcome };
 
@@ -157,12 +185,21 @@ export interface AdmissionRequest {
   hardBounds: PlatformHardBoundProbe;
   env?: GatewayEnv;
   /**
-   * Identifies this worker on the claim it takes. Defaults to a per-call id;
-   * a runner that wants its claims attributable passes its own.
+   * Identifies this worker on the claim it takes. Defaults to a per-call id; a
+   * runner that wants attributable claims passes its own. Note that the epoch,
+   * not this name, is what fences a stale writer out.
    */
   workerId?: string;
   /** Lease length for this run. Shorter values make recovery tests fast. */
   leaseSeconds?: number;
+}
+
+/** Raised internally when a fenced write finds the claim is no longer ours. */
+class ClaimLost extends Error {
+  constructor() {
+    super("admission: the claim on this source event was reclaimed");
+    this.name = "ClaimLost";
+  }
 }
 
 function decision(params: {
@@ -262,12 +299,11 @@ export function applyPolicyToProposal(params: {
 }
 
 /**
- * Rebuilds the settled decision of an already-completed event.
+ * Rebuilds the settled outcome of an already-completed event.
  *
- * `decision_jsonb` is the record written at settlement; `admitted_case_id` is
- * the canonical Case. Returning `disposition: admitted` with a null `case_id`
- * would be internally contradictory, so when the pointer is somehow missing the
- * Case is looked up rather than assumed absent.
+ * Returning `disposition: admitted` with a null `case_id` would be internally
+ * contradictory, so when the pointer is somehow missing the Case is looked up
+ * rather than assumed absent.
  */
 async function reconstructSettled(
   db: DbClient,
@@ -290,24 +326,14 @@ async function reconstructSettled(
   };
 }
 
-/**
- * Recovers the decision of an event that materialised a Case but died before
- * settlement.
- *
- * The Case's `admission.disposition` fact is the durable record of what was
- * actually decided, so recovery reads it rather than re-deciding — re-running
- * the model could produce a different answer and contradict the Case already
- * written. Returns null when no such fact exists, which means the crash landed
- * between Case creation and the first fact.
- */
-async function recoverDecisionFromCase(
-  db: DbClient,
-  params: { ownerUserId: string; caseId: string }
-): Promise<AdmissionDecision | null> {
-  const facts = await getCurrentCaseFacts(db, params.ownerUserId, params.caseId);
-  const fact = facts.get(ADMISSION_FACT_KEYS.disposition);
-  if (!fact) return null;
-  return fact.value_jsonb as unknown as AdmissionDecision;
+function inFlight(event: SourceEvent, lostClaim = false): AdmissionResult {
+  return {
+    status: "in_flight",
+    sourceEventId: event.id,
+    claimedBy: event.claimed_by,
+    claimExpiresAt: event.claim_expires_at,
+    lostClaim,
+  };
 }
 
 /**
@@ -370,78 +396,221 @@ export async function runAdmission(
   });
 
   let inbox = recorded.event;
-  /** Set when this call is recovering an abandoned attempt rather than starting one. */
-  let recovering = false;
 
-  if (recorded.created) {
-    const claimed = await claimSourceEvent(db, {
-      organizationId: ctx.organizationId,
-      sourceEventId: inbox.id,
-      claimedBy: workerId,
-      leaseSeconds: request.leaseSeconds,
-    });
-    if (!claimed) {
-      // Another worker claimed the row between our insert and our claim.
-      const current = await reloadInbox(db, ctx.organizationId, inbox.id);
-      return inFlight(current ?? inbox);
-    }
-    inbox = claimed;
-  } else {
-    // A duplicate. Its processing state decides everything.
-    if (inbox.status === "completed") {
+  if (inbox.status === "completed") {
+    return {
+      status: "evaluated",
+      outcome: await reconstructSettled(db, ctx.organizationId, inbox),
+    };
+  }
+  if (inbox.status === "processing" && !isClaimExpired(inbox)) {
+    // Someone else owns it right now. Do not decide, do not create, and do not
+    // pretend the answer is `not_admitted` — it is simply not settled.
+    return inFlight(inbox);
+  }
+
+  const claim =
+    inbox.status === "pending"
+      ? await claimSourceEvent(db, {
+          organizationId: ctx.organizationId,
+          sourceEventId: inbox.id,
+          claimedBy: workerId,
+          observedEpoch: inbox.claim_epoch,
+          leaseSeconds: request.leaseSeconds,
+        })
+      : await reclaimSourceEvent(db, {
+          organizationId: ctx.organizationId,
+          sourceEventId: inbox.id,
+          claimedBy: workerId,
+          observedEpoch: inbox.claim_epoch,
+          leaseSeconds: request.leaseSeconds,
+        });
+
+  if (!claim) {
+    // Lost the claim race, or the row settled in the meantime.
+    const current = await getSourceEventById(db, ctx.organizationId, inbox.id);
+    if (current?.status === "completed") {
       return {
         status: "evaluated",
-        outcome: await reconstructSettled(db, ctx.organizationId, inbox),
+        outcome: await reconstructSettled(db, ctx.organizationId, current),
       };
     }
-    if (inbox.status === "processing" && !isClaimExpired(inbox)) {
-      // Someone else owns it right now. Do not decide, do not create, and do
-      // not pretend the answer is `not_admitted` — it is simply not settled.
-      return inFlight(inbox);
+    return inFlight(current ?? inbox);
+  }
+
+  inbox = claim.event;
+  const epoch = claim.epoch;
+  const sourceEventId = inbox.id;
+
+  try {
+    // ── 4–8. Decide, unless a previous attempt already did.
+    //
+    // Replaying the recorded decision rather than re-deciding is what preserves
+    // the ORIGINAL effective policy version: the policy in force now may differ
+    // from the one that governed this admission, and attributing the decision
+    // to today's version would rewrite history (ADR-108).
+    let settled = inbox.decision_jsonb as unknown as AdmissionDecision | null;
+
+    if (!settled) {
+      settled = await decide({ request, epoch, sourceEventId });
+      // Durable BEFORE anything irreversible.
+      if (
+        !(await recordSourceEventDecision(db, {
+          organizationId: ctx.organizationId,
+          sourceEventId,
+          epoch,
+          decision: settled as unknown as Record<string, unknown>,
+        }))
+      ) {
+        throw new ClaimLost();
+      }
     }
-    // pending (the original died before claiming), an expired lease, or a
-    // failed attempt: reclaimable.
-    const reclaimed =
-      inbox.status === "pending"
-        ? await claimSourceEvent(db, {
-            organizationId: ctx.organizationId,
-            sourceEventId: inbox.id,
-            claimedBy: workerId,
-            leaseSeconds: request.leaseSeconds,
-          })
-        : await reclaimSourceEvent(db, {
-            organizationId: ctx.organizationId,
-            sourceEventId: inbox.id,
-            claimedBy: workerId,
-            leaseSeconds: request.leaseSeconds,
-          });
-    if (!reclaimed) {
-      // Lost the reclaim race, or the row settled in the meantime.
-      const current = await reloadInbox(db, ctx.organizationId, inbox.id);
+
+    // ── 9–10. Finish everything this decision owes, then settle.
+    return await completeMaterialisation({
+      db,
+      request,
+      sourceEventId,
+      epoch,
+      settled,
+    });
+  } catch (error) {
+    if (error instanceof ClaimLost) {
+      const current = await getSourceEventById(db, ctx.organizationId, sourceEventId);
       if (current?.status === "completed") {
         return {
           status: "evaluated",
           outcome: await reconstructSettled(db, ctx.organizationId, current),
         };
       }
-      return inFlight(current ?? inbox);
+      return inFlight(current ?? inbox, true);
     }
-    inbox = reclaimed;
-    recovering = true;
-  }
-
-  const sourceEventId = inbox.id;
-
-  const settle = async (
-    settled: AdmissionDecision,
-    caseId: string | null
-  ): Promise<AdmissionResult> => {
-    await settleSourceEvent(db, {
+    // Release the claim so a retry can reclaim, rather than leaving the
+    // dedup_key owned by a dead worker until the lease runs out. Fenced: if we
+    // already lost the claim, this changes nothing and must not clobber the new
+    // owner's row.
+    await failSourceEvent(db, {
       organizationId: ctx.organizationId,
       sourceEventId,
+      epoch,
+      error: describeFailure(error),
+    }).catch(() => undefined);
+    throw error;
+  }
+}
+
+/** Steps 4–7: bounds, policy, model, exclusion. */
+async function decide(params: {
+  request: AdmissionRequest;
+  epoch: number;
+  sourceEventId: string;
+}): Promise<AdmissionDecision> {
+  const { request } = params;
+  const { ctx, event } = request;
+  const db = ctx.db;
+
+  // ── 4. Platform hard bounds, before policy and before the model (SA-2.5).
+  const bound = await request.hardBounds.evaluate({
+    organizationId: ctx.organizationId,
+    externalLeadRef: event.externalLeadRef,
+    payload: event.payload ?? {},
+  });
+  if (bound) {
+    return decision({
+      disposition: "not_admitted",
+      reason: "platform_hard_bound",
+      policy: HARD_BOUND_ATTRIBUTION,
+      hardBound: bound,
+    });
+  }
+
+  // ── 5. Effective policy, attributed by version (SA-2.7 / ADR-108).
+  const effective = await resolveEffectiveAdmissionPolicy(db, ctx.organizationId);
+  if (effective.status === "unavailable") {
+    return decision({
+      disposition: "not_admitted",
+      reason: "policy_unavailable",
+      policy: effective.attribution,
+    });
+  }
+
+  // ── 6. Semantic judgment. The model speaks only now, and only about intent.
+  const interpreterInput: AdmissionInterpreterInput = {
+    message: event.message ?? null,
+    sourceLabel: event.sourceLabel ?? null,
+    originLabel: event.originLabel ?? null,
+    propertyContext: event.propertyContext ?? null,
+    priorMessages: event.priorMessages ?? [],
+  };
+  //
+  // The model call runs inside a bound AI-usage context, which is what makes
+  // its cost attributable (Technical Plan §7 (a), the correlation-coverage
+  // check that applies from SL-2). Without this the meter finds no ambient
+  // context and DROPS the event: the column would exist and stay empty.
+  //
+  // `organizationId` is the only correlation dimension available here — the
+  // interpreter runs before any Case exists, so `operational_case_id` and
+  // `work_item_id` are both genuinely null rather than merely unset.
+  // Callback-scoped rather than `bindAiUsageContext`, so admission never leaves
+  // its attribution behind in a caller's async context.
+  const proposal = await runWithAiUsageContext(
+    {
+      userId: request.ownerUserId,
+      organizationId: ctx.organizationId,
+      // A polled, server-initiated path with no interactive channel.
+      channel: "cron",
+    },
+    db,
+    () => request.interpreter.interpret(interpreterInput)
+  );
+
+  // ── 7. Policy applied to the proposal (SA-2.3, SA-2.6).
+  return applyPolicyToProposal({
+    policy: effective.policy,
+    attribution: effective.attribution,
+    proposal,
+    sourceLabel: event.sourceLabel ?? null,
+  });
+}
+
+/**
+ * Writes everything the decision owes, then settles. Idempotent at every step.
+ *
+ * The owed set for an admitted decision is:
+ *
+ *   1. the Opportunity Case — creation is structurally unique per source event,
+ *      so two workers cannot both create one;
+ *   2. `source_events.admitted_case_id` — the recovery anchor;
+ *   3. the `admission.disposition` fact;
+ *   4. the `admission.source` fact;
+ *   5. the `opportunity.objective` fact, when the decision carries an objective;
+ *   6. the admission timeline event;
+ *   7. settlement.
+ *
+ * A resume checks each before writing it, so a crash at any boundary converges
+ * on exactly one canonical materialisation. Settlement is last and unconditional
+ * on nothing: the event is never marked completed while something it owes is
+ * missing.
+ */
+async function completeMaterialisation(params: {
+  db: DbClient;
+  request: AdmissionRequest;
+  sourceEventId: string;
+  epoch: number;
+  settled: AdmissionDecision;
+}): Promise<AdmissionResult> {
+  const { db, request, sourceEventId, epoch, settled } = params;
+  const { ctx, event } = request;
+
+  const settle = async (caseId: string | null): Promise<AdmissionResult> => {
+    const applied = await settleSourceEvent(db, {
+      organizationId: ctx.organizationId,
+      sourceEventId,
+      epoch,
       decision: settled as unknown as Record<string, unknown>,
       admittedCaseId: caseId,
     });
+    if (!applied) throw new ClaimLost();
     return {
       status: "evaluated",
       outcome: {
@@ -453,133 +622,171 @@ export async function runAdmission(
     };
   };
 
-  try {
-    // ── 3b. Reconciliation, before anything is decided again.
-    //
-    // A reclaimed event may already have materialised a Case. Deciding afresh
-    // could contradict what is durably written, and creating again would be a
-    // second Opportunity for one admitted event (S1 §8.16). So converge first.
-    if (recovering) {
-      const existingCaseId =
-        inbox.admitted_case_id ??
-        (await findCaseMaterialisedBySourceEvent(db, {
-          organizationId: ctx.organizationId,
-          sourceEventId,
-        }));
-      if (existingCaseId) {
-        const recovered = await recoverDecisionFromCase(db, {
-          ownerUserId: request.ownerUserId,
-          caseId: existingCaseId,
-        });
-        if (recovered) return settle(recovered, existingCaseId);
-        // A Case exists but carries no disposition fact: the crash landed
-        // between creation and the first fact. Finish that materialisation on
-        // the SAME Case rather than creating another one.
-        return finishMaterialisation({
-          db,
-          request,
-          sourceEventId,
-          caseId: existingCaseId,
-          settled: null,
-          settle,
-        });
-      }
-    }
+  if (settled.disposition !== "admitted") return settle(null);
 
-    // ── 4. Platform hard bounds, before policy and before the model (SA-2.5).
-    const bound = await request.hardBounds.evaluate({
-      organizationId: ctx.organizationId,
-      externalLeadRef: event.externalLeadRef,
-      payload: event.payload ?? {},
-    });
-    if (bound) {
-      return await settle(
-        decision({
-          disposition: "not_admitted",
-          reason: "platform_hard_bound",
-          policy: HARD_BOUND_ATTRIBUTION,
-          hardBound: bound,
-        }),
-        null
-      );
-    }
-
-    // ── 5. Effective policy, attributed by version (SA-2.7 / ADR-108).
-    const effective = await resolveEffectiveAdmissionPolicy(
-      db,
-      ctx.organizationId
+  // Membership is re-checked here rather than trusted from the caller: the Case
+  // is about to carry durable responsibility for a named advisor, and a revoked
+  // member must not become the owner of new work.
+  const membership = await getActiveMembership(
+    db,
+    ctx.organizationId,
+    request.ownerUserId
+  );
+  if (!membership) {
+    throw new Error(
+      "runAdmission: ownerUserId is not an active member of the Organization"
     );
-    if (effective.status === "unavailable") {
-      return await settle(
-        decision({
-          disposition: "not_admitted",
-          reason: "policy_unavailable",
-          policy: effective.attribution,
-        }),
-        null
-      );
-    }
-
-    // ── 6. Semantic judgment. The model speaks only now, and only about intent.
-    const interpreterInput: AdmissionInterpreterInput = {
-      message: event.message ?? null,
-      sourceLabel: event.sourceLabel ?? null,
-      originLabel: event.originLabel ?? null,
-      propertyContext: event.propertyContext ?? null,
-      priorMessages: event.priorMessages ?? [],
-    };
-    //
-    // The model call runs inside a bound AI-usage context, which is what makes
-    // its cost attributable (Technical Plan §7 (a), the correlation-coverage
-    // check that applies from SL-2). Without this the meter finds no ambient
-    // context and DROPS the event: the column would exist and stay empty.
-    //
-    // `organizationId` is the only correlation dimension available here — the
-    // interpreter runs before any Case exists, so `operational_case_id` and
-    // `work_item_id` are both genuinely null rather than merely unset.
-    // Callback-scoped rather than `bindAiUsageContext`, so admission never
-    // leaves its attribution behind in a caller's async context.
-    const proposal = await runWithAiUsageContext(
-      {
-        userId: request.ownerUserId,
-        organizationId: ctx.organizationId,
-        // A polled, server-initiated path with no interactive channel.
-        channel: "cron",
-      },
-      db,
-      () => request.interpreter.interpret(interpreterInput)
-    );
-
-    // ── 7. Policy applied to the proposal (SA-2.3, SA-2.6).
-    const settled = applyPolicyToProposal({
-      policy: effective.policy,
-      attribution: effective.attribution,
-      proposal,
-      sourceLabel: event.sourceLabel ?? null,
-    });
-
-    if (settled.disposition !== "admitted") return await settle(settled, null);
-
-    // ── 8. Materialisation. Only an admitted lead reaches this point.
-    return await finishMaterialisation({
-      db,
-      request,
-      sourceEventId,
-      caseId: null,
-      settled,
-      settle,
-    });
-  } catch (error) {
-    // The claim must not outlive the attempt. Marking the row `failed` releases
-    // it for a later reclaim instead of leaving the dedup_key owned by a dead
-    // worker until its lease runs out.
-    await failSourceEvent(db, {
-      organizationId: ctx.organizationId,
-      sourceEventId,
-      error: describeFailure(error),
-    }).catch(() => undefined);
-    throw error;
   }
+
+  // ── 1. The Case. Find first — a resume, or a lost materialisation race.
+  let caseId = await findCaseMaterialisedBySourceEvent(db, {
+    organizationId: ctx.organizationId,
+    sourceEventId,
+  });
+
+  if (!caseId) {
+    const caseType = await getGlobalOperationalCaseTypeBySlug(
+      db,
+      LEAD_OPPORTUNITY_CASE_TYPE
+    );
+    if (!caseType) {
+      throw new Error(
+        "runAdmission: the lead_opportunity case type is not registered"
+      );
+    }
+    try {
+      const opportunity = await createOperationalCase(db, {
+        userId: request.ownerUserId,
+        caseTypeId: caseType.id,
+        caseType: LEAD_OPPORTUNITY_CASE_TYPE,
+        organizationId: ctx.organizationId,
+        // ADR-107: admission decides whether Gu takes durable responsibility. It
+        // does not acquire runtime decision authority — legacy still decides,
+        // and authority only moves through a separate governed operation.
+        runtimeAuthority: "legacy",
+        status: "active",
+        // No workflow stage: Opportunity progression lives in facts (TD-8, AC-7).
+        currentStep: null,
+        // Shadow: nothing is scheduled to act on this Case.
+        nextActionAt: null,
+        context: {
+          relationship_ops: true,
+          source_system: "traditional_gu",
+          legacy_lead_id: event.externalLeadRef,
+          // The materialisation identity. A partial UNIQUE index on this makes
+          // "one source event admits at most one Opportunity" structural, so a
+          // worker past the fence still cannot create a second one.
+          source_event_id: sourceEventId,
+          admission_mode: "shadow",
+        },
+      });
+      caseId = opportunity.id;
+    } catch (error) {
+      if ((error as { code?: string }).code !== UNIQUE_VIOLATION) throw error;
+      // Another worker materialised it first. Converge on theirs.
+      caseId = await findCaseMaterialisedBySourceEvent(db, {
+        organizationId: ctx.organizationId,
+        sourceEventId,
+      });
+      if (!caseId) throw error;
+    }
+  }
+
+  // ── 2. The recovery anchor, before any fact.
+  if (
+    !(await linkAdmittedCase(db, {
+      organizationId: ctx.organizationId,
+      sourceEventId,
+      epoch,
+      caseId,
+    }))
+  ) {
+    throw new ClaimLost();
+  }
+
+  // ── 3–5. The admitting facts, each written only if it is missing.
+  //
+  // `source_kind` is not uniform on purpose: what Traditional Gu reported is
+  // `integration` evidence, while the disposition and the objective are Gu OS
+  // conclusions drawn from it and are therefore `derived`. Collapsing the two
+  // would make a Gu OS judgment look like a source fact.
+  const existingFacts = await getCurrentCaseFacts(
+    db,
+    request.ownerUserId,
+    caseId
+  );
+  const factProvenance = {
+    userId: request.ownerUserId,
+    caseId,
+    sourceRef: `source_events:${sourceEventId}`,
+  };
+
+  if (!existingFacts.has(ADMISSION_FACT_KEYS.disposition)) {
+    await insertCaseFact(db, {
+      ...factProvenance,
+      sourceKind: "derived",
+      factKey: ADMISSION_FACT_KEYS.disposition,
+      value: settled,
+    });
+  }
+  if (!existingFacts.has(ADMISSION_FACT_KEYS.source)) {
+    await insertCaseFact(db, {
+      ...factProvenance,
+      sourceKind: "integration",
+      factKey: ADMISSION_FACT_KEYS.source,
+      value: {
+        source_system: "traditional_gu",
+        event_kind: event.kind,
+        legacy_lead_id: event.externalLeadRef,
+        source_label: event.sourceLabel ?? null,
+        origin_label: event.originLabel ?? null,
+        dedup_key: event.dedupKey,
+      },
+    });
+  }
+  if (
+    settled.proposal?.objective &&
+    !existingFacts.has(ADMISSION_FACT_KEYS.objective)
+  ) {
+    await insertCaseFact(db, {
+      ...factProvenance,
+      sourceKind: "derived",
+      factKey: ADMISSION_FACT_KEYS.objective,
+      value: {
+        objective: settled.proposal.objective,
+        category: settled.proposal.objective_category,
+      },
+      confidence: confidenceToNumber(settled.proposal.confidence),
+    });
+  }
+
+  // ── 6. The timeline event, once. `operational_case_events` is append-only
+  // with no dedup of its own, so a resume must check rather than re-append.
+  const timeline = await getRecentOperationalCaseEvents(db, caseId, 50);
+  const alreadyRecorded = timeline.some((entry) => {
+    const payload = entry.payload_jsonb as Record<string, unknown> | null;
+    return (
+      payload?.kind === "admission_disposition" &&
+      payload?.source_event_id === sourceEventId
+    );
+  });
+  if (!alreadyRecorded) {
+    await insertOperationalCaseEvent(db, {
+      caseId,
+      eventType: "state_changed",
+      actor: "system",
+      payload: {
+        kind: "admission_disposition",
+        disposition: settled.disposition,
+        reason: settled.reason,
+        effective_policy: settled.policy,
+        source_event_id: sourceEventId,
+      },
+    });
+  }
+
+  // ── 7. Only now.
+  return settle(caseId);
 }
 
 /**
@@ -600,200 +807,6 @@ function describeFailure(error: unknown): string {
       : message;
   }
   return String(error);
-}
-
-function inFlight(event: SourceEvent): AdmissionResult {
-  return {
-    status: "in_flight",
-    sourceEventId: event.id,
-    claimedBy: event.claimed_by,
-    claimExpiresAt: event.claim_expires_at,
-  };
-}
-
-async function reloadInbox(
-  db: DbClient,
-  organizationId: string,
-  sourceEventId: string
-): Promise<SourceEvent | null> {
-  return getSourceEventById(db, organizationId, sourceEventId);
-}
-
-/**
- * Creates (or completes) the Opportunity Case for an admitted event.
- *
- * Write order is the recovery contract:
- *
- *   1. the Case row — carrying `source_event_id` in its context, so it is
- *      findable even before step 2 lands;
- *   2. `source_events.admitted_case_id` — the durable pointer;
- *   3. the provenance-bearing facts, disposition first;
- *   4. the Case timeline event;
- *   5. settlement.
- *
- * A crash at any point leaves either no Case, or a Case a retry will find.
- * `caseId` non-null means this call is finishing a materialisation an earlier
- * attempt started, and `settled` null means the disposition must be re-derived
- * because the earlier attempt never recorded one.
- */
-async function finishMaterialisation(params: {
-  db: DbClient;
-  request: AdmissionRequest;
-  sourceEventId: string;
-  caseId: string | null;
-  settled: AdmissionDecision | null;
-  settle: (
-    settled: AdmissionDecision,
-    caseId: string | null
-  ) => Promise<AdmissionResult>;
-}): Promise<AdmissionResult> {
-  const { db, request, sourceEventId } = params;
-  const { ctx, event } = request;
-
-  // A disposition is required to finish. When recovery found a Case with no
-  // disposition fact, the Case's existence is itself durable evidence that an
-  // admission occurred — so converge on `admitted` rather than re-deciding and
-  // risking a verdict that contradicts the Case already written.
-  //
-  // The attribution is re-resolved rather than invented, and the reason says
-  // exactly what happened: the original attempt never recorded one. Claiming
-  // `clear_objective` here would assert a judgment this call never made.
-  let settled = params.settled;
-  if (!settled) {
-    const effective = await resolveEffectiveAdmissionPolicy(
-      db,
-      ctx.organizationId
-    );
-    settled = decision({
-      disposition: "admitted",
-      reason: "recovered_incomplete_materialisation",
-      policy: {
-        ...effective.attribution,
-        matched_rule: "recovered_from_incomplete_materialisation",
-      },
-    });
-  }
-
-  // Membership is re-checked here rather than trusted from the caller: the
-  // Case is about to carry durable responsibility for a named advisor, and a
-  // revoked member must not become the owner of new work.
-  const membership = await getActiveMembership(
-    db,
-    ctx.organizationId,
-    request.ownerUserId
-  );
-  if (!membership) {
-    throw new Error(
-      "runAdmission: ownerUserId is not an active member of the Organization"
-    );
-  }
-
-  let caseId = params.caseId;
-  if (!caseId) {
-    const caseType = await getGlobalOperationalCaseTypeBySlug(
-      db,
-      LEAD_OPPORTUNITY_CASE_TYPE
-    );
-    if (!caseType) {
-      throw new Error(
-        "runAdmission: the lead_opportunity case type is not registered"
-      );
-    }
-
-    const opportunity = await createOperationalCase(db, {
-      userId: request.ownerUserId,
-      caseTypeId: caseType.id,
-      caseType: LEAD_OPPORTUNITY_CASE_TYPE,
-      organizationId: ctx.organizationId,
-      // ADR-107: admission decides whether Gu takes durable responsibility. It
-      // does not acquire runtime decision authority — legacy still decides, and
-      // authority only moves through a separate governed operation.
-      runtimeAuthority: "legacy",
-      status: "active",
-      // No workflow stage: Opportunity progression lives in facts (TD-8, AC-7).
-      currentStep: null,
-      // Shadow: nothing is scheduled to act on this Case.
-      nextActionAt: null,
-      context: {
-        relationship_ops: true,
-        source_system: "traditional_gu",
-        legacy_lead_id: event.externalLeadRef,
-        // The recovery anchor that exists from the Case's first instant.
-        source_event_id: sourceEventId,
-        admission_mode: "shadow",
-      },
-    });
-    caseId = opportunity.id;
-
-    // Immediately, before any fact: from here on a crash is recoverable
-    // through the inbox row alone.
-    await linkAdmittedCase(db, {
-      organizationId: ctx.organizationId,
-      sourceEventId,
-      caseId,
-    });
-  }
-
-  // Provenance-bearing facts (SA-2.2). `source_ref` carries the inbox row, so
-  // every admitting fact is traceable to the event that produced it.
-  //
-  // `source_kind` is not uniform on purpose: what Traditional Gu reported is
-  // `integration` evidence, while the disposition and the objective are Gu OS
-  // conclusions drawn from it and are therefore `derived`. Collapsing the two
-  // would make a Gu OS judgment look like a source fact.
-  const factProvenance = {
-    userId: request.ownerUserId,
-    caseId,
-    sourceRef: `source_events:${sourceEventId}`,
-  };
-
-  // Disposition first: it is what recovery reads to avoid re-deciding.
-  await insertCaseFact(db, {
-    ...factProvenance,
-    sourceKind: "derived",
-    factKey: ADMISSION_FACT_KEYS.disposition,
-    value: settled,
-  });
-  await insertCaseFact(db, {
-    ...factProvenance,
-    sourceKind: "integration",
-    factKey: ADMISSION_FACT_KEYS.source,
-    value: {
-      source_system: "traditional_gu",
-      event_kind: event.kind,
-      legacy_lead_id: event.externalLeadRef,
-      source_label: event.sourceLabel ?? null,
-      origin_label: event.originLabel ?? null,
-      dedup_key: event.dedupKey,
-    },
-  });
-  if (settled.proposal?.objective) {
-    await insertCaseFact(db, {
-      ...factProvenance,
-      sourceKind: "derived",
-      factKey: ADMISSION_FACT_KEYS.objective,
-      value: {
-        objective: settled.proposal.objective,
-        category: settled.proposal.objective_category,
-      },
-      confidence: confidenceToNumber(settled.proposal.confidence),
-    });
-  }
-
-  await insertOperationalCaseEvent(db, {
-    caseId,
-    eventType: "state_changed",
-    actor: "system",
-    payload: {
-      kind: "admission_disposition",
-      disposition: settled.disposition,
-      reason: settled.reason,
-      effective_policy: settled.policy,
-      source_event_id: sourceEventId,
-    },
-  });
-
-  return params.settle(settled, caseId);
 }
 
 /**

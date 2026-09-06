@@ -215,6 +215,15 @@ create table public.source_events (
   -- on more than one application instance.
   status              text not null default 'pending'
                         check (status in ('pending', 'processing', 'completed', 'failed')),
+  -- Fencing token. Every successful claim or reclaim bumps it, and every write
+  -- a claim owner makes is conditional on the epoch it was handed. A worker
+  -- that stalls past its lease therefore cannot write anything once someone
+  -- else has reclaimed: its epoch is stale and its UPDATE matches zero rows.
+  --
+  -- Same compare-and-swap shape as operational_cases.version, which is the
+  -- repository's established way of making "I still hold this" a durable
+  -- condition rather than an in-memory belief.
+  claim_epoch         integer not null default 0,
   claimed_at          timestamptz,
   claimed_by          text,
   claim_expires_at    timestamptz,
@@ -249,6 +258,26 @@ create table public.source_events (
   constraint source_events_completed_shape check (
     (status = 'completed' and completed_at is not null)
     or (status <> 'completed' and completed_at is null)
+  ),
+
+  -- Settlement completeness, enforced for EVERY service-role writer rather than
+  -- only for the admission executor — future C1 ingestion writes this same
+  -- inbox, and "only completed carries a decision" has to stay true then too.
+  --
+  -- A completed event carries the decision a redelivery will be answered with,
+  -- and a completed ADMITTED event carries the Case it admitted. Without the
+  -- second half, an interrupted materialisation could be settled as admitted
+  -- with nothing to point at, and the next duplicate would be told a Case
+  -- exists that does not.
+  constraint source_events_settled_shape check (
+    status <> 'completed'
+    or (
+      decision_jsonb is not null
+      and (
+        (decision_jsonb ->> 'disposition') is distinct from 'admitted'
+        or admitted_case_id is not null
+      )
+    )
   ),
 
   constraint source_events_admitted_case_same_org
@@ -308,9 +337,19 @@ create policy "Service role manages source events"
 -- rather than a scan.
 -- ============================================================
 
-create index idx_operational_cases_source_event
-  on public.operational_cases ((context_jsonb ->> 'source_event_id'))
-  where context_jsonb ? 'source_event_id';
+-- UNIQUE, not merely indexed. Claim fencing stops a stale worker from writing
+-- to the inbox, but it cannot stop one that is already past the fence from
+-- INSERTing a Case: two workers can both hold a decision and both reach
+-- materialisation across a lease expiry. This index is what makes "one logical
+-- source event admits at most one Opportunity" true against two real workers
+-- rather than by application discipline (S1 §8.16). The loser gets a unique
+-- violation and reconciles onto the winner's Case.
+--
+-- Partial and scoped to the admission Case type: it constrains exactly the rows
+-- admission writes, and no other domain's use of context_jsonb.
+create unique index uq_operational_cases_source_event
+  on public.operational_cases (organization_id, (context_jsonb ->> 'source_event_id'))
+  where case_type = 'lead_opportunity' and context_jsonb ? 'source_event_id';
 
 -- ============================================================
 -- ai_usage_events.organization_id — correlation completeness (TP §7 (a))

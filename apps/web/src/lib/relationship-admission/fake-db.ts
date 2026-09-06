@@ -128,13 +128,21 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
   function uniqueViolation(name: string, candidate: Row): boolean {
     return uniqueIndexes
       .filter((index) => index.table === name)
-      .some((index) =>
-        table(name).some((existing) =>
+      .some((index) => {
+        // Partial-index semantics: a row that has no value for an indexed
+        // expression is simply not covered, so it can never collide.
+        const candidateKey = index.columns.map((column) =>
+          columnValue(candidate, column)
+        );
+        if (candidateKey.some((value) => value === null || value === undefined)) {
+          return false;
+        }
+        return table(name).some((existing) =>
           index.columns.every(
-            (column) => existing[column] === candidate[column]
+            (column, i) => columnValue(existing, column) === candidateKey[i]
           )
-        )
-      );
+        );
+      });
   }
 
   function builder(name: string) {
