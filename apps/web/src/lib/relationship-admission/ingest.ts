@@ -33,7 +33,10 @@ import {
 } from "../legacy-gateway";
 import type { GatewayCallerContext } from "../legacy-gateway/authorization";
 import { runAdmission, type AdmissionResult } from "./admit";
-import type { AdmissionInterpreter } from "./interpreter";
+import type {
+  AdmissionInterpreter,
+  AdmissionInterpreterInput,
+} from "./interpreter";
 import type { PlatformHardBoundProbe } from "./hard-bounds";
 
 /** How many recent messages the admission read asks the gateway for. */
@@ -103,6 +106,15 @@ export interface IngestLegacyLeadResult {
   };
   /** Whether any inbound prospect message was found at all. */
   hadInboundMessage: boolean;
+  /**
+   * Exactly what the interpreter was asked to judge.
+   *
+   * Returned so an authorized hosted run can capture a real opening as an eval
+   * scenario draft without reconstructing the input — a reconstruction would
+   * quietly become a different scenario from the one that was actually judged.
+   * It is prospect content: the caller decides whether it is ever written down.
+   */
+  interpreterInput: AdmissionInterpreterInput;
 }
 
 /**
@@ -127,6 +139,15 @@ export async function ingestLegacyLead(
     .filter((item) => item.direction === "inbound" && item.text)
     .map((item) => item.text as string);
 
+  const interpreterInput: AdmissionInterpreterInput = {
+    message: latest?.text ?? null,
+    // The newest message is the subject; everything before it is context.
+    priorMessages: priorInbound.slice(0, -1),
+    sourceLabel: latest?.source ?? null,
+    originLabel: context.value.originLabel,
+    propertyContext: null,
+  };
+
   const result = await runAdmission({
     ctx: params.ctx,
     ownerUserId: params.ownerUserId,
@@ -141,12 +162,11 @@ export async function ingestLegacyLead(
         message: latest,
         leadUpdatedAt: context.value.updatedAt,
       }),
-      message: latest?.text ?? null,
-      // The newest message is the subject; everything before it is context.
-      priorMessages: priorInbound.slice(0, -1),
-      sourceLabel: latest?.source ?? null,
-      originLabel: context.value.originLabel,
-      propertyContext: null,
+      message: interpreterInput.message,
+      priorMessages: interpreterInput.priorMessages,
+      sourceLabel: interpreterInput.sourceLabel,
+      originLabel: interpreterInput.originLabel,
+      propertyContext: interpreterInput.propertyContext,
       // Allowlisted, non-content metadata only. Message text is passed to the
       // interpreter for judgment but never persisted on the inbox row: the
       // event record does not need to be a second copy of the conversation.
@@ -172,6 +192,7 @@ export async function ingestLegacyLead(
       messages: messages.provenance,
     },
     hadInboundMessage: latest !== null,
+    interpreterInput,
   };
 }
 

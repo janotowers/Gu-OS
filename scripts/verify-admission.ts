@@ -31,10 +31,23 @@
 //     --legacy-env stage --organization <uuid> \
 //     --owner-user <uuid> --lead-file .lead.local \
 //     --acknowledge-durable-write \
-//     [--activate-flags-for-run] [--json evidence.json]
+//     [--activate-flags-for-run] [--json evidence.json] \
+//     [--capture-eval-scenario <path OUTSIDE the repo>]
+//
+// EVAL CAPTURE: the Slice contract asks for a scenario set drawn from REAL
+// recorded lead openings, and this run is the only authorized place a real
+// opening is ever read. `--capture-eval-scenario` writes ONE scenario DRAFT to
+// the path given, carrying the message the model was actually asked to judge,
+// its context and its provenance, with `expected` left BLANK for a human to
+// fill in. It is a draft, not evidence: the message text is prospect content,
+// so the path must be outside the repository, a human reviews and redacts it
+// before it ever enters version control, and nothing is captured at all unless
+// this flag is passed.
 
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import {
   deleteOrganizationFlag,
@@ -116,7 +129,21 @@ async function main(): Promise<void> {
     parseNamed(argv, "--lead") ??
     (leadFile ? readFileSync(leadFile, "utf8").trim() || undefined : undefined);
   const jsonPath = parseNamed(argv, "--json");
+  const captureEvalPath = parseNamed(argv, "--capture-eval-scenario");
   const activateFlags = argv.includes("--activate-flags-for-run");
+
+  if (captureEvalPath) {
+    // Real prospect text must not land in the repository by accident.
+    const resolved = path.resolve(captureEvalPath);
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+    if (resolved === repoRoot || resolved.startsWith(repoRoot + path.sep)) {
+      throw new Error(
+        "--capture-eval-scenario must point OUTSIDE the repository: the draft " +
+          "carries real prospect message text and must be human-reviewed and " +
+          "redacted before it is ever committed."
+      );
+    }
+  }
 
   if (!organizationId) throw new Error("--organization <uuid> is required.");
   if (!ownerUserId) {
@@ -259,6 +286,17 @@ async function main(): Promise<void> {
         `admission was inert: ${ingested.result.reason} (re-run with --activate-flags-for-run)`
       );
       exitCode = 1;
+    } else if (ingested.result.status === "in_flight") {
+      // Another worker owns this event right now. Saying anything about the
+      // disposition here would be inventing one.
+      record(
+        "SA-2.1",
+        "a real inbound lead is evaluated by admission",
+        false,
+        `the event is already being processed by ${ingested.result.claimedBy ?? "another worker"} ` +
+          `(lease until ${ingested.result.claimExpiresAt ?? "unknown"}); re-run after it settles`
+      );
+      exitCode = 1;
     } else {
       const { decision, case_id, source_event_id, deduplicated } =
         ingested.result.outcome;
@@ -313,6 +351,54 @@ async function main(): Promise<void> {
           case_id === null,
           `disposition=${decision.disposition}; SA-2.2 needs an ADMITTED lead, ` +
             "so re-run against a lead the policy admits to complete it"
+        );
+      }
+
+      if (captureEvalPath) {
+        // A DRAFT, deliberately incomplete: `expected` is blank because the
+        // point of the artifact is a human judgment about what the right answer
+        // is, not a recording of what the model happened to say.
+        writeFileSync(
+          captureEvalPath,
+          JSON.stringify(
+            {
+              _README: [
+                "EVAL SCENARIO DRAFT — NOT evidence, and NOT safe to commit as-is.",
+                "`input.message` and `input.priorMessages` are REAL prospect text.",
+                "Review, redact or paraphrase, fill in `expected`, then add it to",
+                "apps/web/src/lib/relationship-admission/eval/admission-scenarios.json.",
+              ],
+              id: `real-${redact(legacyLeadId)?.slice(7, 19)}`,
+              label: "(describe the opening)",
+              capturedAt: new Date().toISOString(),
+              provenance: {
+                guOsEnvironment: target.name,
+                legacyEnvironment: legacy.environment,
+                organizationDigest: redact(organizationId),
+                leadDigest: redact(legacyLeadId),
+                capability: ingested.provenance.messages.capability,
+                sourceUpdatedAt:
+                  ingested.provenance.messages.freshness?.sourceUpdatedAt ?? null,
+              },
+              input: ingested.interpreterInput,
+              expected: {
+                has_actionable_objective: null,
+                objective_category: null,
+              },
+              modelSaid: {
+                has_actionable_objective:
+                  decision.proposal?.has_actionable_objective ?? null,
+                objective_category: decision.proposal?.objective_category ?? null,
+                confidence: decision.proposal?.confidence ?? null,
+              },
+            },
+            null,
+            2
+          ),
+          "utf8"
+        );
+        console.log(
+          `  NOTE  eval scenario DRAFT written to ${captureEvalPath} — review and redact before committing`
         );
       }
 

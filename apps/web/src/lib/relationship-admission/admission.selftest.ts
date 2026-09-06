@@ -42,6 +42,11 @@ import {
   type DbClient,
 } from "@agents/db";
 import {
+  recordOpenRouterCallUsage,
+  setAiUsageRecorder,
+} from "@agents/agent";
+import type { AiUsageEventInput } from "@agents/types";
+import {
   PLATFORM_DEFAULT_POLICY_ID,
   buildSourceEventDedupKey,
   type AdmissionProposal,
@@ -216,13 +221,29 @@ function baseTables(
 }
 
 function harness(
-  overrides: Parameters<typeof baseTables>[0] = {}
+  overrides: Parameters<typeof baseTables>[0] = {},
+  extra: { failWrite?: Array<{ table: string; occurrence?: number }> } = {}
 ): FakeDb {
   return createFakeDb({
     tables: baseTables(overrides),
     uniqueIndexes: [
       { table: "source_events", columns: ["organization_id", "dedup_key"] },
     ],
+    defaults: {
+      source_events: {
+        status: "pending",
+        claimed_at: null,
+        claimed_by: null,
+        claim_expires_at: null,
+        completed_at: null,
+        processing_error: null,
+        decision_jsonb: null,
+        admitted_case_id: null,
+      },
+      case_facts: { superseded_by: null },
+      operational_cases: { organization_id: null, runtime_authority: null },
+    },
+    ...extra,
   });
 }
 
@@ -249,6 +270,18 @@ const AMBIGUOUS: AdmissionProposal = {
   rationale: "isolated greeting with no context",
 };
 
+/**
+ * The fake rejects the way PostgREST does — a plain `{ code, message }` object,
+ * not an Error — so the assertion has to match that shape rather than a string.
+ */
+function isInjectedFailure(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: string }).code === "INJECTED"
+  );
+}
+
 const noBounds: PlatformHardBoundProbe = { evaluate: async () => null };
 const blockedBounds: PlatformHardBoundProbe = {
   evaluate: async () => "prospect_blocked",
@@ -262,6 +295,7 @@ function request(
     lead?: string;
     dedupKey?: string;
     sourceLabel?: string | null;
+    leaseSeconds?: number;
   } = {}
 ) {
   const lead = options.lead ?? PILOT_LEAD;
@@ -291,6 +325,9 @@ function request(
     interpreter: options.interpreter ?? fixedInterpreter(CLEAR_BUY),
     hardBounds: options.hardBounds ?? noBounds,
     env: GATEWAY_ON,
+    ...(options.leaseSeconds === undefined
+      ? {}
+      : { leaseSeconds: options.leaseSeconds }),
   };
 }
 
@@ -399,10 +436,17 @@ async function testNoJudgmentIsAmbiguity(): Promise<void> {
 }
 
 // ============================================================
-// SA-2.4 — the same event twice yields one effective outcome
+// SA-2.4 — one logical event, one settled outcome, at least once
+//
+// The happy-path duplicate is the easy half. These cover the half that decides
+// whether the guarantee actually holds in production: concurrency, crashes
+// between the durable writes, and retry after abandonment. S1 §8.16 states the
+// invariant these all serve — duplicate/retry processing must not create
+// multiple active Opportunities for the same admitted event.
 // ============================================================
 
-async function testDuplicateSourceEvent(): Promise<void> {
+/** 1. Duplicate after a COMPLETED admitted event. */
+async function testDuplicateAfterCompletedAdmission(): Promise<void> {
   const db = harness();
   const first = await runAdmission(request(db));
   const second = await runAdmission(request(db));
@@ -413,21 +457,290 @@ async function testDuplicateSourceEvent(): Promise<void> {
 
   assert.equal(first.outcome.deduplicated, false);
   assert.equal(second.outcome.deduplicated, true, "the collision is observable");
-
-  // One inbox row, one Case, one disposition — however many deliveries arrive.
+  assert.equal(second.outcome.decision.disposition, "admitted");
+  assert.equal(
+    second.outcome.case_id,
+    first.outcome.case_id,
+    "the canonical admitted Case comes back with the settled outcome"
+  );
+  assert.ok(
+    second.outcome.case_id,
+    "an admitted duplicate must never report admitted with a null Case"
+  );
   assert.equal(db.tables.source_events.length, 1);
   assert.equal(db.tables.operational_cases.length, 1);
-  assert.equal(second.outcome.case_id, null, "no second Case");
-  assert.deepEqual(
-    second.outcome.decision.disposition,
-    first.outcome.decision.disposition,
-    "the redelivery returns the original outcome, it does not decide again"
+}
+
+/** 1b. Duplicate after a COMPLETED not-admitted event returns that outcome. */
+async function testDuplicateAfterCompletedRefusal(): Promise<void> {
+  const db = harness();
+  const first = await runAdmission(
+    request(db, { hardBounds: blockedBounds })
   );
+  const second = await runAdmission(
+    // Even a permissive probe on the retry must not change a settled outcome.
+    request(db, { hardBounds: noBounds })
+  );
+  assert.equal(first.status, "evaluated");
+  assert.equal(second.status, "evaluated");
+  if (first.status !== "evaluated" || second.status !== "evaluated") return;
+  assert.equal(second.outcome.decision.disposition, "not_admitted");
+  assert.equal(second.outcome.decision.reason, "platform_hard_bound");
+  assert.equal(second.outcome.case_id, null);
+  assert.equal(db.tables.operational_cases.length, 0);
+}
+
+/** 2. Duplicate while the first delivery is still in flight. */
+async function testDuplicateWhileInFlight(): Promise<void> {
+  const db = harness();
+
+  // Hold the first call inside the interpreter, which is exactly where the
+  // original delivery spends its time in production.
+  let release = (): void => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const slow: AdmissionInterpreter = {
+    async interpret() {
+      await held;
+      return CLEAR_BUY;
+    },
+  };
+
+  const firstPromise = runAdmission(request(db, { interpreter: slow }));
+  // Let the first call reach the interpreter before the duplicate arrives.
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const second = await runAdmission(request(db));
   assert.equal(
-    second.outcome.source_event_id,
-    first.outcome.source_event_id,
-    "both deliveries resolve to the same inbox row"
+    second.status,
+    "in_flight",
+    "a duplicate must not decide while another worker owns the event"
   );
+  if (second.status === "in_flight") {
+    assert.ok(second.claimedBy, "the live claim is reported, not invented");
+    assert.ok(second.claimExpiresAt);
+  }
+  assert.equal(
+    db.tables.operational_cases.length,
+    0,
+    "no Case yet: the first call has not finished"
+  );
+
+  release();
+  const first = await firstPromise;
+  assert.equal(first.status, "evaluated");
+  if (first.status !== "evaluated") return;
+  assert.equal(first.outcome.decision.disposition, "admitted");
+  assert.equal(db.tables.operational_cases.length, 1, "still exactly one Case");
+  assert.equal(db.tables.source_events.length, 1);
+}
+
+/** 3. Failure after the inbox insert, before any admission settlement. */
+async function testCrashBeforeSettlement(): Promise<void> {
+  const db = harness();
+  const exploding: AdmissionInterpreter = {
+    async interpret() {
+      throw new Error("interpreter died mid-evaluation");
+    },
+  };
+
+  await assert.rejects(
+    () => runAdmission(request(db, { interpreter: exploding })),
+    /interpreter died/
+  );
+
+  const [inbox] = db.tables.source_events;
+  assert.equal(inbox.status, "failed", "the claim is released, not held");
+  assert.equal(inbox.decision_jsonb, null, "nothing was settled");
+  assert.equal(db.tables.operational_cases.length, 0);
+
+  // The retry must reclaim and decide cleanly — a crashed attempt must not
+  // poison the dedup_key forever.
+  const retry = await runAdmission(request(db));
+  assert.equal(retry.status, "evaluated");
+  if (retry.status !== "evaluated") return;
+  assert.equal(retry.outcome.decision.disposition, "admitted");
+  assert.equal(retry.outcome.deduplicated, false);
+  assert.equal(db.tables.source_events.length, 1, "still one inbox row");
+  assert.equal(db.tables.operational_cases.length, 1, "exactly one Case");
+}
+
+/**
+ * 4. Failure AFTER Case materialisation, before source-event settlement.
+ *
+ * The write that fails is a real one — the Case timeline event, which lands
+ * after the Case, the inbox link and the facts. Injecting the fault at the
+ * actual write proves recovery reads what the CODE wrote, where constructing
+ * the post-crash rows by hand would only prove it reads what the TEST wrote.
+ */
+async function testCrashAfterMaterialisation(): Promise<void> {
+  const db = harness();
+  db.failNextWrite("operational_case_events");
+
+  await assert.rejects(() => runAdmission(request(db)), isInjectedFailure);
+
+  const [inbox] = db.tables.source_events;
+  assert.equal(inbox.status, "failed");
+  assert.equal(inbox.decision_jsonb, null, "never settled");
+  assert.ok(inbox.admitted_case_id, "but the Case pointer is durable");
+  assert.equal(db.tables.operational_cases.length, 1);
+  const caseId = db.tables.operational_cases[0].id;
+
+  const retry = await runAdmission(request(db));
+  assert.equal(retry.status, "evaluated");
+  if (retry.status !== "evaluated") return;
+  assert.equal(
+    db.tables.operational_cases.length,
+    1,
+    "recovery converges on the existing Case; it never creates a second one"
+  );
+  assert.equal(retry.outcome.case_id, caseId);
+  assert.equal(
+    retry.outcome.decision.disposition,
+    "admitted",
+    "the recovered outcome agrees with the Case already written"
+  );
+  assert.equal(db.tables.source_events[0].status, "completed");
+}
+
+/**
+ * 4b. Failure between Case creation and the FIRST fact — the narrow window
+ * where no disposition was ever recorded.
+ */
+async function testCrashBetweenCaseAndFirstFact(): Promise<void> {
+  const db = harness();
+  db.failNextWrite("case_facts");
+
+  await assert.rejects(() => runAdmission(request(db)), isInjectedFailure);
+  assert.equal(db.tables.operational_cases.length, 1);
+  assert.equal(db.tables.case_facts.length, 0, "no disposition was recorded");
+  const caseId = db.tables.operational_cases[0].id;
+
+  const retry = await runAdmission(request(db));
+  assert.equal(retry.status, "evaluated");
+  if (retry.status !== "evaluated") return;
+  assert.equal(db.tables.operational_cases.length, 1, "still exactly one Case");
+  assert.equal(retry.outcome.case_id, caseId);
+  assert.equal(retry.outcome.decision.disposition, "admitted");
+  assert.equal(
+    retry.outcome.decision.reason,
+    "recovered_incomplete_materialisation",
+    "recovery states what it knows, and does not claim a judgment it never made"
+  );
+  assert.ok(
+    db.tables.case_facts.some(
+      (fact) => fact.fact_key === "admission.disposition"
+    ),
+    "the finished materialisation records the disposition on the same Case"
+  );
+}
+
+/** 5. Recovery after an expired claim, without any explicit failure. */
+async function testExpiredClaimIsReclaimable(): Promise<void> {
+  const db = harness();
+
+  // A worker that claims and then vanishes: hold the interpreter open forever
+  // and abandon the promise, which is what a process kill looks like from the
+  // database's side.
+  const stalled: AdmissionInterpreter = {
+    interpret: () => new Promise(() => undefined),
+  };
+  void runAdmission(
+    request(db, { interpreter: stalled, leaseSeconds: 0 })
+  ).catch(() => undefined);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const [inbox] = db.tables.source_events;
+  assert.equal(inbox.status, "processing", "the dead worker still holds it");
+
+  // A zero-second lease is already expired, so the next delivery may reclaim.
+  const retry = await runAdmission(request(db));
+  assert.equal(
+    retry.status,
+    "evaluated",
+    "an expired lease is reclaimable; a dead worker cannot poison the key"
+  );
+  if (retry.status !== "evaluated") return;
+  assert.equal(retry.outcome.decision.disposition, "admitted");
+  assert.equal(db.tables.source_events.length, 1);
+  assert.equal(db.tables.operational_cases.length, 1);
+}
+
+/** 6 + 7. Across every path above: one Case, and never two contradictory answers. */
+async function testNoPathProducesTwoCasesOrTwoAnswers(): Promise<void> {
+  // Each scenario runs the real executor repeatedly against one dedup_key and
+  // collects every effective disposition it ever reported.
+  const scenarios: Array<[string, (db: FakeDb) => Promise<void>]> = [
+    [
+      "clean redelivery x3",
+      async (db) => {
+        await runAdmission(request(db));
+        await runAdmission(request(db));
+        await runAdmission(request(db));
+      },
+    ],
+    [
+      "crash before settlement, then two retries",
+      async (db) => {
+        db.failNextWrite("case_facts");
+        await runAdmission(request(db)).catch(() => undefined);
+        await runAdmission(request(db));
+        await runAdmission(request(db));
+      },
+    ],
+    [
+      "crash after materialisation, then two retries",
+      async (db) => {
+        db.failNextWrite("operational_case_events");
+        await runAdmission(request(db)).catch(() => undefined);
+        await runAdmission(request(db));
+        await runAdmission(request(db));
+      },
+    ],
+  ];
+
+  for (const [label, run] of scenarios) {
+    const db = harness();
+    await run(db);
+
+    assert.equal(
+      db.tables.operational_cases.length,
+      1,
+      `${label}: exactly one Opportunity Case`
+    );
+    assert.equal(
+      db.tables.source_events.length,
+      1,
+      `${label}: exactly one inbox row`
+    );
+
+    const settled = db.tables.source_events[0]
+      .decision_jsonb as { disposition?: string } | null;
+    assert.ok(settled, `${label}: the event settled`);
+    assert.equal(
+      settled?.disposition,
+      "admitted",
+      `${label}: the settled disposition matches the durable Case`
+    );
+
+    // And the Case's own current disposition fact agrees with the inbox.
+    const dispositionFacts = db.tables.case_facts.filter(
+      (fact) =>
+        fact.fact_key === "admission.disposition" && fact.superseded_by == null
+    );
+    assert.equal(
+      dispositionFacts.length,
+      1,
+      `${label}: exactly one current disposition fact`
+    );
+    assert.equal(
+      (dispositionFacts[0].value_jsonb as { disposition?: string })
+        .disposition,
+      "admitted",
+      `${label}: Case and inbox never disagree`
+    );
+  }
 }
 
 /** A genuinely different event about the same lead is not a duplicate. */
@@ -889,6 +1202,69 @@ function testLatestInboundIgnoresOutbound(): void {
 // Correlation coverage (Technical Plan §7 (a)) — applies from SL-2
 // ============================================================
 
+/**
+ * The correlation-coverage check the shared baseline adds from SL-2 onward
+ * (Technical Plan §7 (a)).
+ *
+ * Asserting that `insertAiUsageEvent` persists the column would prove the
+ * column exists, not that the admission path uses it. What actually decides
+ * coverage is whether the model call runs inside a bound ambient context: with
+ * none, the meter drops the event entirely and the column stays empty forever.
+ * So this drives the REAL executor and captures what the meter would have
+ * written.
+ */
+async function testAdmissionModelCallIsCorrelated(): Promise<void> {
+  const captured: AiUsageEventInput[] = [];
+  setAiUsageRecorder((event) => {
+    captured.push(event);
+  });
+  try {
+    const db = harness();
+    // An interpreter that meters exactly the way the production one does. What
+    // is under test is the CONTEXT admission binds around it, not the metering
+    // call itself.
+    const metering: AdmissionInterpreter = {
+      async interpret() {
+        await recordOpenRouterCallUsage({
+          modelId: "openai/gpt-5.4-mini",
+          modelRole: "relationship_admission_interpreter",
+          operation: "classification",
+          usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+        });
+        return CLEAR_BUY;
+      },
+    };
+    const result = await runAdmission(
+      request(db, { interpreter: metering })
+    );
+    assert.equal(result.status, "evaluated");
+
+    assert.equal(
+      captured.length,
+      1,
+      "the admission model call is metered, not dropped for want of a context"
+    );
+    assert.equal(
+      captured[0].organizationId,
+      PILOT_ORG,
+      "an Organization-scoped model call correlates to its Organization"
+    );
+    assert.equal(captured[0].userId, ADVISOR);
+    assert.equal(
+      captured[0].modelRole,
+      "relationship_admission_interpreter",
+      "the admission interpreter is attributable as its own role"
+    );
+    assert.equal(
+      captured[0].operationalCaseId ?? null,
+      null,
+      "no Case exists yet at interpretation time — which is exactly why the Organization dimension had to land at SL-2"
+    );
+  } finally {
+    setAiUsageRecorder(null);
+  }
+}
+
 async function testUsageCorrelationCoverage(): Promise<void> {
   const db = createFakeDb({ tables: { ai_usage_events: [] } });
   await insertAiUsageEvent(db.client as DbClient, {
@@ -960,7 +1336,14 @@ const tests: Array<[string, () => void | Promise<void>]> = [
   ["SA-2.2 an admitted lead materialises exactly one Case", testAdmittedMaterialisesOneCase],
   ["SA-2.3 an ambiguous opener creates no Case", testAmbiguousCreatesNoCase],
   ["SA-2.3 an absent judgment behaves as ambiguity", testNoJudgmentIsAmbiguity],
-  ["SA-2.4 the same event twice yields one outcome", testDuplicateSourceEvent],
+  ["SA-2.4 duplicate after a completed admission returns the same Case", testDuplicateAfterCompletedAdmission],
+  ["SA-2.4 duplicate after a completed refusal returns that refusal", testDuplicateAfterCompletedRefusal],
+  ["SA-2.4 duplicate while in flight does not decide", testDuplicateWhileInFlight],
+  ["SA-2.4 crash before settlement is reclaimable", testCrashBeforeSettlement],
+  ["SA-2.4 crash after materialisation converges on the same Case", testCrashAfterMaterialisation],
+  ["SA-2.4 crash between Case and first fact is recovered honestly", testCrashBetweenCaseAndFirstFact],
+  ["SA-2.4 an expired claim is reclaimable", testExpiredClaimIsReclaimable],
+  ["SA-2.4 no path yields two Cases or two contradictory answers", testNoPathProducesTwoCasesOrTwoAnswers],
   ["SA-2.4 distinct events are not deduplicated", testDistinctEventsAreNotDeduplicated],
   ["SA-2.5 a hard bound beats policy and confidence", testHardBoundWins],
   ["SA-2.6 an excluded category is not auto-admitted", testExcludedCategory],
@@ -981,7 +1364,8 @@ const tests: Array<[string, () => void | Promise<void>]> = [
   ["a dedup key prefers the provider message id", testDedupKeyPrefersProviderId],
   ["a dedup key is stable across polls", testDedupKeyIsStableAcrossPolls],
   ["the latest inbound message ignores outbound", testLatestInboundIgnoresOutbound],
-  ["usage correlation covers the Organization", testUsageCorrelationCoverage],
+  ["the admission model call is correlated, not dropped", testAdmissionModelCallIsCorrelated],
+  ["usage correlation persists the Organization", testUsageCorrelationCoverage],
   ["the eval set is well formed and has a stated bar", testEvalSetIsWellFormed],
 ];
 

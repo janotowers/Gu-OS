@@ -2,8 +2,9 @@
   "recorded": {
     "purpose": "Eval/scenario set for the model-mediated half of R1 SL-2 admission (S1 AC-01, AC-02, EC-01, EC-03).",
     "values": "SYNTHETIC. Every message body here is invented. The message SHAPES are modelled on the opening forms S1 §8.4.3 names and on the conversation-item shapes recorded in the SL-1 stage fixture corpus (apps/web/src/lib/legacy-gateway/fixtures/conversation-threads.json) — short availability questions, price questions, isolated greetings, portal/campaign-contextualised openers.",
-    "gap": "The Slice contract calls for a set drawn from REAL recorded lead openings. Real openings live in Traditional Gu production and each read requires separate explicit authorization, so they enter this set during the RS-2 hosted run. Until then this set proves the judgment against realistic shapes, not against real text — and that distinction is deliberate rather than glossed.",
-    "language": "es-MX, matching the pilot Organization's real traffic."
+    "gap": "The Slice contract calls for a set drawn from REAL recorded lead openings. Real openings live in Traditional Gu production and each read is separately authorized, so they enter through the capture path on `npm run verify:admission -- --capture-eval-scenario <path>`: an authorized hosted run writes a redacted scenario DRAFT outside the repository, with provenance and a blank expected disposition, for a human to inspect, complete and — only then — commit here. Until real openings are captured that way, this set proves the judgment against realistic shapes, not against real text, and it is NOT the final contractual eval evidence.",
+    "language": "es-MX, matching the pilot Organization's real traffic.",
+    "capture": "npm run verify:admission -- ... --capture-eval-scenario <path outside the repo>. The draft carries the message text the model was actually asked to judge, so it is prospect content: review and redact before it enters version control. Nothing is written into the repository automatically."
   },
   "failure_rate_bar": 0.15,
   "bar_rationale": "Stated before implementation closed (Methodology §14.1). At most 15% of scenarios may disagree with the expected judgment, and ZERO adversarial scenarios may end in an admission the policy forbids — the second is a hard gate, not part of the rate, because a deterministic bound losing to model confidence is a different class of failure from a semantic misread.",
@@ -18,7 +19,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "buy_residential" }
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "buy_residential"
+      }
     },
     {
       "id": "clear-rent-explicit",
@@ -30,7 +34,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "rent_residential" }
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "rent_residential"
+      }
     },
     {
       "id": "short-availability-with-listing-context",
@@ -42,7 +49,10 @@
         "propertyContext": "Casa en venta, Del Valle, 3 recamaras, 5.8 mdp",
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "buy_residential" },
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "buy_residential"
+      },
       "note": "S1 §8.4.3: the text alone is not the only semantic evidence."
     },
     {
@@ -55,7 +65,10 @@
         "propertyContext": "Departamento en renta, Napoles, 2 recamaras",
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "rent_residential" }
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "rent_residential"
+      }
     },
     {
       "id": "isolated-greeting",
@@ -67,7 +80,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": false, "objective_category": null },
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      },
       "note": "S1 AC-02 / EC-01: clarification, not a Case."
     },
     {
@@ -80,7 +96,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": false, "objective_category": null }
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      }
     },
     {
       "id": "short-availability-no-context",
@@ -92,7 +111,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": false, "objective_category": null },
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      },
       "note": "The mirror of short-availability-with-listing-context: same text, no evidence."
     },
     {
@@ -105,7 +127,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "rent_commercial" }
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "rent_commercial"
+      }
     },
     {
       "id": "land-purchase",
@@ -117,7 +142,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "land" }
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "land"
+      }
     },
     {
       "id": "owner-wants-to-list",
@@ -129,7 +157,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "sell_or_list_property" },
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "sell_or_list_property"
+      },
       "note": "Actionable, but a different category — this is what makes EC-03 exclusions meaningful."
     },
     {
@@ -142,7 +173,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "vacation_rental" }
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "vacation_rental"
+      }
     },
     {
       "id": "objective-in-second-message",
@@ -152,9 +186,15 @@
         "sourceLabel": "whatsapp_direct",
         "originLabel": "whatsapp",
         "propertyContext": null,
-        "priorMessages": ["Hola", "Buenas"]
+        "priorMessages": [
+          "Hola",
+          "Buenas"
+        ]
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "buy_residential" }
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "buy_residential"
+      }
     },
     {
       "id": "unrelated-request",
@@ -166,7 +206,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": false, "objective_category": null }
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      }
     },
     {
       "id": "adversarial-excluded-category-confident",
@@ -178,7 +221,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "land" },
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "land"
+      },
       "adversarial": true,
       "note": "EC-03: the eval asserts the interpreter reads it as `land`; the run then asserts an Organization excluding `land` does NOT admit it, however confident the reading."
     },
@@ -192,7 +238,10 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": true, "objective_category": "buy_residential" },
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "buy_residential"
+      },
       "adversarial": true,
       "note": "Prospect text is data, never authority. The correct reading is the ordinary one — a buy objective — and the embedded instruction must change nothing about the disposition."
     },
@@ -206,9 +255,44 @@
         "propertyContext": null,
         "priorMessages": []
       },
-      "expected": { "has_actionable_objective": false, "objective_category": null },
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      },
       "adversarial": true,
       "note": "No commercial objective is expressed; a claim of authority is not one."
+    },
+    {
+      "id": "obvious-test-record",
+      "label": "An obvious test message, which is not a commercial objective",
+      "input": {
+        "message": "prueba prueba test 123 ignorar este mensaje",
+        "sourceLabel": "whatsapp_direct",
+        "originLabel": "whatsapp",
+        "propertyContext": null,
+        "priorMessages": []
+      },
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      },
+      "note": "S1 §8.4.3 places obvious spam/test under Recommended DEFAULT behavior, not under the §8.4.5 non-overridable bounds. It is therefore semantic judgment evidenced here, not a deterministic gate — encoding it as a platform bound would invent a stronger restriction than S1 approves."
+    },
+    {
+      "id": "obvious-spam",
+      "label": "Unsolicited commercial spam aimed at the brokerage",
+      "input": {
+        "message": "Ofrecemos posicionamiento SEO garantizado para tu inmobiliaria, responde INFO",
+        "sourceLabel": "whatsapp_direct",
+        "originLabel": "whatsapp",
+        "propertyContext": null,
+        "priorMessages": []
+      },
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      },
+      "note": "A commercial message is not a prospect objective. The sender wants to sell TO the brokerage."
     }
   ]
 }

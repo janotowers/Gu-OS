@@ -40,6 +40,39 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Loads `apps/web/.env.local` when the key is not already exported.
+ *
+ * Next.js reads that file; `tsx` does not, so without this the runner would
+ * report an environment blocker on a machine that is in fact configured. Only
+ * fills variables that are unset, so an explicit export always wins.
+ */
+function loadWebEnvLocal(): void {
+  const envPath = path.resolve(__dirname, "..", "..", "..", "..", ".env.local");
+  let text: string;
+  try {
+    text = readFileSync(envPath, "utf8");
+  } catch {
+    return;
+  }
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const i = line.indexOf("=");
+    if (i <= 0) continue;
+    const key = line.slice(0, i).trim();
+    if (process.env[key] !== undefined) continue;
+    let value = line.slice(i + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
 interface Scenario {
   id: string;
   label: string;
@@ -83,6 +116,7 @@ const ATTRIBUTION = {
 };
 
 async function main(): Promise<void> {
+  loadWebEnvLocal();
   if (!process.env.OPENROUTER_API_KEY) {
     console.error(
       "eval:admission requires OPENROUTER_API_KEY — the point of this run is to exercise a real model."

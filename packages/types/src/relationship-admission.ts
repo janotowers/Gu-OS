@@ -52,7 +52,14 @@ export type AdmissionReason =
    */
   | "policy_unavailable"
   /** An equivalent source event was already processed (AC-05). */
-  | "duplicate_source_event";
+  | "duplicate_source_event"
+  /**
+   * An earlier attempt created the Opportunity Case but died before recording
+   * why. The Case's existence is durable evidence that admission occurred, so
+   * recovery converges on it rather than deciding again or creating a second
+   * one — and says so plainly instead of claiming a reason it cannot know.
+   */
+  | "recovered_incomplete_materialisation";
 
 export const ADMISSION_REASONS: readonly AdmissionReason[] = [
   "clear_objective",
@@ -63,6 +70,7 @@ export const ADMISSION_REASONS: readonly AdmissionReason[] = [
   "manual_admission_required",
   "policy_unavailable",
   "duplicate_source_event",
+  "recovered_incomplete_materialisation",
 ] as const;
 
 /**

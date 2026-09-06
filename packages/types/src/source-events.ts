@@ -63,6 +63,11 @@ export interface SourceEvent {
    * does not depend on the admission vocabulary it merely carries.
    */
   decision_jsonb: Record<string, unknown> | null;
+  /**
+   * The Opportunity Case this event admitted, written BEFORE settlement so a
+   * crash between materialisation and settlement stays recoverable.
+   */
+  admitted_case_id: string | null;
   received_at: string;
 }
 

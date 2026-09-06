@@ -58,7 +58,11 @@ create table public.organization_policies (
   -- structured policy is compiled from it.
   nl_intent_source    text,
 
-  published_by        uuid references public.profiles(id) on delete set null,
+  -- NO ACTION on delete, matching the workflow_definitions precedent (00065).
+  -- `on delete set null` would let a profile deletion silently rewrite the
+  -- publication provenance of a row ADR-108 declares immutable; deleting a
+  -- profile that published a policy is refused instead.
+  published_by        uuid references public.profiles(id),
   published_at        timestamptz,
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
@@ -105,18 +109,26 @@ set search_path = ''
 as $$
 begin
   if old.status = 'published' then
-    -- The only permitted transition out of published is archival, and archival
-    -- may not alter what the policy said.
+    -- ADR-108 §4: published versions are immutable. The ONLY permitted change
+    -- is the lifecycle transition to archived (plus its updated_at stamp).
+    -- Every other column is pinned, publication provenance included: a
+    -- disposition that attributed this version must be reconstructable from it
+    -- later, which is false if nl_intent_source, published_by or published_at
+    -- can be rewritten afterwards.
     if new.status = 'archived'
       and new.id = old.id
       and new.organization_id = old.organization_id
       and new.policy_type = old.policy_type
       and new.version = old.version
       and new.policy_jsonb = old.policy_jsonb
+      and new.nl_intent_source is not distinct from old.nl_intent_source
+      and new.published_by is not distinct from old.published_by
+      and new.published_at is not distinct from old.published_at
+      and new.created_at = old.created_at
     then
       return new;
     end if;
-    raise exception 'organization_policies rows with status=published are immutable (publish a new version, or archive)';
+    raise exception 'organization_policies rows with status=published are immutable; only status may change, to archived (publish a new version instead)';
   end if;
   return new;
 end;
@@ -218,6 +230,17 @@ create table public.source_events (
   -- is the processing record.
   decision_jsonb      jsonb,
 
+  -- The Opportunity Case this event admitted, written immediately after the
+  -- Case row exists and BEFORE settlement. That ordering is the whole point: a
+  -- process that dies between materialisation and settlement leaves a durable
+  -- pointer, so the retry reconciles to the Case that already exists instead of
+  -- creating a second one (S1 §8.16: duplicate/retry processing must not create
+  -- multiple active Opportunities for the same admitted event).
+  --
+  -- Composite FK, matching case_relationships (00083): a cross-tenant pointer is
+  -- structurally impossible rather than merely discouraged.
+  admitted_case_id    uuid,
+
   received_at         timestamptz not null default now(),
 
   constraint source_events_dedup_key_not_empty
@@ -226,7 +249,11 @@ create table public.source_events (
   constraint source_events_completed_shape check (
     (status = 'completed' and completed_at is not null)
     or (status <> 'completed' and completed_at is null)
-  )
+  ),
+
+  constraint source_events_admitted_case_same_org
+    foreign key (admitted_case_id, organization_id)
+    references public.operational_cases (id, organization_id)
 );
 
 comment on table public.source_events is
@@ -237,6 +264,12 @@ comment on column public.source_events.dedup_key is
 
 comment on column public.source_events.payload_jsonb is
   'Allowlisted normalized payload produced by the SL-1 gateway. Never a raw legacy record dump.';
+
+comment on column public.source_events.admitted_case_id is
+  'The Opportunity Case this event admitted. Written before settlement so a crash between materialisation and settlement is recoverable: the retry reconciles to this Case instead of creating a second one. Organization-contained by composite FK.';
+
+comment on column public.source_events.status is
+  'pending -> processing -> completed | failed. A claim moves pending to processing and stamps claim_expires_at; a duplicate arriving while a live claim holds must NOT decide anything, and a duplicate arriving after the lease expired may reclaim. Only completed carries a settled decision_jsonb.';
 
 -- Organization-scoped uniqueness: two Organizations may legitimately produce the
 -- same external key, and neither should collide with the other.
@@ -251,12 +284,33 @@ create index idx_source_events_lead
   on public.source_events (organization_id, external_lead_ref)
   where external_lead_ref is not null;
 
+-- Stale-claim recovery, mirroring the work-plane lease index (00069): a
+-- processing row whose claim_expires_at has passed is reclaimable.
+create index idx_source_events_expired_claims
+  on public.source_events (claim_expires_at)
+  where status = 'processing';
+
 alter table public.source_events enable row level security;
 
 create policy "Service role manages source events"
   on public.source_events for all
   using (auth.role() = 'service_role')
   with check (auth.role() = 'service_role');
+
+-- ============================================================
+-- Reconciliation lookup: the Case a source event already materialised
+--
+-- `admitted_case_id` closes the crash window after it is written, but there is
+-- still a narrow one between `operational_cases` INSERT and that write. The
+-- admission executor stamps the source event id into the Case context, so
+-- recovery has a second, independent way to find an already-created Case
+-- before deciding to create one. This index makes that lookup deterministic
+-- rather than a scan.
+-- ============================================================
+
+create index idx_operational_cases_source_event
+  on public.operational_cases ((context_jsonb ->> 'source_event_id'))
+  where context_jsonb ? 'source_event_id';
 
 -- ============================================================
 -- ai_usage_events.organization_id — correlation completeness (TP §7 (a))

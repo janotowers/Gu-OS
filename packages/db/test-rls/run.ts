@@ -513,13 +513,16 @@ async function main(): Promise<void> {
     // ---------------------------------------------------------------
     console.log("\nSL-2 organization_policies — TD-2 / ADR-108");
 
+    // published_by is populated deliberately: without it the provenance
+    // immutability checks and the FK check below would both pass vacuously.
     await client.query(
       `insert into public.organization_policies
-         (organization_id, policy_type, version, status, policy_jsonb, published_at)
+         (organization_id, policy_type, version, status, policy_jsonb,
+          nl_intent_source, published_by, published_at)
        values ($1, 'relationship_admission', 1, 'published',
                '{"excluded_categories":[],"auto_admit_clear_objectives":true,"trusted_sources":[]}'::jsonb,
-               now())`,
-      [f.orgA]
+               'admitimos compras y rentas residenciales', $2, now())`,
+      [f.orgA, f.memberA2]
     );
 
     const countPolicies = (claims: Claims) =>
@@ -566,17 +569,49 @@ async function main(): Promise<void> {
       assert.equal(code, UNIQUE_VIOLATION);
     });
 
-    await t("a published policy cannot be edited", async () => {
-      // A disposition that attributed this version must keep meaning what it meant.
+    // ADR-108 §4: published versions are immutable. A disposition that
+    // attributed this version must keep meaning what it meant, so the pinned
+    // set includes publication PROVENANCE, not only the policy body.
+    const immutableColumns: Array<[string, string]> = [
+      [
+        "policy_jsonb",
+        `policy_jsonb = '{"excluded_categories":["land"],"auto_admit_clear_objectives":false,"trusted_sources":[]}'::jsonb`,
+      ],
+      ["nl_intent_source", "nl_intent_source = 'rewritten intent'"],
+      ["published_by", "published_by = null"],
+      ["published_at", "published_at = now() + interval '1 day'"],
+      ["created_at", "created_at = now() - interval '1 year'"],
+      ["version", "version = 99"],
+      ["policy_type", "policy_type = 'relationship_admission'::text"],
+      ["status back to draft", "status = 'draft'"],
+    ];
+
+    for (const [label, assignment] of immutableColumns) {
+      await t(`a published policy cannot change ${label}`, async () => {
+        const code = await errorCode(() =>
+          client.query(
+            `update public.organization_policies
+                set ${assignment}
+              where organization_id = $1 and status = 'published'`,
+            [f.orgA]
+          )
+        );
+        assert.equal(code, RAISE_EXCEPTION);
+      });
+    }
+
+    await t("deleting the profile that published a policy is refused", async () => {
+      // `on delete set null` would let a profile deletion silently rewrite the
+      // publication provenance of a row ADR-108 declares immutable. NO ACTION
+      // refuses instead, matching workflow_definitions (00065).
+      //
+      // memberA2 is used because they own no Cases: deleting a Case-owning
+      // profile trips the append-only case_facts trigger on the cascade first,
+      // which would make this assertion pass for the wrong reason.
       const code = await errorCode(() =>
-        client.query(
-          `update public.organization_policies
-              set policy_jsonb = '{"excluded_categories":["land"],"auto_admit_clear_objectives":false,"trusted_sources":[]}'::jsonb
-            where organization_id = $1 and status = 'published'`,
-          [f.orgA]
-        )
+        client.query("delete from auth.users where id = $1", [f.memberA2])
       );
-      assert.equal(code, RAISE_EXCEPTION);
+      assert.equal(code, FK_VIOLATION);
     });
 
     await t("a published policy cannot be deleted", async () => {
@@ -601,6 +636,141 @@ async function main(): Promise<void> {
         [f.orgA]
       );
       assert.equal(rowCount, 1);
+    });
+
+    // ---------------------------------------------------------------
+    // SL-2 processing invariants that only a real PostgreSQL can prove.
+    //
+    // The module selftests exercise the state machine through the real query
+    // helpers against an in-memory client, which is faithful for sequential
+    // behaviour but single-threaded: two conditional UPDATEs racing for one row
+    // is a PostgreSQL semantic, and simulating it would only prove the fake
+    // agrees with itself. Same reason this suite exists for RLS.
+    // ---------------------------------------------------------------
+    console.log("\nSL-2 source_events — claim, lease and containment");
+
+    const newEvent = async (organization: string, key: string) =>
+      (
+        await client.query<{ id: string }>(
+          `insert into public.source_events
+             (organization_id, source_system, event_kind, dedup_key)
+           values ($1, 'traditional_gu', 'inbound_prospect_message', $2)
+           returning id`,
+          [organization, key]
+        )
+      ).rows[0].id;
+
+    /** The exact conditional UPDATE claimSourceEvent issues. */
+    const claim = (eventId: string, worker: string, leaseSeconds: number) =>
+      client.query(
+        `update public.source_events
+            set status = 'processing',
+                claimed_at = now(),
+                claimed_by = $2,
+                claim_expires_at = now() + make_interval(secs => $3)
+          where id = $1
+            and status = 'pending'
+          returning id`,
+        [eventId, worker, leaseSeconds]
+      );
+
+    await t("two workers racing for one pending event produce one winner", async () => {
+      const eventId = await newEvent(f.orgA, "race:one");
+      // Both statements target the same row with the same precondition. The
+      // second sees status = 'processing' and updates nothing.
+      const [first, second] = await Promise.all([
+        claim(eventId, "worker-a", 300),
+        claim(eventId, "worker-b", 300),
+      ]);
+      assert.equal(
+        (first.rowCount ?? 0) + (second.rowCount ?? 0),
+        1,
+        "exactly one claim may win"
+      );
+      const { rows } = await client.query<{ claimed_by: string }>(
+        "select claimed_by from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.ok(["worker-a", "worker-b"].includes(rows[0].claimed_by));
+    });
+
+    await t("a live claim cannot be stolen by a reclaim", async () => {
+      const eventId = await newEvent(f.orgA, "race:live");
+      await claim(eventId, "worker-a", 300);
+      // reclaimSourceEvent's expired-lease branch.
+      const stolen = await client.query(
+        `update public.source_events
+            set claimed_by = 'worker-b'
+          where id = $1
+            and status = 'processing'
+            and claim_expires_at <= now()`,
+        [eventId]
+      );
+      assert.equal(stolen.rowCount, 0, "a live lease is not reclaimable");
+    });
+
+    await t("an expired claim is reclaimable, so a dead worker cannot poison the key", async () => {
+      const eventId = await newEvent(f.orgA, "race:expired");
+      // A zero-second lease is already expired when it is taken.
+      await claim(eventId, "worker-a", 0);
+      const reclaimed = await client.query(
+        `update public.source_events
+            set claimed_by = 'worker-b',
+                claim_expires_at = now() + make_interval(secs => 300)
+          where id = $1
+            and status = 'processing'
+            and claim_expires_at <= now()
+          returning id`,
+        [eventId]
+      );
+      assert.equal(reclaimed.rowCount, 1);
+    });
+
+    await t("a source event cannot point at another Organization's Case", async () => {
+      const eventId = await newEvent(f.orgA, "containment:cross-tenant");
+      const code = await errorCode(() =>
+        client.query(
+          "update public.source_events set admitted_case_id = $2 where id = $1",
+          [eventId, f.orgCaseB]
+        )
+      );
+      // Composite FK (admitted_case_id, organization_id), same shape as
+      // case_relationships: a cross-tenant pointer is structurally impossible.
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    await t("a source event may point at its own Organization's Case", async () => {
+      const eventId = await newEvent(f.orgA, "containment:same-tenant");
+      await client.query(
+        "update public.source_events set admitted_case_id = $2 where id = $1",
+        [eventId, f.orgCaseA]
+      );
+      const { rows } = await client.query<{ admitted_case_id: string }>(
+        "select admitted_case_id from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].admitted_case_id, f.orgCaseA);
+    });
+
+    await t("the reconciliation lookup finds a Case by its source event", async () => {
+      await client.query(
+        `update public.operational_cases
+            set context_jsonb = jsonb_build_object('source_event_id', 'evt-recon')
+          where id = $1`,
+        [f.orgCaseA]
+      );
+      const { rows } = await client.query<{ id: string }>(
+        `select id from public.operational_cases
+          where organization_id = $1
+            and context_jsonb ->> 'source_event_id' = 'evt-recon'`,
+        [f.orgA]
+      );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].id, f.orgCaseA);
+      await client.query(
+        "update public.operational_cases set context_jsonb = '{}'::jsonb where id = $1",
+        [f.orgCaseA]
+      );
     });
 
     // ---------------------------------------------------------------
