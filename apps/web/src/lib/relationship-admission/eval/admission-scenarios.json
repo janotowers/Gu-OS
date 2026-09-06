@@ -1,8 +1,8 @@
 {
   "recorded": {
     "purpose": "Eval/scenario set for the model-mediated half of R1 SL-2 admission (S1 AC-01, AC-02, EC-01, EC-03).",
-    "values": "SYNTHETIC. Every message body here is invented. The message SHAPES are modelled on the opening forms S1 §8.4.3 names and on the conversation-item shapes recorded in the SL-1 stage fixture corpus (apps/web/src/lib/legacy-gateway/fixtures/conversation-threads.json) — short availability questions, price questions, isolated greetings, portal/campaign-contextualised openers.",
-    "gap": "The Slice contract calls for a set drawn from REAL recorded lead openings. Real openings live in Traditional Gu production and each read is separately authorized, so they enter through the capture path on `npm run verify:admission -- --capture-eval-scenario <path>`: an authorized hosted run writes a redacted scenario DRAFT outside the repository, with provenance and a blank expected disposition, for a human to inspect, complete and — only then — commit here. Until real openings are captured that way, this set proves the judgment against realistic shapes, not against real text, and it is NOT the final contractual eval evidence.",
+    "values": "MIXED. One scenario (`real-advisor-contact-request`) is a REAL recorded lead opening, captured under the bounded RS-2 authorization and redacted before inclusion; its expected result was established by human/domain review independently of the model's output. Every other message body is INVENTED, with shapes modelled on the opening forms S1 §8.4.3 names and on the conversation-item shapes in the SL-1 stage fixture corpus (apps/web/src/lib/legacy-gateway/fixtures/conversation-threads.json).",
+    "gap": "The Slice contract calls for a set drawn from REAL recorded lead openings. One is now included; the rest remain synthetic, so the set is only partly drawn from real traffic. Further real openings enter the same way — `npm run verify:admission -- --capture-eval-scenario <path outside the repo>` writes a redacted DRAFT with provenance and a BLANK expected result, a human redacts it and establishes the expected label independently, and only then does it land here. Nothing is written into the repository automatically, and `modelSaid` is never copied into `expected`.",
     "language": "es-MX, matching the pilot Organization's real traffic.",
     "capture": "npm run verify:admission -- ... --capture-eval-scenario <path outside the repo>. The draft carries the message text the model was actually asked to judge, so it is prospect content: review and redact before it enters version control. Nothing is written into the repository automatically."
   },
@@ -293,6 +293,37 @@
         "objective_category": null
       },
       "note": "A commercial message is not a prospect objective. The sender wants to sell TO the brokerage."
+    },
+    {
+      "id": "real-advisor-contact-request",
+      "label": "REAL recorded opening — asks for advisor contact, states no property objective",
+      "recorded": {
+        "values": "REAL, from a Traditional Gu production lead read under the bounded RS-2 authorization. Direct identifiers (email address) replaced; the wording the judgment turns on is otherwise unchanged.",
+        "leadDigest": "sha256:d25abcb07ad4a9ee",
+        "organizationDigest": "sha256:eab41f21d4c319b6",
+        "capability": "legacy_lead_get_recent_messages",
+        "sourceUpdatedAt": "2026-02-06T20:38:19.315Z",
+        "expectedEstablishedBy": "human/domain review against S1 AC-02 / EC-01, independently of the model's own output. `modelSaid` is deliberately not carried into this file."
+      },
+      "input": {
+        "message": "Que un asesor me contacte",
+        "sourceLabel": null,
+        "originLabel": "whatsapp",
+        "propertyContext": null,
+        "priorMessages": [
+          "Opcion 1",
+          "Quiero un asesor",
+          "[correo redactado]",
+          "Sí pertenezco a AMPI",
+          "Quiero un asesor",
+          "Información adicional"
+        ]
+      },
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      },
+      "note": "Human/domain expected result: deferred_clarification / ambiguous_objective, and NO Opportunity Case. The opening asks for advisor contact but states no discernible buy/rent/property objective — an ambiguous commercial opener that stays eligible for clarification rather than manufacturing an Opportunity (S1 AC-02, EC-01, §8.4.6)."
     }
   ]
 }

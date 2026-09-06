@@ -1,0 +1,165 @@
+{
+  "slice": "SL-2",
+  "ranAt": "2026-09-06T22:55:51.775Z",
+  "guOsEnvironment": "staging",
+  "legacyEnvironment": "prod",
+  "organizationDigest": "sha256:eab41f21d4c319b6",
+  "leadDigest": "sha256:9b2b47a56f57cc4c",
+  "environmentMutations": "none — this verifier reads configuration and never writes it",
+  "indexAndConstraintEvidence": "not observable through the target API; established by the migration/deployment record for this environment",
+  "provenanceIdentity": "source_events:<source_event_id>",
+  "checks": [
+    {
+      "assertion": "preflight",
+      "label": "the Organization resolves in the declared Gu OS environment",
+      "ok": true,
+      "detail": "Alebrixe (active)"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the declared Case owner is an active member",
+      "ok": true,
+      "detail": "role=advisor"
+    },
+    {
+      "assertion": "preflight",
+      "label": "relationship_ops is enabled for this Organization",
+      "ok": true,
+      "detail": "enabled=true"
+    },
+    {
+      "assertion": "preflight",
+      "label": "relationship_admission_mode resolves to shadow",
+      "ok": true,
+      "detail": "raw enabled=true value=shadow → resolved=shadow"
+    },
+    {
+      "assertion": "preflight",
+      "label": "organization_policies is readable by the service-role path",
+      "ok": true,
+      "detail": "readable; no published Organization policy (platform baseline will apply)"
+    },
+    {
+      "assertion": "preflight",
+      "label": "source_events exists with the current processing/fencing shape",
+      "ok": true,
+      "detail": "10 columns readable"
+    },
+    {
+      "assertion": "preflight",
+      "label": "ai_usage_events supports organization_id correlation",
+      "ok": true,
+      "detail": "2 columns readable"
+    },
+    {
+      "assertion": "preflight",
+      "label": "case_facts exposes the provenance columns admission evidence uses",
+      "ok": true,
+      "detail": "4 columns readable"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the global lead_opportunity Case type is registered",
+      "ok": true,
+      "detail": "id=sha256:e8447e1bd49e086a"
+    },
+    {
+      "assertion": "preflight",
+      "label": "a published lead_opportunity definition resolves for Case pinning",
+      "ok": true,
+      "detail": "version 1"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "a real inbound lead is evaluated and yields a recorded disposition",
+      "ok": true,
+      "detail": "disposition=deferred_clarification reason=ambiguous_objective"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the disposition carries the effective policy version",
+      "ok": true,
+      "detail": "policy=platform-default@1@1 source=platform_default"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the read carried gateway provenance and freshness",
+      "ok": true,
+      "detail": "store=firestore binding=unbound ageSeconds=17982461"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the source event is settled in the hosted target",
+      "ok": true,
+      "detail": "status=completed"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the settled decision matches the returned disposition",
+      "ok": true,
+      "detail": "settled=deferred_clarification returned=deferred_clarification"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the settled decision carries the same effective policy attribution",
+      "ok": true,
+      "detail": "settled=platform-default@1@1 returned=platform-default@1@1"
+    },
+    {
+      "assertion": "SA-2.2",
+      "label": "an unadmitted lead materialises no Opportunity Case",
+      "ok": true,
+      "detail": "cases=0; disposition=deferred_clarification. SA-2.2 needs an ADMITTED lead, so re-run against a lead the policy admits to complete it"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the settled event points at no Case",
+      "ok": true,
+      "detail": "admitted_case_id=null"
+    }
+  ],
+  "outcome": {
+    "disposition": "deferred_clarification",
+    "reason": "ambiguous_objective",
+    "hardBound": null,
+    "policy": {
+      "source": "platform_default",
+      "policy_id": "platform-default@1",
+      "version": 1,
+      "matched_rule": "no_published_organization_policy"
+    },
+    "deduplicated": false,
+    "caseDigest": null,
+    "sourceEventDigest": "sha256:b283d1f41b7e8f52",
+    "hadInboundMessage": true,
+    "proposalConfidence": "high",
+    "proposalHadObjective": false,
+    "proposalCategory": null
+  },
+  "provenance": {
+    "context": {
+      "store": "firestore",
+      "adapter": "bootstrap_direct",
+      "capability": "legacy_lead_get_context",
+      "bindingState": "unbound",
+      "freshness": {
+        "readAt": "2026-09-06T22:55:47.824Z",
+        "sourceUpdatedAt": "2026-02-10T19:48:06.917Z",
+        "ageSeconds": 17982461,
+        "sourceUpdatedAtField": "edited_time"
+      }
+    },
+    "messages": {
+      "store": "firestore",
+      "adapter": "bootstrap_direct",
+      "capability": "legacy_lead_get_recent_messages",
+      "bindingState": "unbound",
+      "freshness": {
+        "readAt": "2026-09-06T22:55:48.667Z",
+        "sourceUpdatedAt": "2026-02-10T19:48:12.805Z",
+        "ageSeconds": 17982456,
+        "sourceUpdatedAtField": "conversation[last].time"
+      }
+    }
+  }
+}
