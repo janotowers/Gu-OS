@@ -1,5 +1,8 @@
 /**
- * Cross-tenant / RLS negative suite — R1 Relationship Operations SL-0.
+ * Cross-tenant / RLS negative suite — R1 Relationship Operations.
+ *
+ * Landed at SL-0 and extended by every Slice that adds a multi-seat surface:
+ * SL-2 added `organization_policies` and `source_events`.
  *
  * Technical Plan §8: "Cross-tenant negative suite (two-orgs fixture, read and
  * write paths) required from SL-0 and gating every multi-seat surface."
@@ -31,6 +34,10 @@ const FORWARD_DIR = path.resolve(__dirname, "..", "forward", "supabase", "migrat
 
 const RLS_VIOLATION = "42501";
 const FK_VIOLATION = "23503";
+const UNIQUE_VIOLATION = "23505";
+const CHECK_VIOLATION = "23514";
+/** PL/pgSQL RAISE EXCEPTION without an explicit SQLSTATE. */
+const RAISE_EXCEPTION = "P0001";
 
 type Role = "anon" | "authenticated" | "service_role";
 interface Claims {
@@ -177,6 +184,8 @@ interface Fixture {
    * Case whose cascade is empty to actually test the policy.
    */
   legacyCaseNoFacts: string;
+  /** Seeded by the SL-2 migration; needed by the materialisation-identity checks. */
+  leadOpportunityTypeId: string;
 }
 
 async function seed(client: Client): Promise<Fixture> {
@@ -268,11 +277,19 @@ async function seed(client: Client): Promise<Fixture> {
     [orgA, orgCaseA, orgCaseA2]
   );
 
+  const leadOpportunityTypeId = (
+    await client.query<{ id: string }>(
+      `select id from public.operational_case_types
+        where case_type = 'lead_opportunity' and user_id is null`
+    )
+  ).rows[0].id;
+
   return {
     orgA,
     orgB,
     caseType,
     caseTypeId,
+    leadOpportunityTypeId,
     orgCaseA,
     orgCaseA2,
     orgCaseB,
@@ -292,7 +309,7 @@ async function main(): Promise<void> {
   await client.connect();
 
   try {
-    console.log("R1 SL-0 — cross-tenant / RLS suite\n");
+    console.log("R1 — cross-tenant / RLS suite\n");
     await rebuildSchema(client);
     const f = await seed(client);
     console.log("  seeded 2 Organizations, 5 users, 4 Cases\n");
@@ -498,6 +515,631 @@ async function main(): Promise<void> {
                (organization_id, from_case_id, to_case_id, relationship_type)
              values ($1, $2, $3, 'split_from')`,
             [f.orgA, f.orgCaseA, f.orgCaseA2]
+          )
+        )
+      );
+      assert.equal(code, RLS_VIOLATION);
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-2 organization_policies — TD-2 / ADR-108");
+
+    // published_by is populated deliberately: without it the provenance
+    // immutability checks and the FK check below would both pass vacuously.
+    await client.query(
+      `insert into public.organization_policies
+         (organization_id, policy_type, version, status, policy_jsonb,
+          nl_intent_source, published_by, published_at)
+       values ($1, 'relationship_admission', 1, 'published',
+               '{"excluded_categories":[],"auto_admit_clear_objectives":true,"trusted_sources":[]}'::jsonb,
+               'admitimos compras y rentas residenciales', $2, now())`,
+      [f.orgA, f.memberA2]
+    );
+
+    const countPolicies = (claims: Claims) =>
+      asRole(client, claims, async () =>
+        (await client.query("select id from public.organization_policies")).rowCount
+      );
+
+    await t("active member reads their Organization policy", async () => {
+      assert.equal(await countPolicies(authed(f.memberA2)), 1);
+    });
+
+    await t("member of another Organization reads no policy", async () => {
+      assert.equal(await countPolicies(authed(f.memberB)), 0);
+    });
+
+    await t("revoked member reads no policy", async () => {
+      assert.equal(await countPolicies(authed(f.revokedA)), 0);
+    });
+
+    await t("authenticated user cannot write a policy", async () => {
+      const code = await errorCode(() =>
+        asRole(client, authed(f.creatorA), () =>
+          client.query(
+            `insert into public.organization_policies
+               (organization_id, policy_type, version, status)
+             values ($1, 'relationship_admission', 9, 'draft')`,
+            [f.orgA]
+          )
+        )
+      );
+      assert.equal(code, RLS_VIOLATION);
+    });
+
+    await t("a second published policy of the same type is rejected", async () => {
+      // Exactly one effective policy per (Organization, type) at every instant.
+      const code = await errorCode(() =>
+        client.query(
+          `insert into public.organization_policies
+             (organization_id, policy_type, version, status, published_at)
+           values ($1, 'relationship_admission', 2, 'published', now())`,
+          [f.orgA]
+        )
+      );
+      assert.equal(code, UNIQUE_VIOLATION);
+    });
+
+    // ADR-108 §4: published versions are immutable. A disposition that
+    // attributed this version must keep meaning what it meant, so the pinned
+    // set includes publication PROVENANCE, not only the policy body.
+    const immutableColumns: Array<[string, string]> = [
+      [
+        "policy_jsonb",
+        `policy_jsonb = '{"excluded_categories":["land"],"auto_admit_clear_objectives":false,"trusted_sources":[]}'::jsonb`,
+      ],
+      ["nl_intent_source", "nl_intent_source = 'rewritten intent'"],
+      ["published_by", "published_by = null"],
+      ["published_at", "published_at = now() + interval '1 day'"],
+      ["created_at", "created_at = now() - interval '1 year'"],
+      ["version", "version = 99"],
+      ["policy_type", "policy_type = 'relationship_admission'::text"],
+      ["status back to draft", "status = 'draft'"],
+    ];
+
+    for (const [label, assignment] of immutableColumns) {
+      await t(`a published policy cannot change ${label}`, async () => {
+        const code = await errorCode(() =>
+          client.query(
+            `update public.organization_policies
+                set ${assignment}
+              where organization_id = $1 and status = 'published'`,
+            [f.orgA]
+          )
+        );
+        assert.equal(code, RAISE_EXCEPTION);
+      });
+    }
+
+    await t("deleting the profile that published a policy is refused", async () => {
+      // `on delete set null` would let a profile deletion silently rewrite the
+      // publication provenance of a row ADR-108 declares immutable. NO ACTION
+      // refuses instead, matching workflow_definitions (00065).
+      //
+      // memberA2 is used because they own no Cases: deleting a Case-owning
+      // profile trips the append-only case_facts trigger on the cascade first,
+      // which would make this assertion pass for the wrong reason.
+      const code = await errorCode(() =>
+        client.query("delete from auth.users where id = $1", [f.memberA2])
+      );
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    await t("a published policy cannot be deleted", async () => {
+      const code = await errorCode(() =>
+        client.query(
+          "delete from public.organization_policies where organization_id = $1 and status = 'published'",
+          [f.orgA]
+        )
+      );
+      assert.equal(code, RAISE_EXCEPTION);
+    });
+
+    await t("a published policy CAN be archived", async () => {
+      await client.query(
+        `update public.organization_policies
+            set status = 'archived'
+          where organization_id = $1 and status = 'published'`,
+        [f.orgA]
+      );
+      const { rowCount } = await client.query(
+        "select id from public.organization_policies where organization_id = $1 and status = 'archived'",
+        [f.orgA]
+      );
+      assert.equal(rowCount, 1);
+    });
+
+    // ---------------------------------------------------------------
+    // SL-2 claim fencing — PostgreSQL semantics the FakeDb cannot prove.
+    //
+    // The module selftests drive the real executor against an in-memory client,
+    // which is faithful for sequential behaviour but single-threaded: two
+    // conditional UPDATEs racing for one row, and a UNIQUE index rejecting the
+    // loser of a concurrent INSERT, are database properties. Simulating them
+    // would only prove the fake agrees with itself — the same reason this suite
+    // exists for RLS.
+    //
+    // Each statement below is the exact conditional write the query helpers
+    // issue, so what passes here is what the application does.
+    // ---------------------------------------------------------------
+    console.log("\nSL-2 source_events — claim fencing and lease ownership");
+
+    const newEvent = async (organization: string, key: string) =>
+      (
+        await client.query<{ id: string }>(
+          `insert into public.source_events
+             (organization_id, source_system, event_kind, dedup_key, status, claim_epoch)
+           values ($1, 'traditional_gu', 'inbound_prospect_message', $2, 'pending', 0)
+           returning id`,
+          [organization, key]
+        )
+      ).rows[0].id;
+
+    /** claimSourceEvent: pending + observed epoch. */
+    const claim = (
+      eventId: string,
+      worker: string,
+      observedEpoch: number,
+      leaseSeconds: number
+    ) =>
+      client.query(
+        `update public.source_events
+            set status = 'processing',
+                claim_epoch = $3 + 1,
+                claimed_at = now(),
+                claimed_by = $2,
+                claim_expires_at = now() + make_interval(secs => $4)
+          where id = $1
+            and status = 'pending'
+            and claim_epoch = $3
+          returning claim_epoch`,
+        [eventId, worker, observedEpoch, leaseSeconds]
+      );
+
+    /** reclaimSourceEvent, expired-lease branch. */
+    const reclaim = (
+      eventId: string,
+      worker: string,
+      observedEpoch: number,
+      leaseSeconds: number
+    ) =>
+      client.query(
+        `update public.source_events
+            set status = 'processing',
+                claim_epoch = $3 + 1,
+                claimed_at = now(),
+                claimed_by = $2,
+                claim_expires_at = now() + make_interval(secs => $4)
+          where id = $1
+            and status = 'processing'
+            and claim_epoch = $3
+            and claim_expires_at <= now()
+          returning claim_epoch`,
+        [eventId, worker, observedEpoch, leaseSeconds]
+      );
+
+    /** Every fenced write: epoch + status = 'processing'. */
+    const fenced = (eventId: string, epoch: number, assignment: string) =>
+      client.query(
+        `update public.source_events
+            set ${assignment}
+          where id = $1
+            and status = 'processing'
+            and claim_epoch = $2
+          returning id`,
+        [eventId, epoch]
+      );
+
+    await t("two workers racing for one pending event produce one winner", async () => {
+      const eventId = await newEvent(f.orgA, "fence:race");
+      const [first, second] = await Promise.all([
+        claim(eventId, "worker-a", 0, 300),
+        claim(eventId, "worker-b", 0, 300),
+      ]);
+      assert.equal(
+        (first.rowCount ?? 0) + (second.rowCount ?? 0),
+        1,
+        "exactly one claim may win"
+      );
+      const { rows } = await client.query<{ claim_epoch: number }>(
+        "select claim_epoch from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].claim_epoch, 1, "the fence advanced exactly once");
+    });
+
+    await t("a live claim cannot be reclaimed", async () => {
+      const eventId = await newEvent(f.orgA, "fence:live");
+      await claim(eventId, "worker-a", 0, 300);
+      const stolen = await reclaim(eventId, "worker-b", 1, 300);
+      assert.equal(stolen.rowCount, 0, "a live lease is not reclaimable");
+    });
+
+    await t("an expired claim is reclaimable and bumps the fence", async () => {
+      const eventId = await newEvent(f.orgA, "fence:expired");
+      await claim(eventId, "worker-a", 0, 0);
+      const reclaimed = await reclaim(eventId, "worker-b", 1, 300);
+      assert.equal(reclaimed.rowCount, 1);
+      assert.equal(reclaimed.rows[0].claim_epoch, 2);
+    });
+
+    /**
+     * The blocker: a stale owner resuming after losing the lease. Each of its
+     * durable writes must match zero rows.
+     */
+    const staleOwnerFixture = async (key: string) => {
+      const eventId = await newEvent(f.orgA, key);
+      await claim(eventId, "worker-a", 0, 0); // A owns epoch 1, already expired
+      await reclaim(eventId, "worker-b", 1, 300); // B owns epoch 2
+      return eventId;
+    };
+
+    await t("a stale owner cannot record a decision after reclaim", async () => {
+      const eventId = await staleOwnerFixture("fence:stale-decide");
+      const stale = await fenced(
+        eventId,
+        1,
+        `decision_jsonb = '{"disposition":"not_admitted"}'::jsonb`
+      );
+      assert.equal(stale.rowCount, 0);
+      const { rows } = await client.query<{ decision_jsonb: unknown }>(
+        "select decision_jsonb from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].decision_jsonb, null);
+    });
+
+    await t("a stale owner cannot link a Case after reclaim", async () => {
+      const eventId = await staleOwnerFixture("fence:stale-link");
+      const stale = await fenced(eventId, 1, `admitted_case_id = '${f.orgCaseA}'`);
+      assert.equal(stale.rowCount, 0);
+      const { rows } = await client.query<{ admitted_case_id: string | null }>(
+        "select admitted_case_id from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].admitted_case_id, null);
+    });
+
+    await t("a stale owner cannot settle after reclaim", async () => {
+      const eventId = await staleOwnerFixture("fence:stale-settle");
+      const stale = await fenced(
+        eventId,
+        1,
+        `status = 'completed', completed_at = now(),
+         decision_jsonb = '{"disposition":"not_admitted"}'::jsonb`
+      );
+      assert.equal(stale.rowCount, 0);
+      const { rows } = await client.query<{ status: string }>(
+        "select status from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].status, "processing", "B still owns a live claim");
+    });
+
+    await t("a stale owner cannot fail the new owner's row", async () => {
+      const eventId = await staleOwnerFixture("fence:stale-fail");
+      const stale = await fenced(
+        eventId,
+        1,
+        `status = 'failed', processing_error = 'stale worker'`
+      );
+      assert.equal(stale.rowCount, 0);
+      const { rows } = await client.query<{
+        status: string;
+        processing_error: string | null;
+      }>(
+        "select status, processing_error from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].status, "processing");
+      assert.equal(rows[0].processing_error, null);
+    });
+
+    await t("the new owner completes normally after the stale attempts", async () => {
+      const eventId = await staleOwnerFixture("fence:new-owner-wins");
+      await fenced(eventId, 1, `status = 'failed'`); // stale, no-op
+      const settled = await fenced(
+        eventId,
+        2,
+        `status = 'completed', completed_at = now(),
+         decision_jsonb = '{"disposition":"not_admitted"}'::jsonb`
+      );
+      assert.equal(settled.rowCount, 1, "the current owner's write applies");
+    });
+
+    await t("a completed event cannot be reverted by any worker", async () => {
+      const eventId = await staleOwnerFixture("fence:no-revert");
+      await fenced(
+        eventId,
+        2,
+        `status = 'completed', completed_at = now(),
+         decision_jsonb = '{"disposition":"not_admitted"}'::jsonb`
+      );
+      // Neither the stale epoch nor the settling epoch may reopen it: every
+      // fenced write also requires status = 'processing'.
+      for (const epoch of [1, 2]) {
+        const revert = await fenced(eventId, epoch, `status = 'failed'`);
+        assert.equal(revert.rowCount, 0, `epoch ${epoch} must not revert it`);
+      }
+      const { rows } = await client.query<{ status: string }>(
+        "select status from public.source_events where id = $1",
+        [eventId]
+      );
+      assert.equal(rows[0].status, "completed");
+    });
+
+    await t("a completed event must carry its decision", async () => {
+      // Structural, so it holds for every service-role writer — including the
+      // C1 ingestion path that will write this same inbox later.
+      const eventId = await newEvent(f.orgA, "fence:settled-shape");
+      const code = await errorCode(() =>
+        client.query(
+          "update public.source_events set status = 'completed', completed_at = now() where id = $1",
+          [eventId]
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
+    });
+
+    await t("a completed ADMITTED event must carry its Case", async () => {
+      const eventId = await newEvent(f.orgA, "fence:settled-admitted");
+      const code = await errorCode(() =>
+        client.query(
+          `update public.source_events
+              set status = 'completed',
+                  completed_at = now(),
+                  decision_jsonb = '{"disposition":"admitted"}'::jsonb
+            where id = $1`,
+          [eventId]
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
+    });
+
+    await t("two workers cannot materialise two Cases for one source event", async () => {
+      // The fence stops a stale worker writing to the inbox, but not one that
+      // is already past it from INSERTing a Case. This index is what makes
+      // "one source event admits at most one Opportunity" structural.
+      const eventId = await newEvent(f.orgA, "fence:one-case");
+      const insertCase = () =>
+        client.query(
+          `insert into public.operational_cases
+             (user_id, case_type, case_type_id, organization_id, context_jsonb)
+           values ($1, 'lead_opportunity', $2, $3, jsonb_build_object('source_event_id', $4::text))`,
+          [f.creatorA, f.leadOpportunityTypeId, f.orgA, eventId]
+        );
+      await insertCase();
+      const code = await errorCode(insertCase);
+      assert.equal(code, UNIQUE_VIOLATION);
+
+      const { rowCount } = await client.query(
+        `select id from public.operational_cases
+          where organization_id = $1
+            and context_jsonb ->> 'source_event_id' = $2`,
+        [f.orgA, eventId]
+      );
+      assert.equal(rowCount, 1, "exactly one Opportunity survives");
+    });
+
+    await t("a different source event may still materialise its own Case", async () => {
+      const other = await newEvent(f.orgA, "fence:other-case");
+      await client.query(
+        `insert into public.operational_cases
+           (user_id, case_type, case_type_id, organization_id, context_jsonb)
+         values ($1, 'lead_opportunity', $2, $3, jsonb_build_object('source_event_id', $4::text))`,
+        [f.creatorA, f.leadOpportunityTypeId, f.orgA, other]
+      );
+      const { rowCount } = await client.query(
+        `select id from public.operational_cases
+          where organization_id = $1 and context_jsonb ? 'source_event_id'`,
+        [f.orgA]
+      );
+      assert.equal(rowCount, 2, "the index constrains the identity, not the type");
+    });
+
+    await t("concurrent workers cannot write two admission evidence rows", async () => {
+      // The Case index stops a second Opportunity; it does nothing for the
+      // Case's CHILDREN. Two workers inside materialisation at once — one whose
+      // lease expired mid-run, one that reclaimed — can both reach the fact
+      // writes, and a read-then-insert would let both observe "missing".
+      const eventId = await newEvent(f.orgA, "artifact:facts");
+      const insertFact = () =>
+        client.query(
+          `insert into public.case_facts
+             (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+           values ($1, $2, 'admission.disposition', '{"disposition":"admitted"}'::jsonb,
+                   'derived', 'source_events:' || $3::text)`,
+          [f.orgCaseA, f.creatorA, eventId]
+        );
+      const [first, second] = await Promise.allSettled([
+        insertFact(),
+        insertFact(),
+      ]);
+      const rejected = [first, second].filter((r) => r.status === "rejected");
+      assert.equal(rejected.length, 1, "exactly one insert survives");
+      assert.equal(
+        (rejected[0] as PromiseRejectedResult).reason.code,
+        UNIQUE_VIOLATION
+      );
+
+      const { rowCount } = await client.query(
+        `select id from public.case_facts
+          where case_id = $1
+            and fact_key = 'admission.disposition'
+            and source_ref = 'source_events:' || $2::text`,
+        [f.orgCaseA, eventId]
+      );
+      assert.equal(rowCount, 1);
+    });
+
+    await t("a different writer's fact for the same key is unaffected", async () => {
+      // The identity is (case, key, source_ref), NOT (case, key): a later
+      // legitimate correction with its own provenance must still be writable,
+      // and must not be blocked by admission's evidence.
+      const eventId = await newEvent(f.orgA, "artifact:coexist");
+      await client.query(
+        `insert into public.case_facts
+           (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+         values ($1, $2, 'opportunity.objective', '{"objective":"comprar"}'::jsonb,
+                 'derived', 'source_events:' || $3::text)`,
+        [f.orgCaseA, f.creatorA, eventId]
+      );
+      await client.query(
+        `insert into public.case_facts
+           (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+         values ($1, $2, 'opportunity.objective', '{"objective":"rentar"}'::jsonb,
+                 'user', 'advisor_correction')`,
+        [f.orgCaseA, f.creatorA]
+      );
+      // The fixture already seeds an opportunity.objective on this Case, so
+      // count the two provenances this check wrote rather than the whole key.
+      const { rows } = await client.query<{ source_ref: string | null }>(
+        `select source_ref from public.case_facts
+          where case_id = $1
+            and fact_key = 'opportunity.objective'
+            and source_ref is not null
+          order by source_ref`,
+        [f.orgCaseA]
+      );
+      assert.deepEqual(
+        rows.map((r) => r.source_ref),
+        ["advisor_correction", `source_events:${eventId}`],
+        "both provenances coexist"
+      );
+    });
+
+    await t("the free-form source_ref of other domains stays unconstrained", async () => {
+      // The index is partial on `source_ref like 'source_events:%'`. Existing
+      // writers reuse values such as 'readiness_owner_simulation', and must
+      // keep being able to.
+      for (let i = 0; i < 2; i += 1) {
+        await client.query(
+          `insert into public.case_facts
+             (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+           values ($1, $2, 'property.bedrooms', '3'::jsonb, 'user',
+                   'readiness_owner_simulation')`,
+          [f.orgCaseA, f.creatorA]
+        );
+      }
+      const { rowCount } = await client.query(
+        `select id from public.case_facts
+          where case_id = $1 and source_ref = 'readiness_owner_simulation'`,
+        [f.orgCaseA]
+      );
+      assert.equal(rowCount, 2, "non-admission provenance is not deduplicated");
+    });
+
+    await t("concurrent workers cannot narrate one admission twice", async () => {
+      const eventId = await newEvent(f.orgA, "artifact:timeline");
+      const insertEvent = () =>
+        client.query(
+          `insert into public.operational_case_events
+             (case_id, event_type, actor, payload_jsonb)
+           values ($1, 'state_changed', 'system',
+                   jsonb_build_object('kind', 'admission_disposition',
+                                      'source_event_id', $2::text))`,
+          [f.orgCaseA, eventId]
+        );
+      const [first, second] = await Promise.allSettled([
+        insertEvent(),
+        insertEvent(),
+      ]);
+      const rejected = [first, second].filter((r) => r.status === "rejected");
+      assert.equal(rejected.length, 1, "exactly one narration survives");
+      assert.equal(
+        (rejected[0] as PromiseRejectedResult).reason.code,
+        UNIQUE_VIOLATION
+      );
+    });
+
+    await t("other Case timeline events are unconstrained", async () => {
+      // The index is partial on kind = 'admission_disposition'. The append-only
+      // timeline must stay append-only for everything else.
+      for (let i = 0; i < 2; i += 1) {
+        await client.query(
+          `insert into public.operational_case_events
+             (case_id, event_type, actor, payload_jsonb)
+           values ($1, 'state_changed', 'system',
+                   jsonb_build_object('kind', 'step_completed'))`,
+          [f.orgCaseA]
+        );
+      }
+      const { rowCount } = await client.query(
+        `select id from public.operational_case_events
+          where case_id = $1 and payload_jsonb ->> 'kind' = 'step_completed'`,
+        [f.orgCaseA]
+      );
+      assert.equal(rowCount, 2);
+    });
+
+    await t("a source event cannot point at another Organization's Case", async () => {
+      const eventId = await newEvent(f.orgA, "fence:containment");
+      await claim(eventId, "worker-a", 0, 300);
+      const code = await errorCode(() =>
+        fenced(eventId, 1, `admitted_case_id = '${f.orgCaseB}'`)
+      );
+      // Composite FK (admitted_case_id, organization_id), same shape as
+      // case_relationships: a cross-tenant pointer is structurally impossible.
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-2 source_events — M-SOURCE-EVENTS");
+
+    await client.query(
+      `insert into public.source_events
+         (organization_id, source_system, event_kind, dedup_key)
+       values ($1, 'traditional_gu', 'inbound_prospect_message', 'traditional_gu:msg:lead-a:one')`,
+      [f.orgA]
+    );
+
+    await t("the same dedup_key cannot be recorded twice for one Organization", async () => {
+      // S1 AC-05 is a schema guarantee, not application discipline.
+      const code = await errorCode(() =>
+        client.query(
+          `insert into public.source_events
+             (organization_id, source_system, event_kind, dedup_key)
+           values ($1, 'traditional_gu', 'inbound_prospect_message', 'traditional_gu:msg:lead-a:one')`,
+          [f.orgA]
+        )
+      );
+      assert.equal(code, UNIQUE_VIOLATION);
+    });
+
+    await t("two Organizations may carry the same dedup_key independently", async () => {
+      await client.query(
+        `insert into public.source_events
+           (organization_id, source_system, event_kind, dedup_key)
+         values ($1, 'traditional_gu', 'inbound_prospect_message', 'traditional_gu:msg:lead-a:one')`,
+        [f.orgB]
+      );
+      const { rowCount } = await client.query(
+        "select id from public.source_events where dedup_key = 'traditional_gu:msg:lead-a:one'"
+      );
+      assert.equal(rowCount, 2);
+    });
+
+    await t("source_events is unreadable from any authenticated JWT, member or not", async () => {
+      // TD-1 access matrix: operational internals, service-role only in BOTH
+      // directions. Even an active member of the owning Organization sees none.
+      const asMember = await asRole(client, authed(f.memberA2), async () =>
+        (await client.query("select id from public.source_events")).rowCount
+      );
+      const asOther = await asRole(client, authed(f.memberB), async () =>
+        (await client.query("select id from public.source_events")).rowCount
+      );
+      assert.equal(asMember, 0);
+      assert.equal(asOther, 0);
+    });
+
+    await t("authenticated user cannot write a source event", async () => {
+      const code = await errorCode(() =>
+        asRole(client, authed(f.creatorA), () =>
+          client.query(
+            `insert into public.source_events
+               (organization_id, source_system, event_kind, dedup_key)
+             values ($1, 'traditional_gu', 'advisor_activity', 'forged')`,
+            [f.orgA]
           )
         )
       );
