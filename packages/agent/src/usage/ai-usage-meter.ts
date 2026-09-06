@@ -389,6 +389,7 @@ export async function recordOpenRouterCallUsage(params: {
     channel: store.context.channel ?? null,
     sessionId: store.context.sessionId ?? null,
     turnId: store.context.turnId ?? null,
+    organizationId: store.context.organizationId ?? null,
     operationalCaseId: store.context.operationalCaseId ?? null,
     workflowDefinitionId: store.context.workflowDefinitionId ?? null,
     studioQualificationRunId:
@@ -469,6 +470,7 @@ export function createAiUsageCallbackHandler(params: {
         channel: store.context.channel ?? null,
         sessionId: store.context.sessionId ?? null,
         turnId: store.context.turnId ?? null,
+        organizationId: store.context.organizationId ?? null,
         operationalCaseId: store.context.operationalCaseId ?? null,
         workflowDefinitionId: store.context.workflowDefinitionId ?? null,
         studioQualificationRunId:
@@ -498,6 +500,7 @@ export function createAiUsageCallbackHandler(params: {
         channel: store.context.channel ?? null,
         sessionId: store.context.sessionId ?? null,
         turnId: store.context.turnId ?? null,
+        organizationId: store.context.organizationId ?? null,
         operationalCaseId: store.context.operationalCaseId ?? null,
         workflowDefinitionId: store.context.workflowDefinitionId ?? null,
         studioQualificationRunId:

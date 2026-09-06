@@ -55,6 +55,12 @@ export const DEFAULT_BUSINESS_BRAIN_REVIEWER_MODEL_ID =
  */
 export const DEFAULT_OPERATIONAL_CONVERSATION_CLASSIFIER_MODEL_ID =
   "openai/gpt-5.4-mini";
+/**
+ * Default del intérprete semántico de admisión de Relationship Operations
+ * (R1 SL-2). Ningún artefacto de gobierno prescribe un modelo, así que es
+ * configuración: override con `RELATIONSHIP_ADMISSION_MODEL_ID`.
+ */
+export const DEFAULT_RELATIONSHIP_ADMISSION_MODEL_ID = "openai/gpt-5.4-mini";
 /** Default vision (analyze_property_images y tools de foto). */
 export const DEFAULT_IMAGE_VISION_MODEL_ID = "openai/gpt-4.1-mini";
 /** Default redacción comercial (prepare_listing_description_draft). */
@@ -87,6 +93,11 @@ export const BUSINESS_BRAIN_REVIEWER_MODEL_ID =
 export const OPERATIONAL_CONVERSATION_CLASSIFIER_MODEL_ID =
   process.env.OPERATIONAL_CONVERSATION_CLASSIFIER_MODEL_ID?.trim() ||
   DEFAULT_OPERATIONAL_CONVERSATION_CLASSIFIER_MODEL_ID;
+
+/** Intérprete semántico de admisión R1 (env override > default). */
+export const RELATIONSHIP_ADMISSION_MODEL_ID =
+  process.env.RELATIONSHIP_ADMISSION_MODEL_ID?.trim() ||
+  DEFAULT_RELATIONSHIP_ADMISSION_MODEL_ID;
 
 /** Vision / análisis de imágenes (env override > default). */
 export const IMAGE_VISION_MODEL_ID =

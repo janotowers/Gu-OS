@@ -1,5 +1,8 @@
 /**
- * Cross-tenant / RLS negative suite — R1 Relationship Operations SL-0.
+ * Cross-tenant / RLS negative suite — R1 Relationship Operations.
+ *
+ * Landed at SL-0 and extended by every Slice that adds a multi-seat surface:
+ * SL-2 added `organization_policies` and `source_events`.
  *
  * Technical Plan §8: "Cross-tenant negative suite (two-orgs fixture, read and
  * write paths) required from SL-0 and gating every multi-seat surface."
@@ -31,6 +34,9 @@ const FORWARD_DIR = path.resolve(__dirname, "..", "forward", "supabase", "migrat
 
 const RLS_VIOLATION = "42501";
 const FK_VIOLATION = "23503";
+const UNIQUE_VIOLATION = "23505";
+/** PL/pgSQL RAISE EXCEPTION without an explicit SQLSTATE. */
+const RAISE_EXCEPTION = "P0001";
 
 type Role = "anon" | "authenticated" | "service_role";
 interface Claims {
@@ -292,7 +298,7 @@ async function main(): Promise<void> {
   await client.connect();
 
   try {
-    console.log("R1 SL-0 — cross-tenant / RLS suite\n");
+    console.log("R1 — cross-tenant / RLS suite\n");
     await rebuildSchema(client);
     const f = await seed(client);
     console.log("  seeded 2 Organizations, 5 users, 4 Cases\n");
@@ -498,6 +504,162 @@ async function main(): Promise<void> {
                (organization_id, from_case_id, to_case_id, relationship_type)
              values ($1, $2, $3, 'split_from')`,
             [f.orgA, f.orgCaseA, f.orgCaseA2]
+          )
+        )
+      );
+      assert.equal(code, RLS_VIOLATION);
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-2 organization_policies — TD-2 / ADR-108");
+
+    await client.query(
+      `insert into public.organization_policies
+         (organization_id, policy_type, version, status, policy_jsonb, published_at)
+       values ($1, 'relationship_admission', 1, 'published',
+               '{"excluded_categories":[],"auto_admit_clear_objectives":true,"trusted_sources":[]}'::jsonb,
+               now())`,
+      [f.orgA]
+    );
+
+    const countPolicies = (claims: Claims) =>
+      asRole(client, claims, async () =>
+        (await client.query("select id from public.organization_policies")).rowCount
+      );
+
+    await t("active member reads their Organization policy", async () => {
+      assert.equal(await countPolicies(authed(f.memberA2)), 1);
+    });
+
+    await t("member of another Organization reads no policy", async () => {
+      assert.equal(await countPolicies(authed(f.memberB)), 0);
+    });
+
+    await t("revoked member reads no policy", async () => {
+      assert.equal(await countPolicies(authed(f.revokedA)), 0);
+    });
+
+    await t("authenticated user cannot write a policy", async () => {
+      const code = await errorCode(() =>
+        asRole(client, authed(f.creatorA), () =>
+          client.query(
+            `insert into public.organization_policies
+               (organization_id, policy_type, version, status)
+             values ($1, 'relationship_admission', 9, 'draft')`,
+            [f.orgA]
+          )
+        )
+      );
+      assert.equal(code, RLS_VIOLATION);
+    });
+
+    await t("a second published policy of the same type is rejected", async () => {
+      // Exactly one effective policy per (Organization, type) at every instant.
+      const code = await errorCode(() =>
+        client.query(
+          `insert into public.organization_policies
+             (organization_id, policy_type, version, status, published_at)
+           values ($1, 'relationship_admission', 2, 'published', now())`,
+          [f.orgA]
+        )
+      );
+      assert.equal(code, UNIQUE_VIOLATION);
+    });
+
+    await t("a published policy cannot be edited", async () => {
+      // A disposition that attributed this version must keep meaning what it meant.
+      const code = await errorCode(() =>
+        client.query(
+          `update public.organization_policies
+              set policy_jsonb = '{"excluded_categories":["land"],"auto_admit_clear_objectives":false,"trusted_sources":[]}'::jsonb
+            where organization_id = $1 and status = 'published'`,
+          [f.orgA]
+        )
+      );
+      assert.equal(code, RAISE_EXCEPTION);
+    });
+
+    await t("a published policy cannot be deleted", async () => {
+      const code = await errorCode(() =>
+        client.query(
+          "delete from public.organization_policies where organization_id = $1 and status = 'published'",
+          [f.orgA]
+        )
+      );
+      assert.equal(code, RAISE_EXCEPTION);
+    });
+
+    await t("a published policy CAN be archived", async () => {
+      await client.query(
+        `update public.organization_policies
+            set status = 'archived'
+          where organization_id = $1 and status = 'published'`,
+        [f.orgA]
+      );
+      const { rowCount } = await client.query(
+        "select id from public.organization_policies where organization_id = $1 and status = 'archived'",
+        [f.orgA]
+      );
+      assert.equal(rowCount, 1);
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-2 source_events — M-SOURCE-EVENTS");
+
+    await client.query(
+      `insert into public.source_events
+         (organization_id, source_system, event_kind, dedup_key)
+       values ($1, 'traditional_gu', 'inbound_prospect_message', 'traditional_gu:msg:lead-a:one')`,
+      [f.orgA]
+    );
+
+    await t("the same dedup_key cannot be recorded twice for one Organization", async () => {
+      // S1 AC-05 is a schema guarantee, not application discipline.
+      const code = await errorCode(() =>
+        client.query(
+          `insert into public.source_events
+             (organization_id, source_system, event_kind, dedup_key)
+           values ($1, 'traditional_gu', 'inbound_prospect_message', 'traditional_gu:msg:lead-a:one')`,
+          [f.orgA]
+        )
+      );
+      assert.equal(code, UNIQUE_VIOLATION);
+    });
+
+    await t("two Organizations may carry the same dedup_key independently", async () => {
+      await client.query(
+        `insert into public.source_events
+           (organization_id, source_system, event_kind, dedup_key)
+         values ($1, 'traditional_gu', 'inbound_prospect_message', 'traditional_gu:msg:lead-a:one')`,
+        [f.orgB]
+      );
+      const { rowCount } = await client.query(
+        "select id from public.source_events where dedup_key = 'traditional_gu:msg:lead-a:one'"
+      );
+      assert.equal(rowCount, 2);
+    });
+
+    await t("source_events is unreadable from any authenticated JWT, member or not", async () => {
+      // TD-1 access matrix: operational internals, service-role only in BOTH
+      // directions. Even an active member of the owning Organization sees none.
+      const asMember = await asRole(client, authed(f.memberA2), async () =>
+        (await client.query("select id from public.source_events")).rowCount
+      );
+      const asOther = await asRole(client, authed(f.memberB), async () =>
+        (await client.query("select id from public.source_events")).rowCount
+      );
+      assert.equal(asMember, 0);
+      assert.equal(asOther, 0);
+    });
+
+    await t("authenticated user cannot write a source event", async () => {
+      const code = await errorCode(() =>
+        asRole(client, authed(f.creatorA), () =>
+          client.query(
+            `insert into public.source_events
+               (organization_id, source_system, event_kind, dedup_key)
+             values ($1, 'traditional_gu', 'advisor_activity', 'forged')`,
+            [f.orgA]
           )
         )
       );

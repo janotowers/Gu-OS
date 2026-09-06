@@ -24,6 +24,7 @@ import type {
   OperationalCaseType,
   OperationalCaseTypeStatus,
   OperationalCaseTypeVisibility,
+  RuntimeAuthority,
 } from "@agents/types";
 import { getLatestPublishedDefinitionForUser } from "./workflow-definitions";
 
@@ -195,6 +196,19 @@ export interface CreateOperationalCaseInput {
    * de prueba a un draft). Si se omite, se resuelve la última publicada.
    */
   workflowDefinition?: { id: string; version: number } | null;
+  /**
+   * Organization propietaria (R1 / ADR-106). Omitirlo mantiene exactamente la
+   * semántica legacy user-scoped: la columna queda NULL y las políticas
+   * restrictivas de 00081 no aplican. Nunca se infiere del usuario.
+   */
+  organizationId?: string | null;
+  /**
+   * Autoridad de runtime por Oportunidad (ADR-107 / TD-3). Deliberadamente sin
+   * default: un Caso de relación se crea en 'legacy' porque el legacy sigue
+   * decidiendo, y la autoridad sólo se mueve mediante una operación gobernada
+   * autorizada, nunca implícitamente al crear el Caso.
+   */
+  runtimeAuthority?: RuntimeAuthority | null;
 }
 
 export async function createOperationalCase(
@@ -212,13 +226,24 @@ export async function createOperationalCase(
       user_id: input.userId,
       case_type_id: input.caseTypeId,
       case_type: input.caseType,
+      organization_id: input.organizationId ?? null,
+      runtime_authority: input.runtimeAuthority ?? null,
       workflow_definition_id: definition?.id ?? null,
       workflow_definition_version: definition?.version ?? null,
       status: input.status ?? "active",
       current_step: input.currentStep ?? null,
       assigned_to_user_id: input.assignedToUserId ?? input.userId,
       external_contact_jsonb: input.externalContact ?? {},
-      next_action_at: input.nextActionAt ?? new Date().toISOString(),
+      // `??` here silently overrode an EXPLICIT null: a caller that passed
+      // null to mean "do not schedule this Case" still got `now`, so the cron
+      // scanner picked it up anyway. Distinguishing omitted from explicitly
+      // null preserves the default for every caller that omits it, and makes
+      // null mean null — which is what the e2e-controlled, controlled-test and
+      // R1 shadow call sites were already written to expect.
+      next_action_at:
+        input.nextActionAt === undefined
+          ? new Date().toISOString()
+          : input.nextActionAt,
       due_at: input.dueAt ?? null,
       context_jsonb: input.context ?? {},
       version: 0,

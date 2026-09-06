@@ -32,6 +32,7 @@ function event(
 ): AiUsageEvent {
   return {
     user_id: "u1",
+    organization_id: null,
     occurred_at: "2026-07-29T00:00:00.000Z",
     provider: "openrouter",
     resource_type: "ai_model",

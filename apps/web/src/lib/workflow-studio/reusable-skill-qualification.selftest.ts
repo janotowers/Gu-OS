@@ -862,6 +862,7 @@ function usageEvent(
   return {
     id: randomUUID(),
     user_id: skill.user_id,
+    organization_id: null,
     occurred_at: "2026-08-09T12:00:00.000Z",
     provider: "openrouter",
     resource_type: "ai_model",

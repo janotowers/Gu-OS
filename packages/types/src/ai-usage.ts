@@ -58,6 +58,8 @@ export const AI_USAGE_MODEL_ROLES = {
   STUDIO_REUSABLE_SKILL_COMPILER: "studio_reusable_skill_compiler",
   STUDIO_SKILL_REPAIR: "studio_skill_repair",
   STUDIO_CAPABILITY_CODER: "studio_capability_coder",
+  /** Semantic objective interpreter for Relationship Operations admission (R1 SL-2). */
+  RELATIONSHIP_ADMISSION_INTERPRETER: "relationship_admission_interpreter",
 } as const;
 
 export type AiUsageStatus = "ok" | "error";
@@ -93,6 +95,12 @@ export interface AiUsageCostBreakdown {
  */
 export interface AiUsageContext {
   userId: string;
+  /**
+   * Owning Organization when the call runs under an Organization-scoped
+   * context (R1 / Technical Plan §7 (a)). Nullable: user-scoped legacy paths
+   * have none, and a missing value must never be guessed from the user.
+   */
+  organizationId?: string | null;
   channel?:
     | "web"
     | "telegram"
@@ -117,6 +125,8 @@ export interface AiUsageContext {
 /** Input for one append-only `ai_usage_events` row. */
 export interface AiUsageEventInput extends AiUsageTokenBreakdown, AiUsageCostBreakdown {
   userId: string;
+  /** Correlation dimension, not an allocation (ADR-110 / TP §7 (a)). */
+  organizationId?: string | null;
   provider?: string;
   resourceType?: AiUsageResourceType;
   operation: AiUsageOperation;
@@ -149,6 +159,7 @@ export interface AiUsageEventInput extends AiUsageTokenBreakdown, AiUsageCostBre
 export interface AiUsageEvent {
   id: string;
   user_id: string;
+  organization_id: string | null;
   occurred_at: string;
   provider: string;
   resource_type: AiUsageResourceType;

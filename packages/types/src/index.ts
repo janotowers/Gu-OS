@@ -1,3 +1,5 @@
+import type { RuntimeAuthority } from "./organizations";
+
 export type Channel = "web" | "telegram" | "cron" | "heartbeat" | "case_runner";
 
 export type ToolRisk = "low" | "medium" | "high";
@@ -456,6 +458,16 @@ export interface OperationalCase {
   /** Pin a la definición de workflow (Slice 1.1); null en casos sin definición global. */
   workflow_definition_id: string | null;
   workflow_definition_version: number | null;
+  /**
+   * Organization propietaria (R1 / ADR-106, migración 00081). NULL en los Casos
+   * legacy user-scoped, que conservan su semántica de dueño intacta.
+   */
+  organization_id: string | null;
+  /**
+   * Autoridad de runtime por Oportunidad (ADR-107 / TD-3). NULL fuera de
+   * Relationship Operations; nunca se deduce, sólo se fija explícitamente.
+   */
+  runtime_authority: RuntimeAuthority | null;
   created_at: string;
   updated_at: string;
 }
@@ -1124,3 +1136,6 @@ export * from "./attachments";
 export * from "./organizations";
 export * from "./case-relationships";
 export * from "./legacy-gateway";
+export * from "./organization-policies";
+export * from "./relationship-admission";
+export * from "./source-events";
