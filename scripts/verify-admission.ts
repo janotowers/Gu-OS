@@ -87,6 +87,7 @@ import {
   assertBinding,
   describeTarget,
   parseTargetArgs,
+  resolveEncryptionKeyForTarget,
 } from "./lib/target-env";
 import {
   assertProductionReadAcknowledged,
@@ -235,6 +236,26 @@ async function main(): Promise<void> {
     target.supabaseUrl,
     target.serviceRoleKey
   ) as unknown as DbClient;
+
+  // Admission resolves the legacy credential per Organization out of
+  // `organization_tool_secrets` and decrypts it server-side. That decrypt needs
+  // the key the DECLARED environment encrypts with — an ambient ENCRYPTION_KEY
+  // is deliberately refused, because material encrypted for one environment
+  // must never be decryptable with another's key. Same resolution as
+  // `verify-legacy-reads.ts`; without it the gateway refuses every read with
+  // `no_usable_credential` even though the credential is stored and active.
+  process.env.ENCRYPTION_KEY = resolveEncryptionKeyForTarget(
+    targetArgs.envFile,
+    target.name
+  );
+
+  // The gateway's global kill-switch. Admission reaches the source through the
+  // SL-1 top-level entry points, which read `process.env` rather than taking an
+  // override, so this process must carry what a deployed runtime would.
+  // Process-local only: it configures this run, never the hosted environment.
+  // The per-call `env` passed into ingestion below covers admission's own gate;
+  // this covers the gateway's internal ones, and the two must agree.
+  process.env.LEGACY_GATEWAY_ENABLED = "true";
 
   // ==========================================================================
   // PREFLIGHT — everything that can be established about the Gu OS target,
