@@ -55,19 +55,29 @@
  *
  * ## Why resuming is safe (steps 9–10)
  *
- * Materialisation is idempotent and finishes what the decision owes: the Case
- * (whose creation is structurally unique per source event), the inbox link,
- * each admitting fact, the timeline event, and only then settlement. Every step
- * checks what already exists, so a resume after a crash at any boundary
- * converges on the one canonical materialisation rather than duplicating part
- * of it — and the event is never settled while something it owes is missing.
+ * Materialisation finishes what the decision owes: the Case, the inbox link,
+ * each admitting fact, the timeline event, and only then settlement. The event
+ * is never settled while something it owes is missing.
+ *
+ * Every one of those writes is **structurally idempotent**, not merely guarded
+ * by a preceding read. A worker that linked the Case under a lease that has
+ * since expired can still be inside materialisation when a reclaimer starts the
+ * same work, and "is this fact missing? then write it" proves nothing there —
+ * both workers can observe "missing" before either writes. So each artifact has
+ * a durable identity the database enforces: one Case per source event, one
+ * evidence row per (Case, fact key, source event), one admission timeline event
+ * per (Case, source event). Two workers may both attempt every write; exactly
+ * one of each survives, and the loser continues instead of failing. Concurrent
+ * completion is commutative rather than coordinated.
  *
  * ## Fencing
  *
  * Ownership is durable, not remembered. Each claim carries an epoch, and every
- * write this module makes to the inbox is conditional on it, so a worker that
+ * write this module makes to the INBOX is conditional on it, so a worker that
  * stalls past its lease is locked out the instant another reclaims. Losing the
- * claim is reported, never silently treated as success.
+ * claim is reported, never silently treated as success. Fencing governs the
+ * inbox; structural identity governs the Case and its children, because a
+ * worker already past the fence can still reach them.
  *
  * Shadow throughout: no prospect-facing effect is reachable from this module.
  * It writes Gu OS rows and nothing else — no send, no legacy write, no
@@ -81,12 +91,10 @@ import {
   failSourceEvent,
   findCaseMaterialisedBySourceEvent,
   getActiveMembership,
-  getCurrentCaseFacts,
   getGlobalOperationalCaseTypeBySlug,
-  getRecentOperationalCaseEvents,
   getRelationshipAdmissionMode,
   getSourceEventById,
-  insertCaseFact,
+  insertCaseFactOnce,
   insertOperationalCaseEvent,
   isClaimExpired,
   isRelationshipOpsEnabled,
@@ -704,51 +712,51 @@ async function completeMaterialisation(params: {
     throw new ClaimLost();
   }
 
-  // ── 3–5. The admitting facts, each written only if it is missing.
+  // ── 3–5. The admitting facts.
+  //
+  // Written through `insertCaseFactOnce`, whose identity is
+  // (case_id, fact_key, source_ref) with `source_ref` naming THIS source event.
+  // Two consequences, both deliberate:
+  //
+  //  * a concurrent resume cannot produce a second copy — the database keeps
+  //    one, and the loser of the race carries on;
+  //  * the check is "has THIS admission's evidence been written?", not "does
+  //    the Case have any fact with this key?". A later legitimate writer that
+  //    changes `opportunity.objective` therefore neither blocks admission's
+  //    historical evidence nor gets overwritten by it: a late resume records
+  //    its fact as history, superseded by the newer current value.
   //
   // `source_kind` is not uniform on purpose: what Traditional Gu reported is
   // `integration` evidence, while the disposition and the objective are Gu OS
   // conclusions drawn from it and are therefore `derived`. Collapsing the two
   // would make a Gu OS judgment look like a source fact.
-  const existingFacts = await getCurrentCaseFacts(
-    db,
-    request.ownerUserId,
-    caseId
-  );
   const factProvenance = {
     userId: request.ownerUserId,
     caseId,
     sourceRef: `source_events:${sourceEventId}`,
   };
 
-  if (!existingFacts.has(ADMISSION_FACT_KEYS.disposition)) {
-    await insertCaseFact(db, {
-      ...factProvenance,
-      sourceKind: "derived",
-      factKey: ADMISSION_FACT_KEYS.disposition,
-      value: settled,
-    });
-  }
-  if (!existingFacts.has(ADMISSION_FACT_KEYS.source)) {
-    await insertCaseFact(db, {
-      ...factProvenance,
-      sourceKind: "integration",
-      factKey: ADMISSION_FACT_KEYS.source,
-      value: {
-        source_system: "traditional_gu",
-        event_kind: event.kind,
-        legacy_lead_id: event.externalLeadRef,
-        source_label: event.sourceLabel ?? null,
-        origin_label: event.originLabel ?? null,
-        dedup_key: event.dedupKey,
-      },
-    });
-  }
-  if (
-    settled.proposal?.objective &&
-    !existingFacts.has(ADMISSION_FACT_KEYS.objective)
-  ) {
-    await insertCaseFact(db, {
+  await insertCaseFactOnce(db, {
+    ...factProvenance,
+    sourceKind: "derived",
+    factKey: ADMISSION_FACT_KEYS.disposition,
+    value: settled,
+  });
+  await insertCaseFactOnce(db, {
+    ...factProvenance,
+    sourceKind: "integration",
+    factKey: ADMISSION_FACT_KEYS.source,
+    value: {
+      source_system: "traditional_gu",
+      event_kind: event.kind,
+      legacy_lead_id: event.externalLeadRef,
+      source_label: event.sourceLabel ?? null,
+      origin_label: event.originLabel ?? null,
+      dedup_key: event.dedupKey,
+    },
+  });
+  if (settled.proposal?.objective) {
+    await insertCaseFactOnce(db, {
       ...factProvenance,
       sourceKind: "derived",
       factKey: ADMISSION_FACT_KEYS.objective,
@@ -760,33 +768,57 @@ async function completeMaterialisation(params: {
     });
   }
 
-  // ── 6. The timeline event, once. `operational_case_events` is append-only
-  // with no dedup of its own, so a resume must check rather than re-append.
-  const timeline = await getRecentOperationalCaseEvents(db, caseId, 50);
-  const alreadyRecorded = timeline.some((entry) => {
-    const payload = entry.payload_jsonb as Record<string, unknown> | null;
-    return (
-      payload?.kind === "admission_disposition" &&
-      payload?.source_event_id === sourceEventId
-    );
+  // ── 6. The timeline event, once.
+  //
+  // `operational_case_events` is append-only and carries no identity of its
+  // own, so a partial unique index on (case_id, payload->>'source_event_id')
+  // for `admission_disposition` rows is what stops a concurrent resume from
+  // narrating the same admission twice. Reading the recent window and
+  // appending if absent would be a check-then-insert race — and a bounded
+  // window is not a permanent identity in any case.
+  await insertAdmissionTimelineEventOnce(db, {
+    caseId,
+    sourceEventId,
+    settled,
   });
-  if (!alreadyRecorded) {
+
+  // ── 7. Only now.
+  return settle(caseId);
+}
+
+/**
+ * Appends the admission timeline event, tolerating the concurrent duplicate.
+ *
+ * The unique index is the guarantee; this only decides that losing the race is
+ * a normal outcome rather than a fault. Kept local because the identity is
+ * admission's, not the Case timeline's in general.
+ */
+async function insertAdmissionTimelineEventOnce(
+  db: DbClient,
+  params: {
+    caseId: string;
+    sourceEventId: string;
+    settled: AdmissionDecision;
+  }
+): Promise<void> {
+  try {
     await insertOperationalCaseEvent(db, {
-      caseId,
+      caseId: params.caseId,
       eventType: "state_changed",
       actor: "system",
       payload: {
         kind: "admission_disposition",
-        disposition: settled.disposition,
-        reason: settled.reason,
-        effective_policy: settled.policy,
-        source_event_id: sourceEventId,
+        disposition: params.settled.disposition,
+        reason: params.settled.reason,
+        effective_policy: params.settled.policy,
+        source_event_id: params.sourceEventId,
       },
     });
+  } catch (error) {
+    if ((error as { code?: string }).code !== UNIQUE_VIOLATION) throw error;
+    // Another worker narrated this admission first. One logical event exists,
+    // which is the whole requirement.
   }
-
-  // ── 7. Only now.
-  return settle(caseId);
 }
 
 /**

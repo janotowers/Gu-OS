@@ -41,6 +41,7 @@ import {
   claimSourceEvent,
   failSourceEvent,
   insertAiUsageEvent,
+  insertCaseFact,
   linkAdmittedCase,
   reclaimSourceEvent,
   recordSourceEvent,
@@ -229,7 +230,10 @@ function baseTables(
 
 function harness(
   overrides: Parameters<typeof baseTables>[0] = {},
-  extra: { failWrite?: Array<{ table: string; occurrence?: number }> } = {}
+  extra: {
+    failWrite?: Array<{ table: string; occurrence?: number }>;
+    onWrite?: (table: string) => Promise<void> | void;
+  } = {}
 ): FakeDb {
   return createFakeDb({
     tables: baseTables(overrides),
@@ -242,6 +246,23 @@ function harness(
       {
         table: "operational_cases",
         columns: ["organization_id", "context_jsonb->>source_event_id"],
+      },
+      // uq_case_facts_admission_evidence: one evidence row per (Case, fact key,
+      // source event). Keyed on source_ref, so another writer's fact for the
+      // same key neither blocks admission's nor is blocked by it.
+      {
+        table: "case_facts",
+        columns: ["case_id", "fact_key", "source_ref"],
+        where: (row) => String(row.source_ref ?? "").startsWith("source_events:"),
+      },
+      // uq_operational_case_events_admission: one admission narration per
+      // (Case, source event).
+      {
+        table: "operational_case_events",
+        columns: ["case_id", "payload_jsonb->>source_event_id"],
+        where: (row) =>
+          (row.payload_jsonb as Record<string, unknown> | null)?.kind ===
+          "admission_disposition",
       },
     ],
     defaults: {
@@ -256,7 +277,7 @@ function harness(
         decision_jsonb: null,
         admitted_case_id: null,
       },
-      case_facts: { superseded_by: null },
+      case_facts: { superseded_by: null, source_ref: null, confidence: null },
       operational_cases: { organization_id: null, runtime_authority: null },
     },
     ...extra,
@@ -1016,6 +1037,183 @@ async function testFencedHelpersReportNonApplication(): Promise<void> {
   assert.equal(db.tables.source_events[0].status, "completed");
 }
 
+/**
+ * 7d. THE mid-materialisation race.
+ *
+ * The other stale-worker tests lose the claim before the old worker enters
+ * materialisation, so they never exercise two workers writing to the same Case
+ * at once. This one holds A at its first fact write — after it recorded the
+ * decision, created the Case AND successfully linked it under epoch 1 — then
+ * lets B reclaim and complete the whole admission, then releases A.
+ *
+ * Everything A does from there must be absorbed: no second fact, no second
+ * timeline event, no mutation of B's settled truth.
+ */
+async function testMidMaterialisationRaceConverges(): Promise<void> {
+  let heldOnce = false;
+  let release = (): void => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const db = harness(
+    {},
+    {
+      onWrite: async (table) => {
+        // Hold ONLY A's first fact write. B's writes, which happen while A is
+        // parked here, must proceed.
+        if (table === "case_facts" && !heldOnce) {
+          heldOnce = true;
+          await held;
+        }
+      },
+    }
+  );
+
+  // A takes an already-expired lease and walks into materialisation.
+  const aPromise = runAdmission(request(db, { leaseSeconds: 0 }));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  // A got far enough to link the Case before parking.
+  assert.equal(
+    db.tables.operational_cases.length,
+    1,
+    "A created the Case before stalling"
+  );
+  assert.ok(
+    db.tables.source_events[0].admitted_case_id,
+    "and linked it under its own epoch"
+  );
+  assert.equal(db.tables.source_events[0].claim_epoch, 1);
+
+  // B reclaims the expired lease and completes everything.
+  const owner = await runAdmission(request(db));
+  assert.equal(owner.status, "evaluated");
+  if (owner.status !== "evaluated") return;
+  assert.equal(owner.outcome.decision.disposition, "admitted");
+  assert.equal(db.tables.source_events[0].status, "completed");
+  assert.equal(db.tables.source_events[0].claim_epoch, 2);
+  const settledAt = db.tables.source_events[0].completed_at;
+  const canonicalCaseId = owner.outcome.case_id;
+
+  // A resumes into a Case that is already fully materialised and settled.
+  release();
+  const stale = await aPromise;
+
+  assert.equal(
+    db.tables.operational_cases.length,
+    1,
+    "still exactly one Opportunity Case"
+  );
+
+  for (const key of [
+    "admission.disposition",
+    "admission.source",
+    "opportunity.objective",
+  ]) {
+    const rows = db.tables.case_facts.filter((fact) => fact.fact_key === key);
+    assert.equal(
+      rows.length,
+      1,
+      `exactly one ${key} evidence row survives the race (found ${rows.length})`
+    );
+    assert.equal(
+      rows[0].superseded_by,
+      null,
+      `and it is the current value for ${key}`
+    );
+  }
+
+  const admissionEvents = db.tables.operational_case_events.filter((entry) => {
+    const payload = entry.payload_jsonb as Record<string, unknown>;
+    return payload?.kind === "admission_disposition";
+  });
+  assert.equal(
+    admissionEvents.length,
+    1,
+    "the admission is narrated once, not twice"
+  );
+
+  // B's settled truth is untouched.
+  const inbox = db.tables.source_events[0];
+  assert.equal(inbox.status, "completed");
+  assert.equal(inbox.completed_at, settledAt, "A did not re-settle");
+  assert.equal(inbox.admitted_case_id, canonicalCaseId);
+
+  // And A reports the canonical result rather than one of its own.
+  assert.equal(stale.status, "evaluated");
+  if (stale.status !== "evaluated") return;
+  assert.equal(stale.outcome.deduplicated, true);
+  assert.equal(stale.outcome.case_id, canonicalCaseId);
+}
+
+/**
+ * 7e. Admission's late evidence never displaces a newer legitimate fact.
+ *
+ * `opportunity.objective` is business truth other writers will own in later
+ * Slices. A resume that arrives after one of them must record its historical
+ * evidence WITHOUT rewriting the present — and the completion check must ask
+ * "has THIS admission's evidence been written?", not "does the Case have any
+ * fact with this key?".
+ */
+async function testLateAdmissionEvidenceDoesNotOverwriteNewerTruth(): Promise<void> {
+  const db = harness();
+
+  // Crash after the disposition fact, before the objective fact.
+  db.failNextWrite("case_facts");
+  db.failNextWrite("case_facts");
+  db.failNextWrite("case_facts");
+  await assert.rejects(() => runAdmission(request(db)), isInjectedFailure);
+  const caseId = db.tables.operational_cases[0].id as string;
+  assert.equal(
+    db.tables.case_facts.length,
+    0,
+    "no admission fact landed before the crash"
+  );
+
+  // Another writer sets the current objective in the meantime, with its own
+  // provenance — not admission's.
+  await insertCaseFact(db.client, {
+    userId: ADVISOR,
+    caseId,
+    factKey: "opportunity.objective",
+    value: { objective: "Cambió a renta", category: "rent_residential" },
+    sourceKind: "user",
+    sourceRef: "advisor_correction",
+  });
+
+  const retry = await runAdmission(request(db));
+  assert.equal(retry.status, "evaluated");
+
+  const objectives = db.tables.case_facts.filter(
+    (fact) => fact.fact_key === "opportunity.objective"
+  );
+  assert.equal(objectives.length, 2, "both evidence items exist in history");
+
+  const current = objectives.filter((fact) => fact.superseded_by == null);
+  assert.equal(current.length, 1, "exactly one is current");
+  assert.equal(
+    current[0].source_ref,
+    "advisor_correction",
+    "the newer legitimate fact stays current; admission does not rewrite the present"
+  );
+
+  const admissionEvidence = objectives.find((fact) =>
+    String(fact.source_ref).startsWith("source_events:")
+  );
+  assert.ok(
+    admissionEvidence,
+    "admission's own provenance-bearing evidence is still recorded"
+  );
+  assert.ok(
+    admissionEvidence?.superseded_by,
+    "recorded as history, since it arrived after the current value"
+  );
+
+  // ...and the admission still completed: its owed evidence exists.
+  assert.equal(db.tables.source_events[0].status, "completed");
+}
+
 /** 8. Across every path: one Case, and never two contradictory answers. */
 async function testNoPathProducesTwoCasesOrTwoAnswers(): Promise<void> {
   const scenarios: Array<[string, (db: FakeDb) => Promise<void>]> = [
@@ -1692,6 +1890,8 @@ const tests: Array<[string, () => void | Promise<void>]> = [
   ["SA-2.4 a stale worker after settlement returns the canonical outcome", testStaleWorkerAfterSettlement],
   ["SA-2.4 a stale worker on an unsettled event reports lost claim", testStaleWorkerReportsLostClaim],
   ["SA-2.4 fenced helpers report non-application", testFencedHelpersReportNonApplication],
+  ["SA-2.4 a mid-materialisation race converges to one artifact set", testMidMaterialisationRaceConverges],
+  ["SA-2.4 late admission evidence does not overwrite newer truth", testLateAdmissionEvidenceDoesNotOverwriteNewerTruth],
   ["SA-2.4 no path yields two Cases or two contradictory answers", testNoPathProducesTwoCasesOrTwoAnswers],
   ["SA-2.4 distinct events are not deduplicated", testDistinctEventsAreNotDeduplicated],
   ["SA-2.5 a hard bound beats policy and confidence", testHardBoundWins],

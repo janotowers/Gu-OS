@@ -937,6 +937,141 @@ async function main(): Promise<void> {
       assert.equal(rowCount, 2, "the index constrains the identity, not the type");
     });
 
+    await t("concurrent workers cannot write two admission evidence rows", async () => {
+      // The Case index stops a second Opportunity; it does nothing for the
+      // Case's CHILDREN. Two workers inside materialisation at once — one whose
+      // lease expired mid-run, one that reclaimed — can both reach the fact
+      // writes, and a read-then-insert would let both observe "missing".
+      const eventId = await newEvent(f.orgA, "artifact:facts");
+      const insertFact = () =>
+        client.query(
+          `insert into public.case_facts
+             (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+           values ($1, $2, 'admission.disposition', '{"disposition":"admitted"}'::jsonb,
+                   'derived', 'source_events:' || $3::text)`,
+          [f.orgCaseA, f.creatorA, eventId]
+        );
+      const [first, second] = await Promise.allSettled([
+        insertFact(),
+        insertFact(),
+      ]);
+      const rejected = [first, second].filter((r) => r.status === "rejected");
+      assert.equal(rejected.length, 1, "exactly one insert survives");
+      assert.equal(
+        (rejected[0] as PromiseRejectedResult).reason.code,
+        UNIQUE_VIOLATION
+      );
+
+      const { rowCount } = await client.query(
+        `select id from public.case_facts
+          where case_id = $1
+            and fact_key = 'admission.disposition'
+            and source_ref = 'source_events:' || $2::text`,
+        [f.orgCaseA, eventId]
+      );
+      assert.equal(rowCount, 1);
+    });
+
+    await t("a different writer's fact for the same key is unaffected", async () => {
+      // The identity is (case, key, source_ref), NOT (case, key): a later
+      // legitimate correction with its own provenance must still be writable,
+      // and must not be blocked by admission's evidence.
+      const eventId = await newEvent(f.orgA, "artifact:coexist");
+      await client.query(
+        `insert into public.case_facts
+           (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+         values ($1, $2, 'opportunity.objective', '{"objective":"comprar"}'::jsonb,
+                 'derived', 'source_events:' || $3::text)`,
+        [f.orgCaseA, f.creatorA, eventId]
+      );
+      await client.query(
+        `insert into public.case_facts
+           (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+         values ($1, $2, 'opportunity.objective', '{"objective":"rentar"}'::jsonb,
+                 'user', 'advisor_correction')`,
+        [f.orgCaseA, f.creatorA]
+      );
+      // The fixture already seeds an opportunity.objective on this Case, so
+      // count the two provenances this check wrote rather than the whole key.
+      const { rows } = await client.query<{ source_ref: string | null }>(
+        `select source_ref from public.case_facts
+          where case_id = $1
+            and fact_key = 'opportunity.objective'
+            and source_ref is not null
+          order by source_ref`,
+        [f.orgCaseA]
+      );
+      assert.deepEqual(
+        rows.map((r) => r.source_ref),
+        ["advisor_correction", `source_events:${eventId}`],
+        "both provenances coexist"
+      );
+    });
+
+    await t("the free-form source_ref of other domains stays unconstrained", async () => {
+      // The index is partial on `source_ref like 'source_events:%'`. Existing
+      // writers reuse values such as 'readiness_owner_simulation', and must
+      // keep being able to.
+      for (let i = 0; i < 2; i += 1) {
+        await client.query(
+          `insert into public.case_facts
+             (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+           values ($1, $2, 'property.bedrooms', '3'::jsonb, 'user',
+                   'readiness_owner_simulation')`,
+          [f.orgCaseA, f.creatorA]
+        );
+      }
+      const { rowCount } = await client.query(
+        `select id from public.case_facts
+          where case_id = $1 and source_ref = 'readiness_owner_simulation'`,
+        [f.orgCaseA]
+      );
+      assert.equal(rowCount, 2, "non-admission provenance is not deduplicated");
+    });
+
+    await t("concurrent workers cannot narrate one admission twice", async () => {
+      const eventId = await newEvent(f.orgA, "artifact:timeline");
+      const insertEvent = () =>
+        client.query(
+          `insert into public.operational_case_events
+             (case_id, event_type, actor, payload_jsonb)
+           values ($1, 'state_changed', 'system',
+                   jsonb_build_object('kind', 'admission_disposition',
+                                      'source_event_id', $2::text))`,
+          [f.orgCaseA, eventId]
+        );
+      const [first, second] = await Promise.allSettled([
+        insertEvent(),
+        insertEvent(),
+      ]);
+      const rejected = [first, second].filter((r) => r.status === "rejected");
+      assert.equal(rejected.length, 1, "exactly one narration survives");
+      assert.equal(
+        (rejected[0] as PromiseRejectedResult).reason.code,
+        UNIQUE_VIOLATION
+      );
+    });
+
+    await t("other Case timeline events are unconstrained", async () => {
+      // The index is partial on kind = 'admission_disposition'. The append-only
+      // timeline must stay append-only for everything else.
+      for (let i = 0; i < 2; i += 1) {
+        await client.query(
+          `insert into public.operational_case_events
+             (case_id, event_type, actor, payload_jsonb)
+           values ($1, 'state_changed', 'system',
+                   jsonb_build_object('kind', 'step_completed'))`,
+          [f.orgCaseA]
+        );
+      }
+      const { rowCount } = await client.query(
+        `select id from public.operational_case_events
+          where case_id = $1 and payload_jsonb ->> 'kind' = 'step_completed'`,
+        [f.orgCaseA]
+      );
+      assert.equal(rowCount, 2);
+    });
+
     await t("a source event cannot point at another Organization's Case", async () => {
       const eventId = await newEvent(f.orgA, "fence:containment");
       await claim(eventId, "worker-a", 0, 300);

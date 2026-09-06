@@ -84,6 +84,130 @@ export async function insertCaseFact(
   return { fact, superseded };
 }
 
+export interface InsertCaseFactOnceResult {
+  fact: CaseFact;
+  /** False when an equivalent evidence row already existed. */
+  inserted: boolean;
+  /**
+   * True when the row was recorded as HISTORY rather than as the current value,
+   * because another writer's fact for this key was already current.
+   */
+  recordedAsSuperseded: boolean;
+}
+
+/** Postgres unique-violation: this evidence item already exists. */
+const UNIQUE_VIOLATION = "23505";
+
+/**
+ * Inserta un hecho *a lo sumo una vez* por (case_id, fact_key, source_ref).
+ *
+ * Para evidencia que tiene identidad duradera en su origen — un evento de
+ * inbox, un documento — y que dos ejecutores concurrentes pueden intentar
+ * escribir a la vez. `insertCaseFact` no basta ahí: un patrón
+ * leer-y-si-falta-insertar no prueba nada bajo concurrencia, porque ambos
+ * pueden observar "falta" antes de que cualquiera escriba. Aquí la identidad es
+ * estructural (índice único parcial) y el perdedor de la carrera continúa en vez
+ * de fallar.
+ *
+ * Segunda diferencia, deliberada: este helper **nunca desplaza un valor vigente
+ * que no escribió**. Una reanudación tardía que llega después de que otro
+ * escritor legítimo cambió la misma clave registra su evidencia como historia
+ * — insertada y de inmediato superseded_by la fila vigente — en lugar de
+ * reescribir el presente para restaurar el pasado. Cuando no hay otro vigente,
+ * el comportamiento es idéntico a `insertCaseFact`.
+ */
+export async function insertCaseFactOnce(
+  db: DbClient,
+  input: InsertCaseFactInput & { sourceRef: string }
+): Promise<InsertCaseFactOnceResult> {
+  const { data, error } = await db
+    .from("case_facts")
+    .insert({
+      case_id: input.caseId,
+      user_id: input.userId,
+      fact_key: input.factKey,
+      value_jsonb: input.value,
+      source_kind: input.sourceKind,
+      source_ref: input.sourceRef,
+      confidence: input.confidence ?? null,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    if ((error as { code?: string }).code !== UNIQUE_VIOLATION) throw error;
+    const existing = await findCaseFactBySourceRef(db, {
+      userId: input.userId,
+      caseId: input.caseId,
+      factKey: input.factKey,
+      sourceRef: input.sourceRef,
+    });
+    if (!existing) throw error;
+    return {
+      fact: existing,
+      inserted: false,
+      recordedAsSuperseded: existing.superseded_by !== null,
+    };
+  }
+
+  const fact = data as CaseFact;
+
+  // ¿Hay otro vigente para esta clave que no sea el nuestro?
+  const { data: currentData, error: currentError } = await db
+    .from("case_facts")
+    .select("*")
+    .eq("user_id", input.userId)
+    .eq("case_id", input.caseId)
+    .eq("fact_key", input.factKey)
+    .is("superseded_by", null)
+    .order("recorded_at", { ascending: false });
+  if (currentError) throw currentError;
+  const others = ((currentData ?? []) as CaseFact[]).filter(
+    (row) => row.id !== fact.id
+  );
+
+  if (others.length === 0) {
+    return { fact, inserted: true, recordedAsSuperseded: false };
+  }
+
+  // Otro escritor ya tiene el valor vigente: lo nuestro es evidencia histórica
+  // que llegó tarde, no una corrección del presente.
+  const { error: supersedeError } = await db
+    .from("case_facts")
+    .update({ superseded_by: others[0].id })
+    .eq("id", fact.id)
+    .eq("user_id", input.userId)
+    .is("superseded_by", null);
+  if (supersedeError) throw supersedeError;
+  return {
+    fact: { ...fact, superseded_by: others[0].id },
+    inserted: true,
+    recordedAsSuperseded: true,
+  };
+}
+
+/** Busca la evidencia de un origen concreto, vigente o ya reemplazada. */
+export async function findCaseFactBySourceRef(
+  db: DbClient,
+  params: {
+    userId: string;
+    caseId: string;
+    factKey: string;
+    sourceRef: string;
+  }
+): Promise<CaseFact | null> {
+  const { data, error } = await db
+    .from("case_facts")
+    .select("*")
+    .eq("user_id", params.userId)
+    .eq("case_id", params.caseId)
+    .eq("fact_key", params.factKey)
+    .eq("source_ref", params.sourceRef)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as CaseFact | null) ?? null;
+}
+
 export async function getCaseFactById(
   db: DbClient,
   userId: string,

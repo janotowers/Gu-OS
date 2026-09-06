@@ -45,6 +45,8 @@ function columnValue(row: Row, column: string): unknown {
 export interface FakeUniqueIndex {
   table: string;
   columns: string[];
+  /** Partial-index predicate. Rows it excludes can never collide. */
+  where?: (row: Row) => boolean;
 }
 
 export interface FakeDbOptions {
@@ -69,6 +71,15 @@ export interface FakeDbOptions {
    * for the wrong reason.
    */
   defaults?: Record<string, Row>;
+  /**
+   * Fires immediately before each durable write, and is awaited.
+   *
+   * The coordination point a concurrency test needs: it can hold one worker
+   * mid-materialisation while another reclaims and finishes, which is the only
+   * way to exercise two workers actually racing inside the same Case rather
+   * than one merely resuming after the other stopped.
+   */
+  onWrite?: (table: string) => Promise<void> | void;
 }
 
 export interface FakeDb {
@@ -129,18 +140,21 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
     return uniqueIndexes
       .filter((index) => index.table === name)
       .some((index) => {
-        // Partial-index semantics: a row that has no value for an indexed
-        // expression is simply not covered, so it can never collide.
+        // Partial-index semantics: a row outside the predicate, or with no
+        // value for an indexed expression, is simply not covered.
+        if (index.where && !index.where(candidate)) return false;
         const candidateKey = index.columns.map((column) =>
           columnValue(candidate, column)
         );
         if (candidateKey.some((value) => value === null || value === undefined)) {
           return false;
         }
-        return table(name).some((existing) =>
-          index.columns.every(
-            (column, i) => columnValue(existing, column) === candidateKey[i]
-          )
+        return table(name).some(
+          (existing) =>
+            (!index.where || index.where(existing)) &&
+            index.columns.every(
+              (column, i) => columnValue(existing, column) === candidateKey[i]
+            )
         );
       });
   }
@@ -153,6 +167,12 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
     let orderColumn: string | null = null;
     let orderAscending = true;
     let limitValue: number | null = null;
+
+    /** Awaited before any durable write, so a test can hold a worker there. */
+    async function beforeWrite(): Promise<void> {
+      if (mode === "select") return;
+      await options.onWrite?.(name);
+    }
 
     function apply(): { rows: Row[]; error: unknown } {
       if (mode === "insert") {
@@ -273,10 +293,12 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
         return self;
       },
       maybeSingle: async () => {
+        await beforeWrite();
         const { rows, error } = apply();
         return { data: rows[0] ?? null, error };
       },
       single: async () => {
+        await beforeWrite();
         const { rows, error } = apply();
         if (!error && rows.length === 0) {
           return {
@@ -286,10 +308,13 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
         }
         return { data: rows[0] ?? null, error };
       },
-      then: (resolve: (value: { data: Row[]; error: unknown }) => unknown) => {
-        const { rows, error } = apply();
-        return resolve({ data: rows, error });
-      },
+      then: (resolve: (value: { data: Row[]; error: unknown }) => unknown) =>
+        Promise.resolve()
+          .then(() => beforeWrite())
+          .then(() => {
+            const { rows, error } = apply();
+            return resolve({ data: rows, error });
+          }),
     };
     return self;
   }

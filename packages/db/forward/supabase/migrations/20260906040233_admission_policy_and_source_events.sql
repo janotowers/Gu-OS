@@ -352,6 +352,43 @@ create unique index uq_operational_cases_source_event
   where case_type = 'lead_opportunity' and context_jsonb ? 'source_event_id';
 
 -- ============================================================
+-- Admission artifact identity: one logical evidence item per source event
+--
+-- Claim fencing keeps a stale worker out of the INBOX, and the Case index keeps
+-- it from creating a second Opportunity. Neither covers the Case's CHILDREN. A
+-- worker that linked the Case under an expired lease can still be inside
+-- materialisation when a reclaimer starts the same work, and a
+-- read-then-insert ("is this fact missing? then write it") proves nothing: both
+-- workers can observe "missing" before either writes.
+--
+-- So the identity of each admission artifact is made structural. Two workers
+-- may both attempt every write; the database keeps exactly one of each, and the
+-- loser continues rather than failing. Concurrent completion becomes
+-- idempotent instead of coordinated.
+--
+-- Both indexes are scoped to admission's own rows, so no other domain's use of
+-- case_facts.source_ref or of the Case timeline is constrained: `source_ref` is
+-- free-form elsewhere (values like 'readiness_owner_simulation' are legitimately
+-- reused), and only admission writes an `admission_disposition` event kind.
+-- ============================================================
+
+-- One evidence item per (Case, fact key, source event). This is deliberately
+-- keyed on source_ref rather than on fact_key alone: `opportunity.objective`
+-- may be legitimately rewritten later by another writer, and that fact carries
+-- a different provenance. Admission's own evidence is what must not duplicate.
+create unique index uq_case_facts_admission_evidence
+  on public.case_facts (case_id, fact_key, source_ref)
+  where source_ref like 'source_events:%';
+
+-- One admission timeline event per (Case, source event). The Case timeline is
+-- append-only with no identity of its own, so this is what stops a concurrent
+-- resume from narrating the same admission twice.
+create unique index uq_operational_case_events_admission
+  on public.operational_case_events
+     (case_id, (payload_jsonb ->> 'source_event_id'))
+  where payload_jsonb ->> 'kind' = 'admission_disposition';
+
+-- ============================================================
 -- ai_usage_events.organization_id — correlation completeness (TP §7 (a))
 --
 -- Additive and nullable: every existing row keeps its meaning, and the column
