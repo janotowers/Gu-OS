@@ -1,6 +1,6 @@
 # Gu OS Agentic Product & Software Development Methodology
 
-> **Version:** v0.4.1  
+> **Version:** v0.4.2  
 > **Status:** Canonical development methodology  
 > **Scope:** Tool-agnostic, product-portable operating method for humans + coding agents  
 > **Intended repo path:** `docs/development/agentic-product-software-development-methodology.md`
@@ -347,7 +347,7 @@ R1 — Relationship Operations v1          (Roadmap Increment)
 
 Each Slice carries the specific traceability that governs *it* — which may be one Spec, several Specs, or an ADR / invariant / prerequisite capability for enabling work (Section 10).
 
-**How multiple increments inside one enduring Product Area should be represented physically** — one Slice Plan per increment, a successor document, an archived section — is a documentation-architecture question deliberately deferred to the follow-up reconciliation (Sections 22, 23). Semantically, though, a Slice Plan serving a Roadmap Increment is scoped to **that increment**; it is not a perpetual list of every Slice its Product Area will ever have.
+**Physical document organization is repository-specific; the Methodology prescribes no filesystem shape** (Section 1.1). Semantically, a Slice Plan serving a Roadmap Increment is scoped to **that increment**; it is not a perpetual list of every Slice its Product Area will ever have.
 
 | **Element**                        | **What it must answer**                                                                                                                                                          |
 |------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -357,7 +357,7 @@ Each Slice carries the specific traceability that governs *it* — which may be 
 | Governing behavior / traceability  | Which Spec(s), acceptance scenarios, ADR(s), technical decisions or invariants govern this increment?                                                                             |
 | Slice Acceptance Contract          | What must be demonstrably true for this increment specifically, and by what evidence type?                                                                                        |
 | Dependencies                       | What must already be satisfied, and which prerequisites are still outstanding?                                                                                                     |
-| Definition of Done / evidence      | What evidence closes this Slice, beyond the initiative's shared baseline?                                                                                                          |
+| Definition of Done / evidence      | What evidence closes this Slice, beyond any shared baseline defined by its Slice Plan?                                                                                                          |
 | Release Scope                      | RS-1 / RS-2 / RS-3 (Section 14.2) — the Done boundary this Slice claims.                                                                                                          |
 | Estimate                           | Elapsed agent-assisted engineering time to evidence-ready (Section 10.4).                                                                                                          |
 | Estimate confidence / uncertainty  | High / Medium / Low, plus the driver of the uncertainty where useful.                                                                                                             |
@@ -1129,8 +1129,8 @@ Adoption is itself brownfield. Do not stop engineering to rewrite all historical
 
 | **Order** | **Action**                                                                                                                                                                                                                                                                                                                                                                   |
 |-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Next 1    | Maintain this Methodology (current v0.4.1) as the canonical development method, including the four-layer agent instruction architecture, proportional test/eval-first guidance, the Slice / Execution Cycle planning model, and the Development Continuity Loop with its READY Horizon and Roadmap Increment graduation.                                                       |
-| Next 2    | **Align the existing root `AGENTS.md` with the current canonical Methodology (v0.4.1)** — its artifact chain and planning wording still reflect the pre-v0.4.0 model. The Continuity Loop, READY Horizon and taxonomy semantics introduced in v0.4.0 are unchanged by v0.4.1, so the alignment target is those sections as they now stand. Keep it concise: link to Sections 4.1, 10.5, 12.3 and 12.4 rather than copying them into always-on context. Not done by this version.                                                                                              |
+| Next 1    | Maintain this Methodology (current v0.4.2) as the canonical development method, including the four-layer agent instruction architecture, proportional test/eval-first guidance, the Slice / Execution Cycle planning model, and the Development Continuity Loop with its READY Horizon and Roadmap Increment graduation.                                                       |
+| Next 2    | **Align the existing root `AGENTS.md` with the current canonical Methodology (v0.4.2)** — its artifact chain and planning wording still reflect the pre-v0.4.0 model. The Continuity Loop, READY Horizon and taxonomy semantics introduced in v0.4.0 remain unchanged through v0.4.2, so the alignment target is those sections as they now stand. Keep it concise: link to Sections 4.1, 10.5, 12.3 and 12.4 rather than copying them into always-on context. Not done by this version.                                                                                              |
 | Next 3    | ~~Reconcile document organization with the clarified taxonomy.~~ **Done in v0.4.1** (Section 23.6): durable Relationship Operations Specs moved to `product/operating-domains/relationship-operations/specs/`, R1 delivery/discovery/provenance artifacts to `product/roadmap-increments/r1-relationship-operations-v1/`, and the unused `product/initiatives/` tree removed. |
 | Next 4    | Continue empirical calibration with subsequent Slices and Cycles (Section 17.1), including the READY Horizon and Execution Cycle defaults, which are operating starting points rather than invariants.                                                                                                                                                                       |
 | Next 5    | **Exercise the Development Continuity Loop at the next real planning boundary** (Section 12.3), and record where it produced legitimate continuation versus where it correctly stopped at a human-authority boundary.                                                                                                                                                        |
@@ -1213,6 +1213,17 @@ What it records as done:
 Why the two trees are siblings rather than nested: several Gu OS Roadmap Increments map to no single Operating Domain, and an increment may draw from multiple Product Areas and/or Shared/Core capabilities (Section 4.1). Filing increments beneath a domain would encode a hierarchy the method deliberately does not have.
 
 **This layout is a Gu OS choice, not a methodology requirement.** Section 1.1's rule is unchanged: the method prescribes no filesystem shape, and no other product is obliged to adopt `operating-domains/` or `roadmap-increments/`.
+
+# 23.7 v0.4.2 update note
+
+v0.4.2 is a **coherence-only patch** following the v0.4.1 taxonomy reconciliation. It introduces **no new methodology concept, artifact, gate or authority boundary**, and changes no Slice semantics, READY / PLANNED / EXECUTABLE semantics, READY Horizon semantics, Continuity Loop behavior or Roadmap Increment semantics.
+
+It repairs two current-state statements in Section 10.1 that v0.4.1 left behind:
+
+1. **A stale deferral.** Section 10.1 still said that how multiple increments inside one enduring Product Area should be represented physically was "deliberately deferred to the follow-up reconciliation". That reconciliation completed in v0.4.1 (Section 23.6). The sentence now states the standing rule instead: physical document organization is repository-specific and the Methodology prescribes no filesystem shape (Section 1.1), while a Slice Plan serving a Roadmap Increment remains scoped to that increment.
+2. **A residual mandatory-Initiative implication.** The Slice-contract element table asked what evidence closes a Slice "beyond the initiative's shared baseline", which assumed an Initiative owns that baseline even though an Initiative is optional (Section 4.1). It now reads "beyond any shared baseline defined by its Slice Plan".
+
+Unchanged: the Section 23.5 (v0.4.0) and Section 23.6 (v0.4.1) change-history entries, which remain accurate records of what those versions did.
 
 # 24. Working glossary
 
