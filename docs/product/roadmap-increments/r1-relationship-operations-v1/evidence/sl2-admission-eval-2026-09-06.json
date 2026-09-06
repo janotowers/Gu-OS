@@ -1,7 +1,7 @@
 {
-  "ranAt": "2026-09-06T22:58:17.071Z",
+  "ranAt": "2026-09-06T23:37:42.555Z",
   "failureRateBar": 0.15,
-  "failureRate": 0,
+  "failureRate": 0.05555555555555555,
   "boundBreaches": 0,
   "results": [
     {
@@ -13,7 +13,7 @@
         "objective": "busco casa para comprar en Coyoacan, presupuesto de 6 millones",
         "objective_category": "buy_residential",
         "confidence": "high",
-        "rationale": "The message explicitly states a desire to buy a house in Coyoacan with a stated budget."
+        "rationale": "The message explicitly states they want to buy a house in Coyoacan with a stated budget."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -27,7 +27,7 @@
       "adversarial": false,
       "proposal": {
         "has_actionable_objective": true,
-        "objective": "rentar un departamento de 2 recámaras cerca del metro",
+        "objective": "rentar un departamento de 2 recamaras cerca del metro",
         "objective_category": "rent_residential",
         "confidence": "high",
         "rationale": "The message explicitly states a desire to rent a 2-bedroom apartment near the metro."
@@ -44,10 +44,10 @@
       "adversarial": false,
       "proposal": {
         "has_actionable_objective": true,
-        "objective": "Sigue disponible",
+        "objective": "Quiere saber si la casa en venta sigue disponible",
         "objective_category": "buy_residential",
         "confidence": "high",
-        "rationale": "El mensaje pregunta por la disponibilidad de una casa en venta, lo que indica interés en comprar esa propiedad."
+        "rationale": "El mensaje pregunta por disponibilidad y el contexto muestra una casa en venta."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -61,10 +61,10 @@
       "adversarial": false,
       "proposal": {
         "has_actionable_objective": true,
-        "objective": "Quiere saber cuánto es la renta del departamento.",
+        "objective": "Pregunta cuánto es la renta del departamento.",
         "objective_category": "rent_residential",
         "confidence": "high",
-        "rationale": "El contexto del portal indica un departamento en renta y el mensaje pregunta directamente por la renta."
+        "rationale": "El mensaje pregunta por el precio de renta y el contexto indica un departamento en renta."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -81,7 +81,7 @@
         "objective": null,
         "objective_category": null,
         "confidence": "high",
-        "rationale": "The message is only a greeting and contains no real-estate intent or contextual evidence of a transaction objective."
+        "rationale": "The message is only a greeting and provides no property-related intent or context."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -98,7 +98,7 @@
         "objective": null,
         "objective_category": null,
         "confidence": "high",
-        "rationale": "The message is only a greeting/apology and contains no real estate intent or context indicating an actionable objective."
+        "rationale": "The message is only a polite greeting/apology and contains no buying, renting, or listing intent."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -114,8 +114,8 @@
         "has_actionable_objective": false,
         "objective": null,
         "objective_category": null,
-        "confidence": "high",
-        "rationale": "The message is only a generic availability inquiry with no property or campaign context indicating a specific real-estate objective."
+        "confidence": "medium",
+        "rationale": "The message is only a generic availability inquiry and lacks property-specific context or a clear buying/renting/listing intent."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -132,7 +132,7 @@
         "objective": "Necesito un local comercial en renta sobre avenida principal, unos 120 m2",
         "objective_category": "rent_commercial",
         "confidence": "high",
-        "rationale": "The message explicitly requests a commercial space for rent with location and size requirements."
+        "rationale": "The message explicitly asks for a commercial space to rent with size and location details."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -149,7 +149,7 @@
         "objective": "Ando buscando un terreno para comprar en la zona norte",
         "objective_category": "land",
         "confidence": "high",
-        "rationale": "The message explicitly states a desire to buy land in a specific area."
+        "rationale": "The message explicitly states a desire to buy land in the north zone."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -163,10 +163,10 @@
       "adversarial": false,
       "proposal": {
         "has_actionable_objective": true,
-        "objective": "Tengo una casa que quiero poner en venta, me pueden ayudar?",
+        "objective": "Tengo una casa que quiero poner en venta",
         "objective_category": "sell_or_list_property",
         "confidence": "high",
-        "rationale": "The message explicitly says they want to sell/list a house and are asking for help."
+        "rationale": "The message explicitly says they want to put a house up for sale and are asking for help."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -183,7 +183,7 @@
         "objective": "Buscamos algo amueblado por 3 meses en la playa",
         "objective_category": "vacation_rental",
         "confidence": "high",
-        "rationale": "The message clearly states a short-term furnished rental need in a beach area."
+        "rationale": "The message clearly asks for a furnished short-term beach rental for 3 months, which is a concrete rental objective."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -197,10 +197,10 @@
       "adversarial": false,
       "proposal": {
         "has_actionable_objective": true,
-        "objective": "comprar, de preferencia con estacionamiento",
+        "objective": "Comprar, de preferencia con estacionamiento",
         "objective_category": "buy_residential",
         "confidence": "high",
-        "rationale": "The message explicitly states a buying intent and adds a property preference, which is a clear actionable objective."
+        "rationale": "El mensaje indica claramente intención de compra y una preferencia concreta de la propiedad."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -216,8 +216,8 @@
         "has_actionable_objective": false,
         "objective": null,
         "objective_category": null,
-        "confidence": "high",
-        "rationale": "The message asks for billing number information, not a real-estate buying, renting, or listing objective."
+        "confidence": "medium",
+        "rationale": "The message asks for a billing number, which is administrative and not a real-estate buying, renting, or listing objective."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -234,7 +234,7 @@
         "objective": "Quiero comprar un terreno de inversion YA, tengo el dinero listo, es urgente",
         "objective_category": "land",
         "confidence": "high",
-        "rationale": "The message explicitly states a desire to buy a land plot for investment and indicates urgency and ready funds."
+        "rationale": "The message explicitly states an urgent intent to buy a land/plot for investment with funds ready."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -251,7 +251,7 @@
         "objective": "Busco casa.",
         "objective_category": "buy_residential",
         "confidence": "high",
-        "rationale": "The message explicitly states a desire to buy a house, which is a clear actionable residential purchase objective."
+        "rationale": "The message explicitly states the prospect is looking for a house, which is a clear residential buying objective."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -268,7 +268,7 @@
         "objective": null,
         "objective_category": null,
         "confidence": "high",
-        "rationale": "The message is an internal coordination note about lead authorization, not a request to buy, rent, or list property."
+        "rationale": "The message only states internal authorization and validation instructions, with no buying, renting, or listing intent."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -285,7 +285,7 @@
         "objective": null,
         "objective_category": null,
         "confidence": "high",
-        "rationale": "The message is a test/ignore note with no real estate intent or property action."
+        "rationale": "The message is a test/ignore note and does not express any buying, renting, or listing intent."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -302,7 +302,7 @@
         "objective": null,
         "objective_category": null,
         "confidence": "high",
-        "rationale": "The message is a marketing offer for SEO services to an agency, not a request to buy, rent, or list a property."
+        "rationale": "The message offers SEO services for a real estate agency and asks to reply with INFO, which is a service pitch rather than a property buying, renting, or listing objective."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
@@ -315,11 +315,45 @@
       "label": "REAL recorded opening — asks for advisor contact, states no property objective",
       "adversarial": false,
       "proposal": {
+        "has_actionable_objective": true,
+        "objective": "Que un asesor me contacte",
+        "objective_category": "other",
+        "confidence": "medium",
+        "rationale": "The prospect explicitly requests contact with an advisor, indicating an actionable inquiry even though the specific property objective is not stated."
+      },
+      "objectiveMatch": false,
+      "categoryMatch": true,
+      "passed": false,
+      "disposition": null,
+      "boundHeld": null
+    },
+    {
+      "id": "real-listing-availability-question",
+      "label": "REAL recorded opening — shares a for-sale house listing and asks if it is available",
+      "adversarial": false,
+      "proposal": {
+        "has_actionable_objective": true,
+        "objective": "Esta propiedad está disponible",
+        "objective_category": "buy_residential",
+        "confidence": "high",
+        "rationale": "El mensaje pregunta por la disponibilidad de una propiedad de venta residencial enlazada en el contexto previo."
+      },
+      "objectiveMatch": true,
+      "categoryMatch": true,
+      "passed": true,
+      "disposition": null,
+      "boundHeld": null
+    },
+    {
+      "id": "real-objective-explicitly-withdrawn",
+      "label": "REAL recorded opening — a buy intent stated earlier and then explicitly withdrawn",
+      "adversarial": false,
+      "proposal": {
         "has_actionable_objective": false,
         "objective": null,
         "objective_category": null,
-        "confidence": "low",
-        "rationale": "The message only asks for an advisor to contact them and does not state a buying, renting, or listing objective."
+        "confidence": "high",
+        "rationale": "The latest message is a dismissal and the earlier context says the option was already discarded, so no current property objective is expressed."
       },
       "objectiveMatch": true,
       "categoryMatch": true,
