@@ -102,10 +102,21 @@ La migración `00081` añadió dos columnas a `operational_cases`. Ambas son
 **opcionales y aditivas**: no cambian el comportamiento de ningún Caso existente.
 
 **`organization_id` — nullable.** Un Caso con `organization_id = NULL` conserva
-**exactamente** la semántica user-scoped descrita en el resto de este documento, y
-las policies restrictivas de `00081` no le aplican. El valor **nunca se infiere del
-usuario**: se pasa explícitamente o no se pasa. Sobre las filas que sí tienen
-Organización:
+**exactamente** la semántica user-scoped descrita en el resto de este documento. El
+valor **nunca se infiere del usuario**: se pasa explícitamente o no se pasa.
+
+Precisión sobre el mecanismo, porque es una frontera de seguridad: las guardas
+**RESTRICTIVE** que introduce `00081` **sí participan en la evaluación de toda fila**,
+incluidas las legacy. Lo que preserva el comportamiento anterior es cómo están
+escritas — la guardia de tenencia es
+`organization_id is null or is_active_org_member(organization_id)` y las de escritura
+son `organization_id is null` — de modo que **para las filas con `NULL` las guardas
+preservan la semántica legacy user-scoped**, no que dejen de aplicarse. Y ahí siguen
+haciendo trabajo real: el `with check` de la guardia de UPDATE impide que un dueño
+autenticado **adopte** su propio Caso legacy dentro de una Organización asignándole
+`organization_id`.
+
+Sobre las filas que sí tienen Organización:
 
 - lectura por **membresía activa** (`is_active_org_member`), no por propiedad de fila;
 - policies **RESTRICTIVE** de guardia de tenencia en `operational_cases`, `case_facts`,
