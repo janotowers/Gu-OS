@@ -61,6 +61,21 @@ jobs:
       - name: Validate documentation links
         run: npm run validate:doc-links
 
+      # Process invariant, not a semantic one. The architecture documentation
+      # coherence audit (#32–#35) repaired canonical current-state documents
+      # that had drifted from the system they describe; the rule requiring that
+      # repair already existed in AGENTS.md §8. What was missing was a moment
+      # where somebody is asked, on the record, which claims a change
+      # invalidated. This checks that the assessment EXISTS — never that it is
+      # correct, which needs judgment a validator cannot supply without
+      # manufacturing false confidence. `none` with a real rationale passes.
+      #
+      # Reads the PR body from the event payload JSON on disk, so author-
+      # controlled text never reaches a shell. Skips cleanly on push, where
+      # there is no PR body to read.
+      - name: Architecture documentation impact declared (process invariant)
+        run: npm run check:architecture-impact
+
       - name: Type-check
         run: npm run type-check
 
