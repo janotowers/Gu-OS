@@ -334,7 +334,7 @@
         "organizationDigest": "sha256:eab41f21d4c319b6",
         "capability": "legacy_lead_get_recent_messages",
         "sourceUpdatedAt": "2026-08-23T17:40:08.656Z",
-        "expectedEstablishedBy": "Derived from S1 §8.4.3 before consulting the model: the prospect supplied a listing for a house FOR SALE and asked whether it is available, and nothing later withdraws it — the surrounding listing context is exactly what §8.4.3 says makes a short availability question sufficient. `modelSaid` is not carried into this file. The label happens to agree with the model's answer; it was not taken from it, and it remains open to human correction."
+        "expectedEstablishedBy": "HUMAN-REVIEWED AND APPROVED (2026-09-06), independently of `modelSaid`. The reviewer's basis: the prospect asks whether the property is available and the immediately surrounding context is a for-sale house listing. The label was first derived from S1 §8.4.3 before consulting the model and then reviewed and approved by the human domain reviewer; `modelSaid` is not carried into this file."
       },
       "input": {
         "message": "hola buenas tardes esta propiedad esta disponible",
