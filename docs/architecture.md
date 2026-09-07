@@ -199,7 +199,12 @@ Manipulan archivos de texto dentro de una **raíz configurada** (`FILE_TOOLS_ROO
 
 ## Modelo de datos
 
-Migraciones en `packages/db/supabase/migrations/`:
+Las migraciones viven en **dos eras**; el detalle operativo está en [`development/release-path-playbook.md`](development/release-path-playbook.md) §2.
+
+- **Era legacy congelada** — `packages/db/supabase/migrations/`. Histórica e **inmutable**, versión de 5 dígitos, aplicada por `npm run deliver:legacy` (ordered-apply). Tres versiones están duplicadas, así que el CLI de Supabase no puede aplicar ese directorio.
+- **Era forward** — `packages/db/forward/supabase/migrations/`. Timestamp UTC de 14 dígitos, aplicada por el CLI de Supabase (`npm run deliver:forward`) y registrada en `supabase_migrations.schema_migrations`. **Es el único camino normal para migraciones nuevas.**
+
+Selección de la era legacy congelada:
 
 - `00001_initial_schema.sql` — perfiles, integraciones, sesiones, mensajes, tools, telegram, etc.
 - `00002_calendar_booking_links.sql` — enlaces de reserva (`token`, `user_id`, `calendar_id`).
@@ -215,6 +220,16 @@ Migraciones en `packages/db/supabase/migrations/`:
 - `00066_operational_cases_definition_pin.sql` — pin `workflow_definition_id`/`_version` en `operational_cases` + seed de definiciones globales v1 (`property_optioning`, `lead_follow_up`) generadas con el transformer real + backfill de todos los casos.
 - `00067_account_feature_flags.sql` — flags por tenant (`flag_key`, `enabled`, `value_text`); primer consumidor: `workflow_enforcement_mode` (`off`/`advisory`/`enforcing`, default advisory).
 - `00068_evidence_records.sql` — evidencia append-only de gates (replay/lab) pinneada a `artifact_hash`; `detail_jsonb` pasa por scrubber de secretos.
+- `00080_organizations_core.sql` — substrato multi-tenant: `organizations`, `organization_memberships`, `organization_feature_flags`, `organization_tool_secrets` y `contacts`, con RLS por membresía (EXISTS) más políticas de service-role.
+- `00081_operational_cases_organization.sql` — agrega `organization_id` y `runtime_authority` (`legacy` / `gu_os`) a `operational_cases`, y la unique `(id, organization_id)` sobre la que se apoyan los FK compuestos de tenancy de las tablas hijas.
+- `00082_external_identity_bindings.sql` — `external_identity_bindings`: identidades externas opacas de Traditional Gu mapeadas estructuralmente a Organization / membresía / contacto / Case — exactamente una referencia tipada, con FK compuestos que garantizan misma-Organization sin triggers — más un unique global para las identidades críticas de routing. Introduce también el primer `bootstrap_organization(...)` idempotente (resolve-or-create), solo para `service_role`.
+- `00083_case_relationships.sql` — `case_relationships`: vocabulario tipado de relaciones Case↔Case (ADR-109), con `uq_case_relationships_active_edge` (una arista activa por `(from, to, type)`).
+- `00084_bootstrap_organization_provenance.sql` — reemplaza la firma original de `bootstrap_organization` por la versión con provenance: **dropea explícitamente** la de dos argumentos (un `CREATE OR REPLACE` dejaría un overload alcanzable, y con él la ruta que guardaba la clave sin normalizar) y crea la de tres. La clave legacy **normalizada** es la identidad de routing; la representación **cruda** (`users/<ownerUid>`) queda registrada como provenance en la misma operación de creación. No crea membresía y sigue siendo solo `service_role`.
+
+Era forward (aplicada por el CLI de Supabase):
+
+- `20260906040233_admission_policy_and_source_events.sql` — `organization_policies` (política de admisión versionada, ADR-108) y `source_events` (inbox de eventos de origen con claim/fencing).
+- `20260907024941_resolution_artifact_identity.sql` — **solo índices**: `uq_case_facts_resolution_closure` y `uq_operational_case_events_relationship`, que dan identidad estructural a los dos artefactos no-arista que escribe una resolución duplicate/supersession.
 
 ## Uso de IA (observabilidad interna)
 
