@@ -18,7 +18,18 @@
   "bars": {
     "failure_rate_bar": 0.2,
     "false_merge_bar": 0,
-    "establishedBy": "Both stated 2026-09-07 BEFORE the set was run even once (Methodology §14.1; SL-3 Definition of Done). Neither was moved at any point, and no expected label was changed after seeing model output.",
+    "establishedBy": "Both PROPOSED AND FROZEN BY THE CODING AGENT on 2026-09-07, BEFORE the set was run even once (Methodology §14.1; SL-3 Definition of Done). No human approval was sought or given at that point, and nothing here should be read as prior human approval. Neither bar was moved at any point, and no expected label was changed after seeing model output.",
+    "ratification": {
+      "by": "human Accountable / DRI",
+      "when": "2026-09-07",
+      "sequence": "AFTER reviewing the recorded runs below — a review and ratification of an already-frozen bar, not a prior approval of it. The bars were set and the eval was run before this decision existed.",
+      "ratified": {
+        "failure_rate_bar": 0.2,
+        "false_merge_bar": 0
+      },
+      "scope": "LIMITED TO SL-3 SHADOW EVIDENCE. It establishes no general Relationship Operations quality threshold, and none for the assisted or live stages. A later Slice or stage sets its own bar on its own evidence.",
+      "unchanged": "Ratification changed no bar value, no expected label, no scenario input and no judge behaviour. It records a human decision about numbers that were already frozen."
+    },
     "whyTwo": "The two error directions are not equally costly. The Slice's own risk table says a FALSE MERGE is worse than a missed one, because it conflates two real objectives and closes one prospect's responsibility under another's; a missed duplicate leaves two Opportunities standing, which is recoverable and which the next determination can fix. So overall accuracy carries a 20% bar — looser than SL-2's 15%, because sameness-of-objective is harder and more contestable than presence-of-objective — while the costly direction carries a bar of zero."
   },
   "runs": [
@@ -28,7 +39,9 @@
       "failures": 1,
       "failureRate": 0.063,
       "falseMerges": 0,
-      "failed": ["ec05-zone-changed"],
+      "failed": [
+        "ec05-zone-changed"
+      ],
       "bothBarsHeld": true
     },
     {
@@ -37,7 +50,10 @@
       "failures": 2,
       "failureRate": 0.125,
       "falseMerges": 0,
-      "failed": ["ec05-zone-changed", "buy-or-rent-same-need"],
+      "failed": [
+        "ec05-zone-changed",
+        "buy-or-rent-same-need"
+      ],
       "bothBarsHeld": true
     }
   ],
