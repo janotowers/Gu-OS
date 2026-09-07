@@ -1,8 +1,8 @@
 {
   "recorded": {
     "purpose": "Eval/scenario set for the model-mediated half of R1 SL-2 admission (S1 AC-01, AC-02, EC-01, EC-03).",
-    "values": "SYNTHETIC. Every message body here is invented. The message SHAPES are modelled on the opening forms S1 §8.4.3 names and on the conversation-item shapes recorded in the SL-1 stage fixture corpus (apps/web/src/lib/legacy-gateway/fixtures/conversation-threads.json) — short availability questions, price questions, isolated greetings, portal/campaign-contextualised openers.",
-    "gap": "The Slice contract calls for a set drawn from REAL recorded lead openings. Real openings live in Traditional Gu production and each read is separately authorized, so they enter through the capture path on `npm run verify:admission -- --capture-eval-scenario <path>`: an authorized hosted run writes a redacted scenario DRAFT outside the repository, with provenance and a blank expected disposition, for a human to inspect, complete and — only then — commit here. Until real openings are captured that way, this set proves the judgment against realistic shapes, not against real text, and it is NOT the final contractual eval evidence.",
+    "values": "MIXED. 3 of 21 scenarios are REAL recorded lead openings, captured under the bounded RS-2 authorization and redacted before inclusion; each carries its own `recorded` block naming how its expected result was established, always independently of the model's output. Every other message body is INVENTED, with shapes modelled on the opening forms S1 §8.4.3 names and on the conversation-item shapes in the SL-1 stage fixture corpus (apps/web/src/lib/legacy-gateway/fixtures/conversation-threads.json).",
+    "gap": "The Slice contract calls for a set drawn from REAL recorded lead openings. 3 are now included, spanning the three outcomes that matter — an actionable objective, an ambiguous opener, and an objective that was explicitly withdrawn. The remainder stay synthetic, so the set is partly real rather than wholly so. Further real openings enter the same way: `npm run verify:admission -- --capture-eval-scenario <path outside the repo>` writes a redacted DRAFT with provenance and a BLANK expected result, a human redacts it and establishes the expected label independently, and only then does it land here. Nothing is written into the repository automatically, and `modelSaid` is never copied into `expected`.",
     "language": "es-MX, matching the pilot Organization's real traffic.",
     "capture": "npm run verify:admission -- ... --capture-eval-scenario <path outside the repo>. The draft carries the message text the model was actually asked to judge, so it is prospect content: review and redact before it enters version control. Nothing is written into the repository automatically."
   },
@@ -293,6 +293,93 @@
         "objective_category": null
       },
       "note": "A commercial message is not a prospect objective. The sender wants to sell TO the brokerage."
+    },
+    {
+      "id": "real-advisor-contact-request",
+      "label": "REAL recorded opening — asks for advisor contact, states no property objective",
+      "recorded": {
+        "values": "REAL, from a Traditional Gu production lead read under the bounded RS-2 authorization. Direct identifiers (email address) replaced; the wording the judgment turns on is otherwise unchanged.",
+        "leadDigest": "sha256:d25abcb07ad4a9ee",
+        "organizationDigest": "sha256:eab41f21d4c319b6",
+        "capability": "legacy_lead_get_recent_messages",
+        "sourceUpdatedAt": "2026-02-06T20:38:19.315Z",
+        "expectedEstablishedBy": "human/domain review against S1 AC-02 / EC-01, independently of the model's own output. `modelSaid` is deliberately not carried into this file."
+      },
+      "input": {
+        "message": "Que un asesor me contacte",
+        "sourceLabel": null,
+        "originLabel": "whatsapp",
+        "propertyContext": null,
+        "priorMessages": [
+          "Opcion 1",
+          "Quiero un asesor",
+          "[correo redactado]",
+          "Sí pertenezco a AMPI",
+          "Quiero un asesor",
+          "Información adicional"
+        ]
+      },
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      },
+      "note": "Human/domain expected result: deferred_clarification / ambiguous_objective, and NO Opportunity Case. The opening asks for advisor contact but states no discernible buy/rent/property objective — an ambiguous commercial opener that stays eligible for clarification rather than manufacturing an Opportunity (S1 AC-02, EC-01, §8.4.6)."
+    },
+    {
+      "id": "real-listing-availability-question",
+      "label": "REAL recorded opening — shares a for-sale house listing and asks if it is available",
+      "recorded": {
+        "values": "REAL, from a Traditional Gu production lead read under the bounded RS-2 evidence-selection authorization. The shared listing URL is redacted to a neutral host and path that preserves the `venta-casa-…` signal; the prospect's own wording is unchanged.",
+        "leadDigest": "sha256:29ee6eeedebe3f5f",
+        "organizationDigest": "sha256:eab41f21d4c319b6",
+        "capability": "legacy_lead_get_recent_messages",
+        "sourceUpdatedAt": "2026-08-23T17:40:08.656Z",
+        "expectedEstablishedBy": "HUMAN-REVIEWED AND APPROVED (2026-09-06), independently of `modelSaid`. The reviewer's basis: the prospect asks whether the property is available and the immediately surrounding context is a for-sale house listing. The label was first derived from S1 §8.4.3 before consulting the model and then reviewed and approved by the human domain reviewer; `modelSaid` is not carried into this file."
+      },
+      "input": {
+        "message": "hola buenas tardes esta propiedad esta disponible",
+        "sourceLabel": null,
+        "originLabel": "whatsapp",
+        "propertyContext": null,
+        "priorMessages": [
+          "https://www.example-portal.com/listing/venta-casa-en-fraccionamiento-country-club"
+        ]
+      },
+      "expected": {
+        "has_actionable_objective": true,
+        "objective_category": "buy_residential"
+      },
+      "note": "This is the opening that produced the hosted SA-2.2 evidence: admitted / clear_objective, materialising exactly one shadow Opportunity Case."
+    },
+    {
+      "id": "real-objective-explicitly-withdrawn",
+      "label": "REAL recorded opening — a buy intent stated earlier and then explicitly withdrawn",
+      "recorded": {
+        "values": "REAL, from a Traditional Gu production lead read under the bounded RS-2 authorization. No direct identifiers were present; the wording is unchanged.",
+        "leadDigest": "sha256:9b2b47a56f57cc4c",
+        "organizationDigest": "sha256:eab41f21d4c319b6",
+        "capability": "legacy_lead_get_recent_messages",
+        "sourceUpdatedAt": "2026-02-10T19:48:12.805Z",
+        "expectedEstablishedBy": "Human/domain review, independently of `modelSaid`: the thread contained historical buy intent, but it was subsequently and explicitly withdrawn and the newest inbound evidence confirms the option is no longer being pursued."
+      },
+      "input": {
+        "message": "No, gracias.",
+        "sourceLabel": null,
+        "originLabel": "whatsapp",
+        "propertyContext": null,
+        "priorMessages": [
+          "Comprar.",
+          "Opción 2",
+          "Domicilio y cita",
+          "Agente inmobiliario.",
+          "Ya no es necesario. Se descartó esa opción."
+        ]
+      },
+      "expected": {
+        "has_actionable_objective": false,
+        "objective_category": null
+      },
+      "note": "FOR REVIEW, not yet a runtime change: an EXPLICIT WITHDRAWAL may be semantically different at the product-disposition level from a merely ambiguous opener. Both currently resolve to `deferred_clarification` / `ambiguous_objective`, and 'clarification remains open' is arguably the wrong shape for a prospect who has declined. Whether that warrants a distinct disposition or reason is for the governing contract and the eval to settle — nothing here changes runtime behaviour on the strength of this note alone."
     }
   ]
 }

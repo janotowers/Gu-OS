@@ -1,0 +1,207 @@
+{
+  "slice": "SL-2",
+  "ranAt": "2026-09-06T23:35:30.007Z",
+  "guOsEnvironment": "staging",
+  "legacyEnvironment": "prod",
+  "organizationDigest": "sha256:eab41f21d4c319b6",
+  "leadDigest": "sha256:29ee6eeedebe3f5f",
+  "environmentMutations": "none — this verifier reads configuration and never writes it",
+  "indexAndConstraintEvidence": "not observable through the target API; established by the migration/deployment record for this environment",
+  "provenanceIdentity": "source_events:<source_event_id>",
+  "checks": [
+    {
+      "assertion": "preflight",
+      "label": "the Organization resolves in the declared Gu OS environment",
+      "ok": true,
+      "detail": "Alebrixe (active)"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the declared Case owner is an active member",
+      "ok": true,
+      "detail": "role=advisor"
+    },
+    {
+      "assertion": "preflight",
+      "label": "relationship_ops is enabled for this Organization",
+      "ok": true,
+      "detail": "enabled=true"
+    },
+    {
+      "assertion": "preflight",
+      "label": "relationship_admission_mode resolves to shadow",
+      "ok": true,
+      "detail": "raw enabled=true value=shadow → resolved=shadow"
+    },
+    {
+      "assertion": "preflight",
+      "label": "organization_policies is readable by the service-role path",
+      "ok": true,
+      "detail": "readable; no published Organization policy (platform baseline will apply)"
+    },
+    {
+      "assertion": "preflight",
+      "label": "source_events exists with the current processing/fencing shape",
+      "ok": true,
+      "detail": "10 columns readable"
+    },
+    {
+      "assertion": "preflight",
+      "label": "ai_usage_events supports organization_id correlation",
+      "ok": true,
+      "detail": "2 columns readable"
+    },
+    {
+      "assertion": "preflight",
+      "label": "case_facts exposes the provenance columns admission evidence uses",
+      "ok": true,
+      "detail": "4 columns readable"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the global lead_opportunity Case type is registered",
+      "ok": true,
+      "detail": "id=sha256:e8447e1bd49e086a"
+    },
+    {
+      "assertion": "preflight",
+      "label": "a published lead_opportunity definition resolves for Case pinning",
+      "ok": true,
+      "detail": "version 1"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "a real inbound lead is evaluated and yields a recorded disposition",
+      "ok": true,
+      "detail": "disposition=admitted reason=clear_objective"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the disposition carries the effective policy version",
+      "ok": true,
+      "detail": "policy=platform-default@1@1 source=platform_default"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the read carried gateway provenance and freshness",
+      "ok": true,
+      "detail": "store=firestore binding=unbound ageSeconds=1313731"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the source event is settled in the hosted target",
+      "ok": true,
+      "detail": "status=completed"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the settled decision matches the returned disposition",
+      "ok": true,
+      "detail": "settled=admitted returned=admitted"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the settled decision carries the same effective policy attribution",
+      "ok": true,
+      "detail": "settled=platform-default@1@1 returned=platform-default@1@1"
+    },
+    {
+      "assertion": "SA-2.2",
+      "label": "exactly one Opportunity Case exists for this source event",
+      "ok": true,
+      "detail": "cases matching context.source_event_id = 1"
+    },
+    {
+      "assertion": "SA-2.2",
+      "label": "that Case is the one admission returned",
+      "ok": true,
+      "detail": "hosted=sha256:e0207649dd597c74 returned=sha256:e0207649dd597c74"
+    },
+    {
+      "assertion": "SA-2.2",
+      "label": "the Case is Organization-owned, lead_opportunity, and shadow",
+      "ok": true,
+      "detail": "case_type=lead_opportunity runtime_authority=legacy current_step=null next_action_at=null"
+    },
+    {
+      "assertion": "SA-2.1",
+      "label": "the settled event points at that Case",
+      "ok": true,
+      "detail": "admitted_case_id=sha256:e0207649dd597c74"
+    },
+    {
+      "assertion": "SA-2.2",
+      "label": "this admission wrote exactly one admission.disposition fact",
+      "ok": true,
+      "detail": "found 1 with source_ref=source_events:<redacted>"
+    },
+    {
+      "assertion": "SA-2.2",
+      "label": "this admission wrote exactly one admission.source fact",
+      "ok": true,
+      "detail": "found 1 with source_ref=source_events:<redacted>"
+    },
+    {
+      "assertion": "SA-2.2",
+      "label": "this admission wrote exactly one opportunity.objective fact",
+      "ok": true,
+      "detail": "found 1 with source_ref=source_events:<redacted>"
+    },
+    {
+      "assertion": "SA-2.2",
+      "label": "the disposition fact preserves the effective policy attribution",
+      "ok": true,
+      "detail": "fact=platform-default@1@1 returned=platform-default@1@1"
+    },
+    {
+      "assertion": "SA-2.2",
+      "label": "the admission is narrated exactly once on the Case timeline",
+      "ok": true,
+      "detail": "admission_disposition entries for this source event = 1"
+    }
+  ],
+  "outcome": {
+    "disposition": "admitted",
+    "reason": "clear_objective",
+    "hardBound": null,
+    "policy": {
+      "source": "platform_default",
+      "policy_id": "platform-default@1",
+      "version": 1,
+      "matched_rule": "no_published_organization_policy"
+    },
+    "deduplicated": false,
+    "caseDigest": "sha256:e0207649dd597c74",
+    "sourceEventDigest": "sha256:c3e9cd5b9734180e",
+    "hadInboundMessage": true,
+    "proposalConfidence": "high",
+    "proposalHadObjective": true,
+    "proposalCategory": "buy_residential"
+  },
+  "provenance": {
+    "context": {
+      "store": "firestore",
+      "adapter": "bootstrap_direct",
+      "capability": "legacy_lead_get_context",
+      "bindingState": "unbound",
+      "freshness": {
+        "readAt": "2026-09-06T23:35:23.794Z",
+        "sourceUpdatedAt": "2026-08-22T18:39:52.448Z",
+        "ageSeconds": 1313731,
+        "sourceUpdatedAtField": "edited_time"
+      }
+    },
+    "messages": {
+      "store": "firestore",
+      "adapter": "bootstrap_direct",
+      "capability": "legacy_lead_get_recent_messages",
+      "bindingState": "unbound",
+      "freshness": {
+        "readAt": "2026-09-06T23:35:24.605Z",
+        "sourceUpdatedAt": "2026-08-23T17:40:08.656Z",
+        "ageSeconds": 1230916,
+        "sourceUpdatedAtField": "conversation[last].time"
+      }
+    }
+  }
+}
