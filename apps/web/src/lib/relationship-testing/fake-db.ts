@@ -12,7 +12,11 @@
  * beyond that throws rather than pretending, so a helper that grows a new query
  * shape fails loudly instead of silently passing against a fake that guessed.
  *
- * Test-only. Not exported from the module index.
+ * Shared by the SL-2 admission selftests and the SL-3 resolution selftests.
+ * It moved here from `relationship-admission/` when the second consumer
+ * appeared — the concrete need, rather than an anticipated one.
+ *
+ * Test-only. Not exported from any module index.
  */
 import { randomUUID } from "node:crypto";
 import type { DbClient } from "@agents/db";
@@ -23,7 +27,10 @@ type Filter =
   | { kind: "eq"; column: string; value: unknown }
   | { kind: "neq"; column: string; value: unknown }
   | { kind: "lte"; column: string; value: unknown }
-  | { kind: "is"; column: string; value: null };
+  | { kind: "is"; column: string; value: null }
+  | { kind: "in"; column: string; values: unknown[] }
+  /** PostgREST `.or("a.eq.1,b.eq.2")` — any branch matching is enough. */
+  | { kind: "or"; branches: Array<{ column: string; value: unknown }> };
 
 /**
  * Resolves a PostgREST column reference, including the `col->>key` JSON form
@@ -94,6 +101,13 @@ export interface FakeDb {
 
 function matches(row: Row, filters: Filter[]): boolean {
   return filters.every((filter) => {
+    // `or` carries branches rather than a single column, so it is resolved
+    // before the column lookup the other kinds share.
+    if (filter.kind === "or") {
+      return filter.branches.some(
+        (branch) => columnValue(row, branch.column) === branch.value
+      );
+    }
     const actual = columnValue(row, filter.column);
     if (filter.kind === "eq") return actual === filter.value;
     if (filter.kind === "neq") return actual !== filter.value;
@@ -102,6 +116,7 @@ function matches(row: Row, filters: Filter[]): boolean {
       if (actual === null || actual === undefined) return false;
       return String(actual) <= String(filter.value);
     }
+    if (filter.kind === "in") return filter.values.includes(actual);
     return actual === null || actual === undefined;
   });
 }
@@ -281,6 +296,29 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
       },
       is: (column: string, value: null) => {
         filters.push({ kind: "is", column, value });
+        return self;
+      },
+      in: (column: string, values: unknown[]) => {
+        filters.push({ kind: "in", column, values: [...values] });
+        return self;
+      },
+      /**
+       * PostgREST `.or("from_case_id.eq.X,to_case_id.eq.Y")`.
+       *
+       * Only the `column.eq.value` branch form is parsed, because that is the
+       * only form the real helpers use. Anything else throws rather than
+       * silently matching nothing, which would let a lineage query pass for
+       * the wrong reason.
+       */
+      or: (expression: string) => {
+        const branches = expression.split(",").map((branch) => {
+          const parts = branch.split(".");
+          if (parts.length < 3 || parts[1] !== "eq") {
+            throw new Error(`fake-db: unsupported .or() branch: ${branch}`);
+          }
+          return { column: parts[0], value: parts.slice(2).join(".") };
+        });
+        filters.push({ kind: "or", branches });
         return self;
       },
       order: (column: string, opts?: { ascending?: boolean }) => {

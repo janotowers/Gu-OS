@@ -1,0 +1,87 @@
+{
+  "slice": "SL-3",
+  "artifact": "continuity-judgment eval — model-mediated half",
+  "date": "2026-09-07",
+  "command": "npm run eval:continuity --workspace @agents/web",
+  "model": {
+    "id": "openai/gpt-5.4-mini",
+    "role": "relationship_continuity_judge",
+    "temperature": 0,
+    "note": "No governing artifact selects a model; the id is configuration, overridable with RELATIONSHIP_CONTINUITY_MODEL_ID."
+  },
+  "scenarioSet": {
+    "path": "apps/web/src/lib/relationship-resolution/eval/continuity-scenarios.json",
+    "scenarios": 16,
+    "values": "WHOLLY SYNTHETIC. No production lead, message, contact or property is reproduced. The SL-3 Definition of Done allows controlled or pilot-derived shadow data and states that organically occurring live duplicates are not a prerequisite.",
+    "gap": "Being synthetic, this set measures whether the judge follows the approved continuity semantics (S1 §8.6, §8.5.3, AC-15, EC-05) — not how it behaves on the real distribution of Alebrixe conversations. Pilot-derived pairs would enter the way SL-2's real openings did: bounded authorization, redaction, and a human-established expected label, with the model's own output never copied into `expected`."
+  },
+  "bars": {
+    "failure_rate_bar": 0.2,
+    "false_merge_bar": 0,
+    "establishedBy": "Both PROPOSED AND FROZEN BY THE CODING AGENT on 2026-09-07, BEFORE the set was run even once (Methodology §14.1; SL-3 Definition of Done). No human approval was sought or given at that point, and nothing here should be read as prior human approval. Neither bar was moved at any point, and no expected label was changed after seeing model output.",
+    "ratification": {
+      "by": "human Accountable / DRI",
+      "when": "2026-09-07",
+      "sequence": "AFTER reviewing the recorded runs below — a review and ratification of an already-frozen bar, not a prior approval of it. The bars were set and the eval was run before this decision existed.",
+      "ratified": {
+        "failure_rate_bar": 0.2,
+        "false_merge_bar": 0
+      },
+      "scope": "LIMITED TO SL-3 SHADOW EVIDENCE. It establishes no general Relationship Operations quality threshold, and none for the assisted or live stages. A later Slice or stage sets its own bar on its own evidence.",
+      "unchanged": "Ratification changed no bar value, no expected label, no scenario input and no judge behaviour. It records a human decision about numbers that were already frozen."
+    },
+    "whyTwo": "The two error directions are not equally costly. The Slice's own risk table says a FALSE MERGE is worse than a missed one, because it conflates two real objectives and closes one prospect's responsibility under another's; a missed duplicate leaves two Opportunities standing, which is recoverable and which the next determination can fix. So overall accuracy carries a 20% bar — looser than SL-2's 15%, because sameness-of-objective is harder and more contestable than presence-of-objective — while the costly direction carries a bar of zero."
+  },
+  "runs": [
+    {
+      "run": 1,
+      "when": "after the prompt repair described below",
+      "failures": 1,
+      "failureRate": 0.063,
+      "falseMerges": 0,
+      "failed": [
+        "ec05-zone-changed"
+      ],
+      "bothBarsHeld": true
+    },
+    {
+      "run": 2,
+      "when": "immediately after run 1, unchanged code and unchanged set",
+      "failures": 2,
+      "failureRate": 0.125,
+      "falseMerges": 0,
+      "failed": [
+        "ec05-zone-changed",
+        "buy-or-rent-same-need"
+      ],
+      "bothBarsHeld": true
+    }
+  ],
+  "result": "BOTH FROZEN BARS HELD IN BOTH RUNS. Zero false merges across 32 scenario judgements, including all three false-merge traps in both runs.",
+  "observations": [
+    {
+      "kind": "recorded miss, not relabelled",
+      "detail": "`ec05-zone-changed` failed in both runs: the judge treated a zone change after visits as two distinct objectives, where EC-05 holds that a substantial criteria change may still be one evolving objective. `buy-or-rent-same-need` failed in run 2 only. Both are misses in the SAFE direction — a missed duplicate, never a false merge. Neither expected label was changed to match what the model said."
+    },
+    {
+      "kind": "deliberate non-fix",
+      "detail": "The prompt was NOT tightened further to catch `ec05-zone-changed`. Pushing the judge toward finding sameness pulls directly against the anti-false-merge rules, and the product asymmetry is explicit that the costly direction is the one being protected. Trading a zero false-merge record for one recovered continuity case would optimise the wrong bar."
+    },
+    {
+      "kind": "run-to-run variance",
+      "detail": "6.3% then 12.5% on identical code and an identical set, at temperature 0. Recorded rather than smoothed: a single run is not a stable measurement of a model-mediated judgment, and the honest reading of this evidence is 'comfortably inside a 20% bar with variance', not '6.3%'."
+    }
+  ],
+  "implementationRepair": {
+    "what": "The FIRST run against the frozen bar FAILED: the judge merged `trap-thin-evidence-both-sides`, calling two near-empty openers one objective on the reasoning that both were equally vague.",
+    "howItWasFixed": "The judge's prompt was strengthened — absence of evidence is not evidence of sameness, and sameness must rest on something positive the two records share that the rationale can name. The BAR was not moved and the scenario's expected label was not changed. Fixing the implementation against a fixed bar is the intended loop; moving either would have been the failure."
+  },
+  "correlation": {
+    "requirement": "§2 shared baseline correlation-coverage check, which applies from SL-2 onward.",
+    "howItIsMet": "`proposeContinuity` is the only runtime path in this Slice that reaches a model, and it wraps the call in `runWithAiUsageContext` so the Organization that incurred the spend is the one it correlates to. A selftest drives that path with a metering judge and asserts the captured event carries the Organization, the user and the `relationship_continuity_judge` role.",
+    "note": "The eval runner itself logs `[ai-usage-meter] dropped event: no ambient context`, which is correct and expected: a standalone eval has no Organization to attribute spend to. The guarantee is about the runtime path, not the harness."
+  },
+  "boundary": {
+    "detail": "This artifact is the MODEL-MEDIATED half of SL-3's evidence only. The structural guarantees are evidenced separately by 29 deterministic selftest checks and 8 PostgreSQL checks in the cross-tenant suite. RS-2 hosted evidence for EC-06 and AC-15 on shadow traffic is NOT covered here and remains outstanding."
+  }
+}

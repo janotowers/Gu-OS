@@ -2,7 +2,8 @@
  * Cross-tenant / RLS negative suite — R1 Relationship Operations.
  *
  * Landed at SL-0 and extended by every Slice that adds a multi-seat surface:
- * SL-2 added `organization_policies` and `source_events`.
+ * SL-2 added `organization_policies` and `source_events`; SL-3 added the
+ * M-RESOLUTION-IDENTITY indexes.
  *
  * Technical Plan §8: "Cross-tenant negative suite (two-orgs fixture, read and
  * write paths) required from SL-0 and gating every multi-seat surface."
@@ -1144,6 +1145,208 @@ async function main(): Promise<void> {
         )
       );
       assert.equal(code, RLS_VIOLATION);
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-3 resolution artifacts — M-RESOLUTION-IDENTITY");
+
+    // What this section proves is exactly what the in-memory fake CANNOT: the
+    // partial unique indexes under real concurrency, and the ended-vs-active
+    // semantics of the lineage index. The fake enforces the same indexes, but a
+    // fake agreeing with itself is not evidence about PostgreSQL.
+    //
+    // The fixture already seeds one ACTIVE `duplicate_of` edge orgCaseA -> orgCaseA2.
+
+    const seededEdge = (
+      await client.query<{ id: string }>(
+        `select id from public.case_relationships
+          where from_case_id = $1 and to_case_id = $2
+            and relationship_type = 'duplicate_of' and status = 'active'`,
+        [f.orgCaseA, f.orgCaseA2]
+      )
+    ).rows[0].id;
+
+    const closure = (caseId: string, userId: string, edgeId: string, outcome: string) =>
+      client.query(
+        `insert into public.case_facts
+           (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+         values ($1, $2, 'opportunity.closure',
+                 jsonb_build_object('outcome', $4::text),
+                 'derived', 'case_relationships:' || $3::text)`,
+        [caseId, userId, edgeId, outcome]
+      );
+
+    const narrate = (caseId: string, edgeId: string) =>
+      client.query(
+        `insert into public.operational_case_events
+           (case_id, event_type, actor, payload_jsonb)
+         values ($1, 'state_changed', 'system',
+                 jsonb_build_object('kind', 'case_relationship',
+                                    'relationship_id', $2::text))`,
+        [caseId, edgeId]
+      );
+
+    await t("SA-3.7 a second ACTIVE edge of the same (from, to, type) conflicts", async () => {
+      const code = await errorCode(() =>
+        client.query(
+          `insert into public.case_relationships
+             (organization_id, from_case_id, to_case_id, relationship_type)
+           values ($1, $2, $3, 'duplicate_of')`,
+          [f.orgA, f.orgCaseA, f.orgCaseA2]
+        )
+      );
+      assert.equal(code, UNIQUE_VIOLATION);
+    });
+
+    await t("an ENDED edge does not block a new active one", async () => {
+      // Edges are ended rather than deleted so lineage stays reconstructible
+      // (ADR-109 §7). The index has to allow re-relating afterwards, or ending
+      // an edge would silently become a permanent prohibition.
+      await client.query(
+        `insert into public.case_relationships
+           (organization_id, from_case_id, to_case_id, relationship_type,
+            status, ended_at)
+         values ($1, $2, $3, 'superseded_by', 'ended', now())`,
+        [f.orgA, f.orgCaseA, f.orgCaseA2]
+      );
+      await client.query(
+        `insert into public.case_relationships
+           (organization_id, from_case_id, to_case_id, relationship_type)
+         values ($1, $2, $3, 'superseded_by')`,
+        [f.orgA, f.orgCaseA, f.orgCaseA2]
+      );
+      const { rowCount } = await client.query(
+        `select id from public.case_relationships
+          where from_case_id = $1 and to_case_id = $2
+            and relationship_type = 'superseded_by'`,
+        [f.orgCaseA, f.orgCaseA2]
+      );
+      assert.equal(rowCount, 2, "one ended, one active — history intact");
+    });
+
+    await t("SA-3.12 concurrent closures for one resolution: exactly one survives", async () => {
+      // Two workers retrying the same resolution at once. A read-then-write
+      // guard would let both through; the partial unique index does not.
+      const results = await Promise.allSettled([
+        closure(f.orgCaseA, f.creatorA, seededEdge, "duplicate"),
+        closure(f.orgCaseA, f.creatorA, seededEdge, "duplicate"),
+      ]);
+      const rejected = results.filter((r) => r.status === "rejected");
+      assert.equal(rejected.length, 1, "one writer must lose");
+      assert.equal(
+        (rejected[0] as PromiseRejectedResult).reason.code,
+        UNIQUE_VIOLATION
+      );
+      const { rowCount } = await client.query(
+        `select id from public.case_facts
+          where case_id = $1 and fact_key = 'opportunity.closure'
+            and source_ref = 'case_relationships:' || $2::text`,
+        [f.orgCaseA, seededEdge]
+      );
+      assert.equal(rowCount, 1);
+    });
+
+    await t("a DIFFERENT resolution's closure on the same Case coexists", async () => {
+      // Identity is (case, key, edge), not (case, key). A correction arriving
+      // through its own governed determination must be writable, and the
+      // earlier closure stays as history rather than being blocked or erased.
+      const otherEdge = (
+        await client.query<{ id: string }>(
+          `select id from public.case_relationships
+            where from_case_id = $1 and to_case_id = $2
+              and relationship_type = 'superseded_by' and status = 'active'`,
+          [f.orgCaseA, f.orgCaseA2]
+        )
+      ).rows[0].id;
+      await closure(f.orgCaseA, f.creatorA, otherEdge, "superseded");
+      const { rowCount } = await client.query(
+        `select id from public.case_facts
+          where case_id = $1 and fact_key = 'opportunity.closure'`,
+        [f.orgCaseA]
+      );
+      assert.equal(rowCount, 2, "both closures coexist; neither is discarded");
+    });
+
+    await t("the closure index does not constrain other case_facts writers", async () => {
+      // Scoped by the `case_relationships:` prefix. A closure recorded through
+      // some other provenance — or any other key — is untouched by it.
+      await client.query(
+        `insert into public.case_facts
+           (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+         values ($1, $2, 'opportunity.closure', '{"outcome":"lost"}'::jsonb,
+                 'user', 'advisor_manual_closure')`,
+        [f.orgCaseA, f.creatorA]
+      );
+      await client.query(
+        `insert into public.case_facts
+           (case_id, user_id, fact_key, value_jsonb, source_kind, source_ref)
+         values ($1, $2, 'opportunity.closure', '{"outcome":"lost"}'::jsonb,
+                 'user', 'advisor_manual_closure_2')`,
+        [f.orgCaseA, f.creatorA]
+      );
+      const { rowCount } = await client.query(
+        `select id from public.case_facts
+          where case_id = $1 and fact_key = 'opportunity.closure'
+            and source_ref not like 'case_relationships:%'`,
+        [f.orgCaseA]
+      );
+      assert.equal(rowCount, 2);
+    });
+
+    await t("SA-3.5 concurrent narrations of one edge on one Case: exactly one survives", async () => {
+      const results = await Promise.allSettled([
+        narrate(f.orgCaseA, seededEdge),
+        narrate(f.orgCaseA, seededEdge),
+      ]);
+      assert.equal(
+        results.filter((r) => r.status === "rejected").length,
+        1,
+        "the timeline is append-only with no identity of its own — the index is it"
+      );
+      const { rowCount } = await client.query(
+        `select id from public.operational_case_events
+          where case_id = $1
+            and payload_jsonb ->> 'kind' = 'case_relationship'
+            and payload_jsonb ->> 'relationship_id' = $2`,
+        [f.orgCaseA, seededEdge]
+      );
+      assert.equal(rowCount, 1);
+    });
+
+    await t("SA-3.5 the SAME edge is narrated once on EACH Case", async () => {
+      // Two rows, two distinct case_id values, one logical narration each.
+      // Per (Case, edge) is the identity — per edge would silence one side.
+      await narrate(f.orgCaseA2, seededEdge);
+      const { rowCount } = await client.query(
+        `select id from public.operational_case_events
+          where payload_jsonb ->> 'kind' = 'case_relationship'
+            and payload_jsonb ->> 'relationship_id' = $1`,
+        [seededEdge]
+      );
+      assert.equal(rowCount, 2, "both endpoints narrated");
+    });
+
+    await t("the narration index does not constrain other timeline writers", async () => {
+      // Scoped by kind. SL-2's admission narration and every ordinary event
+      // stay outside it.
+      await client.query(
+        `insert into public.operational_case_events
+           (case_id, event_type, actor, payload_jsonb)
+         values ($1, 'state_changed', 'system', '{"kind":"something_else"}'::jsonb)`,
+        [f.orgCaseA]
+      );
+      await client.query(
+        `insert into public.operational_case_events
+           (case_id, event_type, actor, payload_jsonb)
+         values ($1, 'state_changed', 'system', '{"kind":"something_else"}'::jsonb)`,
+        [f.orgCaseA]
+      );
+      const { rowCount } = await client.query(
+        `select id from public.operational_case_events
+          where case_id = $1 and payload_jsonb ->> 'kind' = 'something_else'`,
+        [f.orgCaseA]
+      );
+      assert.equal(rowCount, 2, "unconstrained, as before this Slice");
     });
 
     // ---------------------------------------------------------------
