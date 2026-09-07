@@ -1,9 +1,10 @@
 # Gu OS Development & Release Path — operational playbook
 
-> **Version:** v1.1
+> **Version:** v1.2
 > **Status:** Canonical operational playbook for migration, CI, staging delivery and release execution
 > **Artifact role:** Tool- and environment-specific execution detail. The **HOW Gu OS development is governed** lives in [`agentic-product-software-development-methodology.md`](agentic-product-software-development-methodology.md); the deterministic **enforcement** lives in `scripts/` and `.github/workflows/`. This document is the third thing: how to actually run them.
 > **Scope:** does not decide product behavior, architecture or release authority.
+> **v1.2 update:** documentation reconciled to this repository's actual GitHub **repository ruleset** implementation of `main` protection (§3, §8). **No release-policy or authority-semantics change, no new protection requirement, and the intended invariant is unchanged** — protected landing plus auditable frozen-era break-glass. The previous wording pointed at classic branch protection, which this repository does not use, and that staleness already produced one false "main is unprotected" diagnosis.
 
 ## 1. The path
 
@@ -70,7 +71,7 @@ You cannot, and **two independent invariants** enforce that. Either alone is ins
 
 The content check alone is defeatable: edit a frozen migration, run `migrations:freeze -- --confirm`, and it passes again. `--confirm` is **not** a governance boundary — an agent can supply it too. The change invariant fails on the diff regardless, so a coordinated migration+manifest edit cannot land through a normal PR or push.
 
-There is deliberately **no routine override flag**. Regenerating the manifest is break-glass repository maintenance: it requires a human with authority to bypass the check at the repository level (admin merge or a temporary branch-protection exception), which is visible and auditable rather than a switch any change can flip. Introducing the manifest for the first time is allowed, because it did not exist at the base commit.
+There is deliberately **no routine override flag**. Regenerating the manifest is break-glass repository maintenance: it requires an authorized human to weaken the control at **repository-governance level** — an explicit, temporary modification of, or exception to, the **`Protect main`** repository ruleset (Settings → Rules → Rulesets). That ruleset currently lists **no bypass actors**, so no standing role merges past it silently and there is no admin path that quietly skips the check: the weakening itself is the visible, auditable act, and it has to be reverted just as deliberately. That is the point — it is not a switch any change can flip. Introducing the manifest for the first time is allowed, because it did not exist at the base commit.
 
 **Forward migrations are the only normal migration path.**
 
@@ -207,7 +208,7 @@ This path runs **only for RS-3 slices**. A slice that declared RS-1 or RS-2 does
 | `GUOS_STAGING_SUPABASE_URL` | **variable** | that environment | Public identifier — not a secret |
 | `GUOS_STAGING_SUPABASE_PUBLISHABLE_KEY` | **variable** | that environment | Publishable by design — not a secret |
 | `GUOS_STAGING_SUPABASE_DATABASE_URL` | **secret** | that environment | Embeds the database password |
-| Branch protection on `main` | protection rule | Settings → Branches | Repository setting; also what makes the frozen-era bypass auditable |
+| Repository ruleset **`Protect main`**, applying to the default branch | ruleset | Settings → Rules → Rulesets | Pull request required; **strict** required status checks `ci` and `rls`; deletion blocked; non-fast-forward / force-push blocked; **no bypass actors**. This is what makes landing on `main` protected and frozen-era break-glass auditable (§3). **It is a ruleset, not classic branch protection**: `GET /repos/:owner/:repo/branches/main/protection` returns 404 here, and that 404 is the absence of the *legacy object*, never the absence of protection — read `/rulesets` or `/rules/branches/main` instead |
 | `ENCRYPTION_KEY` for `staging` | **secret** | that environment | Application-level encryption key for `account_tool_secrets` / `organization_tool_secrets`. Must be the *same* 64-hex value as `GUOS_STAGING_ENCRYPTION_KEY` locally, or material stored by a script cannot be decrypted by a runtime |
 | A production environment | — | not yet | Deliberately absent until Gate B is authorized |
 
