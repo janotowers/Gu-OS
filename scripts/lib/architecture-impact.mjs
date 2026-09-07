@@ -88,8 +88,15 @@ const IMPLEMENTATION_PATTERNS = [
   // Operational contracts: CI, delivery and the operator-run verifiers.
   /^\.github\/workflows\//,
   /^scripts\/.+\.(ts|mjs|js)$/,
-  // Build/runtime composition.
+  // Build/runtime composition. Workspace manifests count: this is an npm
+  // workspaces monorepo, so `apps/web/package.json` can change dependencies,
+  // integrations, runtime scripts or composition without touching a single
+  // `.ts` file. Matching only the root manifest let that bypass the assessment.
+  // The lockfile is included for the same reason — a resolved dependency change
+  // is a runtime change even when no manifest range moved.
   /^package\.json$/,
+  /^package-lock\.json$/,
+  /^(apps|packages)\/[^/]+\/package\.json$/,
   /^turbo\.json$/,
 ];
 

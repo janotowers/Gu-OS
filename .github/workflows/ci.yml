@@ -4,10 +4,27 @@
 name: CI
 
 on:
+  # `edited` is load-bearing, not decoration. The architecture-impact check
+  # validates the PR BODY, and GitHub's default pull_request activity types are
+  # opened/synchronize/reopened — no `edited`. Without it the control is not
+  # durable in either direction: a failing run could be "fixed" by editing the
+  # body with nothing re-validating it, and worse, a body that PASSED could
+  # later be edited to remove or corrupt the declaration while the green status
+  # stays attached to the same unchanged head SHA.
+  #
+  # This reruns the whole `ci` job on a body edit. That is deliberate: keeping
+  # the check inside the existing job avoids a second required check whose
+  # interaction with the `Protect main` ruleset would itself need governing,
+  # and the suite is cheap enough that correctness wins. `pull_request` (not
+  # `pull_request_target`) — PR code must never run with a privileged token.
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
+# Unchanged: for a pull_request event `github.ref` is `refs/pull/<n>/merge`, so
+# rapid body edits and pushes on the same PR share a group and obsolete runs are
+# cancelled rather than queued.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

@@ -276,6 +276,54 @@ function body({
   ok("a package README and a stray text file do not trigger");
 }
 
+// ------------------------------------------------------- workspace manifests
+{
+  // This is an npm workspaces monorepo: a workspace manifest can change
+  // dependencies, integrations, runtime scripts or composition without touching
+  // a single .ts file. Matching only the root manifest let that bypass the
+  // assessment entirely.
+  const { triggering, ignored } = classifyPaths([
+    "package.json",
+    "package-lock.json",
+    "apps/web/package.json",
+    "packages/agent/package.json",
+    "packages/workflows/package.json",
+    "turbo.json",
+  ]);
+  assert.equal(ignored.length, 0);
+  assert.equal(triggering.length, 6);
+  ok("root, workspace and lockfile manifests all trigger");
+}
+{
+  assert.equal(requiresDeclaration(["apps/web/package.json"]), true);
+  assert.equal(requiresDeclaration(["packages/db/package.json"]), true);
+  assert.equal(requiresDeclaration(["package-lock.json"]), true);
+  ok("each manifest class triggers on its own, not only in combination");
+}
+{
+  // The manifest rule must stay a manifest rule. It is scoped to files LITERALLY
+  // named package.json / package-lock.json / turbo.json — not to config-shaped
+  // JSON in general, which is where a small rule turns into an ontology.
+  const { triggering, ignored } = classifyPaths([
+    "apps/web/README.md",
+    "apps/web/tsconfig.json",
+    "packages/agent/tsconfig.json",
+    "packages/agent/src/usage/catalogs/openrouter-2026-08.json",
+    "apps/web/.eslintrc.json",
+    "docs/architecture.md",
+  ]);
+  assert.equal(triggering.length, 0, `unexpected trigger: ${triggering.join(", ")}`);
+  assert.equal(ignored.length, 6);
+  ok("a workspace README, tsconfig, lint config and JSON data asset do NOT trigger");
+}
+{
+  // Build output is gitignored so it never reaches a diff, but the rule is
+  // scoped to one directory level anyway, so a stray nested manifest cannot
+  // sneak in through a build artifact path.
+  assert.equal(requiresDeclaration(["apps/web/.next/package.json"]), false);
+  ok("a nested build-output manifest does not trigger");
+}
+
 // ------------------------------------------------------------ parser details
 {
   assert.equal(stripHtmlComments("a <!-- b --> c"), "a  c");
