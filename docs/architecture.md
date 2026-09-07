@@ -1,4 +1,6 @@
-# Arquitectura Técnica — Agente Personal MVP
+# Arquitectura Técnica — runtime implementado de Gu OS
+
+> **Alcance:** este documento describe **lo que corre hoy**. Nació como el overview del *Agente Personal MVP* — de ahí el peso que todavía tienen aquí las secciones de chat, calendario y tareas programadas — pero el runtime implementado ya no es solo ese agente: incluye el subsistema de **casos operacionales**, los **workflows ejecutables** y el **substrato de Organización** de R1 (ver *Modelo de datos*). Lo que este overview corto **no** cubre en profundidad vive en los documentos enlazados abajo; lo que **no está implementado** no pertenece aquí.
 
 > **Nota:** este documento es el overview tecnico corto del stack actual. Para una **guia narrativa** (menos tecnica, con foco en Skills y el mapa mental del sistema), ver [`docs/manuals/gu-os-understanding.md`](manuals/gu-os-understanding.md). Para el **manual tecnico** integrador, ver [`docs/manuals/architecture-manual.md`](manuals/architecture-manual.md). Para **principios agenticos externos** (Thin Harness / Fat Skills, alineacion con Gu OS), ver [`docs/manuals/agentic-principles-alignment.md`](manuals/agentic-principles-alignment.md). Para el **analisis de design space / riesgos** (paper Claude Code), ver [`docs/manuals/gu-os-agent-architecture-analysis.md`](manuals/gu-os-agent-architecture-analysis.md). La dirección futura de la interfaz operacional multimodal vive en [`docs/talk-to-gu/vision.md`](talk-to-gu/vision.md), con su spike ejecutable en [`docs/talk-to-gu/realtime-voice-implementation-plan.md`](talk-to-gu/realtime-voice-implementation-plan.md); no deben interpretarse como capacidades ya implementadas.
 
@@ -26,6 +28,8 @@
 | Skill selector | `SKILL_SELECTOR_MODEL_ID` | `anthropic/claude-haiku-4.5` |
 | Business Brain reviewer | `BUSINESS_BRAIN_REVIEWER_MODEL_ID` | `anthropic/claude-haiku-4.5` |
 | Clasificador conversacional de casos (+ 2ª opinión HITL `unclear`) | `OPERATIONAL_CONVERSATION_CLASSIFIER_MODEL_ID` | `openai/gpt-5.4-mini` |
+| Intérprete semántico de admisión (R1) | `RELATIONSHIP_ADMISSION_MODEL_ID` | `openai/gpt-5.4-mini` |
+| Juez de continuidad duplicado/supersesión (R1) | `RELATIONSHIP_CONTINUITY_MODEL_ID` | `openai/gpt-5.4-mini` |
 | Vision / fotos | `IMAGE_VISION_MODEL_ID` | `openai/gpt-4.1-mini` |
 | Copy de listing | `LISTING_COPY_MODEL_ID` | `openai/gpt-4.1-mini` |
 
@@ -76,33 +80,53 @@ agents/
 
 ## Diagrama de componentes
 
+```mermaid
+flowchart TD
+  WEB["Next.js UI<br/>(web chat)"]
+  TG["Telegram Bot<br/>(webhook)"]
+  CRON["Runners cron externos<br/>scheduled-tasks · heartbeat · operational-cases"]
+  BOOK["Visitante /book<br/>(token opaco, sin login)"]
+
+  AUTH["Supabase Auth (JWT)<br/>web · Telegram por lookup"]
+  SVC["service role (solo servidor)<br/>CRON_SECRET · resolución de token"]
+
+  LG["LangGraph Runtime + tools<br/>canales: web · telegram · cron · heartbeat · case_runner"]
+
+  PG[("Supabase Postgres (RLS)")]
+  EXT["APIs externas<br/>GitHub · Google Calendar · Gmail · BigQuery<br/>EasyBroker · Ungga · host OS (bash + file tools)"]
+  TGU["Traditional Gu<br/>(Firestore / Mongo)"]
+
+  WEB --> AUTH
+  TG --> AUTH
+  CRON --> SVC
+  BOOK --> SVC
+
+  AUTH --> LG
+  SVC --> LG
+
+  LG --> PG
+  LG --> EXT
+  LG -- "legacy gateway<br/>solo lectura, por capacidad" --> TGU
+
+  SVC -- "reserva pública: no pasa por el agente" --> PG
+  SVC -- "FreeBusy · crear evento" --> EXT
 ```
-┌─────────────┐    ┌──────────────┐    ┌────────────────┐
-│  Next.js UI │    │ Telegram Bot │    │ Visitante /book│
-│  (web chat) │    │  (webhook)   │    │ (token opaco)  │
-└──────┬──────┘    └──────┬───────┘    └────────┬───────┘
-       │                  │                     │
-       ▼                  ▼                     ▼
-┌─────────────────────────────────────────────────────┐
-│              Supabase Auth (JWT)                    │
-└──────────────────────────┬──────────────────────────┘
-                           ▼
-┌─────────────────────────────────────────────────────┐
-│   LangGraph Runtime + tools (GitHub, Calendar, bash→host…) │
-└──────────────────────────┬──────────────────────────┘
-                           ▼
-┌─────────────────────────────────────────────────────┐
-│    Supabase Postgres (RLS)                          │
-│  profiles | sessions | messages | tool_calls         │
-│  user_tool_settings | user_integrations | telegram   │
-│  calendar_booking_links | scheduled_tasks | scheduled_task_runs │
-│  heartbeat_runs | user_skill_settings                       │
-└──────────────────────────┬──────────────────────────┘
-                           ▼
-┌─────────────────────────────────────────────────────┐
-│  External: GitHub API | Google Calendar API | host OS (bash + file tools) │
-└─────────────────────────────────────────────────────┘
-```
+
+Planos durables en Postgres (agrupados; la lista completa de migraciones vive en *Modelo de datos*):
+
+| Plano | Tablas |
+| --- | --- |
+| Agente | `profiles`, `agent_sessions`, `agent_messages`, `tool_calls`, `memories`, `user_tool_settings`, `user_skill_settings`, `user_integrations`, `telegram_*`, `calendar_booking_links` |
+| Proactivo | `scheduled_tasks`, `scheduled_task_runs`, `heartbeat_runs` |
+| Casos operacionales | `operational_case_types`, `operational_cases`, `operational_case_events`, `case_facts`, `case_artifacts`, `artifact_inputs`, `case_approvals` |
+| Workflows ejecutables | `workflow_definitions`, `account_feature_flags`, `evidence_records` |
+| Organización (R1) | `organizations`, `organization_memberships`, `contacts`, `organization_feature_flags`, `organization_tool_secrets`, `organization_policies`, `source_events`, `external_identity_bindings`, `case_relationships` |
+| Observabilidad | `ai_usage_events` |
+
+Dos precisiones, porque la tabla de arriba muestra **schema** y el diagrama muestra **flujos que existen hoy**:
+
+- El plano de Organización **existe en schema con RLS activa, pero ninguna ruta HTTP ni cron ejecuta hoy admisión ni resolución de relaciones**. Esos módulos (`apps/web/src/lib/relationship-admission/`, `relationship-resolution/`) no los importa ninguna route ni runner: se ejercitan por selftests, evals y los verificadores **operados a mano** `npm run verify:admission` / `npm run verify:resolution` contra el entorno hospedado de staging. No existe un runtime de aplicación Gu OS desplegado; `deliver-staging` entrega **migraciones** a un proyecto Supabase.
+- El **legacy gateway sí está cableado** al runtime del agente (`apps/web/src/lib/agent/wire-tool-deps.ts` → `packages/agent/src/tools/legacy-gateway-adapters.ts`): lecturas acotadas por capacidad contra Traditional Gu, sin ninguna ruta de escritura.
 
 ## Integraciones OAuth (GitHub y Google Calendar)
 
@@ -268,12 +292,24 @@ Estado (2026-07-31): **Phase 1 completa** con `enforcing` activo en el tenant pi
 - **Tokens OAuth** cifrados en aplicación (`ENCRYPTION_KEY`).
 - **Enlaces /book/**: tratar el token como secreto; HTTPS en producción.
 
+### Tenencia por Organización (migraciones `00080`–`00084`)
+
+El aislamiento por `auth.uid()` / `user_id` sigue vigente para todo lo personal, pero **ya no es el único modelo de tenencia**. Sobre las tablas de Organización aplica un segundo eje:
+
+- **Pertenencia, no propiedad de fila.** La lectura se autoriza por **membresía activa**, vía el predicado `is_active_org_member` (SECURITY DEFINER) usado por las políticas de `organizations`, `organization_memberships`, `contacts`, `organization_feature_flags`, `organization_policies` y `case_relationships`. Una membresía `inactive` conserva identidad resoluble y **no otorga nada**.
+- **Escritura solo desde el servidor.** Las tablas de Organización tienen políticas de `service_role` para escritura; `organization_tool_secrets` además **no tiene política de lectura para `authenticated`**. La autorización de negocio la hace la aplicación (`authorizeOrgAction`), no el cliente.
+- **`operational_cases` es híbrida y compatible hacia atrás.** `organization_id` es *nullable*: las filas legacy con `NULL` conservan **exactamente** su semántica user-scoped anterior. Sobre las filas con Organización, `00081` añade lectura por membresía más políticas **RESTRICTIVE** de guardia de tenencia en `operational_cases`, `case_facts`, `case_artifacts`, `case_approvals` y `operational_case_events`, y hace la escritura server-only. La unique `(id, organization_id)` es el destino de los FK compuestos que hacen **estructuralmente imposible** cruzar tenants.
+- **Identidad externa sin confianza implícita.** `external_identity_bindings` mapea identidades opacas de Traditional Gu a exactamente **una** referencia tipada (Organización / membresía / contacto / Caso), con FK compuestos que garantizan misma-Organización sin triggers. Es solo `service_role`.
+- **`runtime_authority` no se mueve solo.** La columna (`legacy` / `gu_os`) es deliberadamente *nullable* y **sin default**: la autoridad de decisión solo cambia por una operación gobernada autorizada, nunca implícitamente al crear un Caso.
+- **Alcance de despliegue.** Estas migraciones están aplicadas en el entorno hospedado de **staging**. Producción no las tiene: la Gate B del [playbook de release](development/release-path-playbook.md) §7 exige un preflight de solo lectura antes de que `00080`–`00084` lleguen a producción.
+
 ## Canales
 
 - **Web:** POST `/api/chat`, confirmación `POST /api/chat/confirm`.
 - **Telegram:** webhook; teclado inline con `✅ Aprobar` / `❌ Cancelar`; al pulsar, feedback inmediato (`answerCallbackQuery` + mensaje corto al chat) antes de reanudar el grafo con `runAgent({ resumeDecision })`. Idempotencia por `update_id` vía `telegram_webhook_updates` (claim con lease, completar al terminar el turno).
 - **Cron (tareas programadas):** `POST /api/cron/scheduled-tasks` — invocado por jobs programados (p. ej. Supabase `pg_cron`), no por el navegador; autenticación `CRON_SECRET`. Ver subsección *Tareas programadas* arriba.
 - **Heartbeat:** `POST /api/cron/heartbeat` — invocado por scheduler externo, crea runs con `agent_sessions.channel='heartbeat'`, allowlist de solo lectura y auditoría en `heartbeat_runs`.
+- **Cron (casos operacionales):** `POST /api/cron/operational-cases` — tercer runner con `CRON_SECRET`; escanea casos vencidos, toma lock optimista por `version` y ejecuta `runAgent({ caseId, channel: 'case_runner' })`. Concurrencia vía `OPERATIONAL_CASES_CONCURRENCY`. Detalle: [`docs/operational-cases/architecture.md`](operational-cases/architecture.md) §4.
 - **Reserva pública:** `GET /book/[token]`, APIs bajo `/api/public/booking/`.
 
 ## UI de chat (web)
