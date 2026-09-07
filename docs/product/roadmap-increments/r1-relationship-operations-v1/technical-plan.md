@@ -208,6 +208,7 @@ NL conversational authoring is a later slice; R1 starts with the seeded Recommen
 | M-SOURCE-EVENTS | `source_events` inbox (dedup key, claim/lease) | SL-2 |
 | M-CASE-TYPE-SEED | `lead_opportunity` case type + minimal published definition v1 (00066 seed precedent) | SL-2 |
 | M-USAGE-ORG | `ai_usage_events.organization_id` (nullable, additive) + index | SL-2 |
+| M-RESOLUTION-IDENTITY | Partial unique indexes giving a duplicate/supersession resolution's two non-edge artifacts a structural identity: one `opportunity.closure` fact per (Case, edge) and one relationship narration per (Case, edge). **Indexes only — no table, no column, no behavior**; SL-3 builds on M-RELATIONSHIPS and the CURRENT `case_facts` mechanics. Needed because SA-3.12 makes a retried resolution a normal event and a read-then-write guard proves nothing under concurrency; the edge half is already idempotent via SL-0's `uq_case_relationships_active_edge` | SL-3 |
 | M-SUBJECTS | `case_subjects` (immutable, triggers) + `case_subject_external_refs` (append-only child) + `case_facts.subject_id` composite FK + indexes (TD-14 kernel extension; approved with this plan). Organization derived from the parent Case — neither table carries an `organization_id` column | SL-4 (commitments consume it first; visits at SL-8) |
 | M-EXT-BINDINGS | `external_conversation_bindings` (authority fields; `advisor_wa` CHECK) | SL-6 |
 | M-PRESENTATION | `portfolio_presentation_state` (user-scoped write RLS with membership check) | SL-7 |

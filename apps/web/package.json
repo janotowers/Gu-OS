@@ -17,6 +17,7 @@
     "test:intake-extraction": "tsx src/lib/operational-cases/property-optioning-intake-extraction.selftest.ts && tsx src/lib/operational-cases/operational-conversation-classifier.selftest.ts && tsx src/lib/operational-cases/owner-characteristics-extraction.selftest.ts",
     "test:legacy-gateway": "tsx src/lib/legacy-gateway/legacy-gateway.selftest.ts",
     "test:admission": "tsx src/lib/relationship-admission/admission.selftest.ts",
+    "test:resolution": "tsx src/lib/relationship-resolution/resolution.selftest.ts",
     "eval:admission": "tsx src/lib/relationship-admission/eval/run-admission-eval.ts",
     "test:engagement-policies": "tsx src/lib/engagement-policies/registry.selftest.ts",
     "test:work-view": "tsx src/lib/operations/work-view-labels-ui.selftest.ts",

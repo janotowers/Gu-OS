@@ -62,7 +62,7 @@ import {
 import { LegacyReadRefusal } from "../legacy-gateway/errors";
 import { runAdmission, applyPolicyToProposal } from "./admit";
 import { deriveDedupKey, latestInboundMessage } from "./ingest";
-import { createFakeDb, type FakeDb } from "./fake-db";
+import { createFakeDb, type FakeDb } from "../relationship-testing/fake-db";
 import { resolveEffectiveAdmissionPolicy, parseAdmissionPolicy } from "./policy";
 import {
   ADMISSION_OBJECTIVE_CATEGORIES,

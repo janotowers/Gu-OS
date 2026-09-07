@@ -35,6 +35,7 @@ export * from "./queries/organization-tool-secrets";
 export * from "./queries/external-identity-bindings";
 export * from "./queries/contacts";
 export * from "./queries/case-relationships";
+export * from "./queries/opportunity-closure";
 export * from "./queries/organization-policies";
 export * from "./queries/source-events";
 export * from "./queries/evidence-records";

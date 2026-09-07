@@ -1135,6 +1135,7 @@ export * from "./studio-qualification";
 export * from "./attachments";
 export * from "./organizations";
 export * from "./case-relationships";
+export * from "./opportunity-closure";
 export * from "./legacy-gateway";
 export * from "./organization-policies";
 export * from "./relationship-admission";
