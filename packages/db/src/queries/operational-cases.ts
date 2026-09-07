@@ -197,9 +197,12 @@ export interface CreateOperationalCaseInput {
    */
   workflowDefinition?: { id: string; version: number } | null;
   /**
-   * Organization propietaria (R1 / ADR-106). Omitirlo mantiene exactamente la
-   * semántica legacy user-scoped: la columna queda NULL y las políticas
-   * restrictivas de 00081 no aplican. Nunca se infiere del usuario.
+   * Organization propietaria (R1 / ADR-106). Omitirlo deja la columna NULL, y
+   * NULL conserva exactamente la semántica legacy user-scoped. Las guardas
+   * RESTRICTIVE de 00081 sí participan en la evaluación de esas filas: están
+   * escritas para preservar ese comportamiento, no ausentes. Nunca se infiere
+   * una Organization del usuario. Semántica exacta de las políticas:
+   * `00081_operational_cases_organization.sql`.
    */
   organizationId?: string | null;
   /**
