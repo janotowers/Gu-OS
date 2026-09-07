@@ -265,7 +265,7 @@ Estas tres cosas suenan parecidas porque todas “configuran” al agente, pero 
 
 | Pieza | Qué guarda | Nivel actual | Ejemplo | No debe usarse para |
 |-------|------------|--------------|---------|---------------------|
-| `profiles.business_brain` | Contexto estable de la cuenta/perfil: identidad del agente, voz, notas de negocio, `organization_id`, warehouse, checklist de Heartbeat. | Hoy es por **usuario/cuenta** (`profiles.id`). Conceptualmente apunta hacia una organización, pero todavía no hay tabla `organizations` nativa. | `organization_id`, `org_name`, tono de marca, mercados, checklist de pulso. | Guardar el cuerpo completo de todas las skills propias. |
+| `profiles.business_brain` | Contexto estable de la cuenta/perfil: identidad del agente, voz, notas de negocio, `organization_id`, warehouse, checklist de Heartbeat. | Hoy es por **usuario/cuenta** (`profiles.id`) y apunta hacia una organización **externa** por `organization_id`. Desde la migración `00080` sí existe una tabla `organizations` nativa de Gu OS con membresías, pero es un eje aparte: `business_brain` no se movió a ella. | `organization_id`, `org_name`, tono de marca, mercados, checklist de pulso. | Guardar el cuerpo completo de todas las skills propias. |
 | `user_skill_settings.config_json` | Configuración de una skill específica para ese usuario/cuenta. | Por **usuario + skill_id**. | Para `brand-kit`: colores, assets, variantes. Para otra skill: umbrales o defaults. | Guardar conocimiento general del negocio o datos tabulares. |
 | Brain Layer futura | Conocimiento operacional del negocio: entidades, timeline, relaciones, señales y candidatos de playbook. | En el plan v1.4 inicia como capas `brain_*`; el modelo organizacional más completo vendrá después. | `lead/julieta`, `lead -> interested_in -> property`, `financing_concern`, `brain_skill_candidates`. | Reemplazar `business_brain` como configuración de cuenta o reemplazar BigQuery como warehouse. |
 
@@ -292,7 +292,7 @@ flowchart LR
 - `user_skill_settings.config_json` como **configuración puntual de una skill**.
 - Brain Layer como **memoria operacional del negocio** y, más adelante, fuente de candidatos para nuevas skills.
 
-Lo que sí puede cambiar en el futuro es el **nivel de ownership**: hoy casi todo cuelga de `user_id`; con `organizations` + memberships, partes de `business_brain`, Brain Layer y skills propias podrían moverse a nivel organización.
+Lo que sí puede cambiar en el futuro es el **nivel de ownership**: hoy casi todo cuelga de `user_id`. `organizations` + memberships **ya existen** (`00080`) y gobiernan el plano de Organización, pero `business_brain`, Brain Layer y las skills propias **todavía no** se movieron ahí. Que el substrato exista no es lo mismo que haber migrado el ownership.
 
 ### 5.9 Diagrama del ecosistema de skills
 

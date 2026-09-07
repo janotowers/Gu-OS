@@ -124,6 +124,10 @@ flowchart TD
 | HITL | Hoy | `interrupt()` en `packages/agent/src/graph.ts`, `tool_calls`, `agent_messages.structured_payload` |
 | Scheduled tasks | Hoy | `scheduled_tasks`, `scheduled_task_runs`, `/api/cron/scheduled-tasks` |
 | Heartbeat | Hoy | `heartbeat_runs`, `profiles.business_brain.heartbeat`, `/api/cron/heartbeat` |
+| Casos operacionales | Hoy | `operational_cases`, `operational_case_events`, `/api/cron/operational-cases` — ver §13b |
+| Plano de impacto (facts/artefactos) | Hoy | `case_facts`, `case_artifacts`, `artifact_inputs`, `case_approvals` (`00070`) |
+| Workflows ejecutables | Hoy | `workflow_definitions` (`00065`), `packages/workflows` |
+| Substrato de Organizacion (R1) | Hoy en schema; cobertura de runtime parcial | `organizations` y tablas hermanas (`00080`–`00084`, era forward) — ver §3 y §17 |
 | Business data / warehouse | Configurado hoy / manual | BigQuery + `business_brain` binding |
 | Multi-proveedor LLM | Previsto | `docs/tools-design/model-providers.md` |
 | Brain Layer G Brain-inspired | Previsto | `docs/brain/gbrain-evaluation-and-plan.md` |
@@ -145,20 +149,27 @@ La meta futura es que el usuario no sienta dos sistemas ni dos logins: Gu OS deb
 
 ### Estado actual
 
+Hay que separar **dos** cosas que antes eran una sola. El `organization_id` del sistema operativo externo sigue siendo el binding de warehouse en `business_brain`. Pero desde la migracion `00080` existe ademas una tabla **`organizations` nativa de Gu OS** con membresias propias. No son sinonimos y no se sustituyen: la primera dice *contra que datos externos consulto*, la segunda dice *quien es el tenant dentro de Gu OS*.
+
 | Tema | Hoy | Futuro esperado |
 |---|---|---|
 | Login de Gu OS | Supabase Auth | Login consolidado con el sistema operativo externo |
 | Usuario del agente | `profiles.id` (`user_id`) | Seguir siendo la identidad del runtime, posiblemente enlazada a identidad externa |
-| Organizacion de negocio | `organization_id` configurado en `business_brain` / Ajustes | Derivada automaticamente del sistema operativo externo |
+| Tenant nativo de Gu OS | **Hoy:** `organizations` + `organization_memberships` (`00080`) | Cobertura de runtime mas amplia; hoy alcanza al plano de Organizacion, no a todo el agente |
+| Binding de datos externos | `organization_id` configurado en `business_brain` / Ajustes | Derivado automaticamente del sistema operativo externo |
+| Vinculo entre ambas identidades | **Hoy:** `external_identity_bindings` (`00082`), incluido `legacy_organization_key` | Cobertura de mas tipos de identidad externa |
 | Fuente de datos operativa | BigQuery replica Firebase/Mongo | Posible acceso directo a Firebase/Mongo si conviene |
-| Multi-org por usuario | No: hoy un usuario se asocia a una organizacion | No decidido |
+| Multi-org por usuario | **Si, estructuralmente:** `organization_memberships` es unique por `(organization_id, user_id)`, asi que un usuario puede tener membresia activa en varias Organizaciones | La experiencia de producto para cambiar de Organizacion no esta resuelta |
+
+> **Precision importante.** Que el substrato exista no significa que todo el agente sea multi-tenant. El aislamiento por `user_id` sigue siendo el modelo del plano personal (chat, memoria, skills, tools, tareas). Lo que `00080`–`00084` anaden es un **segundo eje** que hoy gobierna el plano de Organizacion y las filas de `operational_cases` que tienen `organization_id`. Ver §17.
 
 ### Detalle tecnico
 
 En Supabase:
 
 - `profiles.id` referencia `auth.users(id)`.
-- Las tablas del agente se aislan por `user_id` y RLS.
+- Las tablas del **plano personal** del agente se aislan por `user_id` y RLS.
+- Las tablas del **plano de Organizacion** (`00080`+) se aislan por **membresia activa**, no por propiedad de fila: el predicado `is_active_org_member` (SECURITY DEFINER) alimenta las policies de `organizations`, `organization_memberships`, `contacts`, `organization_feature_flags`, `organization_policies` y `case_relationships`. La escritura es de `service_role`; `organization_tool_secrets` ademas no tiene policy de lectura para `authenticated`.
 - `profiles.business_brain` guarda contexto por cuenta, incluyendo datos de warehouse.
 - `profiles.is_ungga_admin` permite modo staff/cross-tenant en BigQuery.
 
@@ -189,13 +200,18 @@ organization (external org_id)
 └── teams
 ```
 
-La integracion futura debe conservar el ID externo en una columna estable, por ejemplo `organizations.external_org_id`, y separar:
+Ese modelo conceptual dejo de ser enteramente futuro. Lo que ya existe y lo que sigue pendiente:
 
-- **Membership:** a que organizacion pertenece el usuario.
-- **Role:** que puede hacer (`owner`, `org_admin`, `sales_agent`, `legal_reviewer`, etc.).
-- **Team:** con quien comparte trabajo o conocimiento (area, sucursal, region, pod o proyecto).
-- **Assignment:** de que lead, caso o work item es responsable.
-- **DRI:** quien responde por el outcome; no siempre coincide con assignee o approver.
+| Pieza | Estado | Como esta implementada |
+|---|---|---|
+| **Membership:** a que organizacion pertenece el usuario | **Hoy** | `organization_memberships`, con ciclo de vida suave (`status active/inactive`, nunca hard-delete) para que las referencias historicas de identidad sigan resolviendose |
+| **Role:** que puede hacer | **Hoy, acotado** | `check (role in ('owner','org_admin','advisor'))`. La propia migracion advierte que es el **mapeo inicial** desde `super-admin`/`admin`/`vendedor`, **no el modelo de autorizacion permanente** |
+| **Conservar el ID externo** | **Hoy, pero no como columna** | No es `organizations.external_org_id`: se resolvio con `external_identity_bindings` (`00082`), una identidad externa opaca por fila con **exactamente una** referencia tipada y FK compuestos que garantizan misma-Organizacion sin triggers. La clave legacy **normalizada** es la identidad de routing; la cruda queda como provenance (`00084`) |
+| **Assignment:** de que lead, caso o work item es responsable | **Parcial** | `operational_cases.assigned_to_user_id` existe; no hay un modelo de asignacion transversal |
+| **Team:** con quien comparte trabajo o conocimiento | **Previsto** | No hay tabla de equipos |
+| **DRI:** quien responde por el outcome | **Previsto** como concepto de runtime | Hoy vive en artefactos de desarrollo (Slice Plan), no en el schema |
+
+La autorizacion de negocio no la hace RLS sola: las escrituras del plano de Organizacion pasan por `authorizeOrgAction` en el servidor. **Una membresia `inactive` conserva identidad resoluble y no otorga nada** — la autorizacion se evalua siempre contra `status='active'` en el momento de la accion.
 
 Para leads, la propiedad logica es de la organizacion aunque el sistema externo hoy la resuelva indirectamente mediante el usuario `super-admin`. Gu OS puede empezar con el adapter `lead -> receiving user -> external org_id`; el contrato futuro preferido es `lead.organization_id` + `lead.assigned_to_user_id`. El sistema externo sigue siendo SOR de intake/asignacion mientras Gu OS referencia `external_lead_id`, `external_org_id` y el assignee vigente.
 
@@ -214,6 +230,9 @@ No confundir tres autoridades:
 | Settings de tools | tool habilitada / deshabilitada | Usuario | `user_tool_settings` | Por cuenta |
 | Settings de skills | skill habilitada / config | Usuario | `user_skill_settings` | Por cuenta |
 | Business Brain | org binding, contexto, voz, heartbeat | Usuario/cuenta hoy; organizacion en direccion futura | `profiles.business_brain` | Es el puente actual hacia datos de organizacion |
+| Tenant nativo y su gente | Organizacion, membresias, contactos | Organizacion | `organizations`, `organization_memberships`, `contacts` | **Hoy.** RLS por membresia activa; escritura solo service role |
+| Configuracion y secretos de Organizacion | flags, credenciales de tool, politica de admision | Organizacion | `organization_feature_flags`, `organization_tool_secrets`, `organization_policies` | **Hoy.** `organization_tool_secrets` no tiene lectura para `authenticated` |
+| Identidad externa vinculada | clave legacy, numero de WhatsApp, lead legacy | Organizacion | `external_identity_bindings` | **Hoy.** Solo service role; una referencia tipada por fila |
 | Datos operativos | leads, propiedades, mensajes, deals | Organizacion externa | BigQuery replica Firebase/Mongo | Consultado por `bigquery_run_query` |
 | Brain Layer futuro | pages, links, signals del negocio | Usuario hoy; organizacion cuando exista modelo org | `brain_*` previsto | Debe evolucionar a org/memberships |
 
@@ -945,9 +964,42 @@ Estado:
 - Credenciales por cuenta: **Hoy** (`easybroker`, `easybroker_web`, `ungga_api`,
   `ungga`; tabla + API + UI + prueba de conexión).
 - EasyBroker búsqueda MLS: **Hoy** (Playwright + `easybroker_web`).
-- EasyBroker create/upload: **Stub** hasta mapear endpoints write de la API.
-- Templates DOCX/PDF y watermark: **Stub** (requiere assets).
+- EasyBroker create/upload: **Hoy** — write HTTP real (`POST /v1/properties`,
+  `PATCH /v1/properties/{id}`), `risk='high'`/HITL, con selftests de payload y
+  ubicación. *(Esta línea decía "Stub hasta mapear endpoints write de la API" y
+  contradecía el cuerpo de esta misma sección; los endpoints ya están mapeados.)*
+- Templates DOCX y watermark: **Hoy** (`docxtemplater` + `pizzip`; `sharp` con
+  composite sobre el bucket privado `account-assets`). **Conversión a PDF: pendiente.**
 - Ungga publish: **Parcial** (API si hay credencial; CLI Playwright como fallback).
+- Tenencia por Organización en `operational_cases`: **Hoy en schema, cobertura de
+  runtime parcial** — ver el bloque siguiente.
+
+### Tenencia por Organización y autoridad de runtime (`00081`)
+
+Este subsistema dejó de ser exclusivamente user-scoped, **sin romper nada de lo anterior**:
+
+- `operational_cases.organization_id` es *nullable*. Las filas con `NULL` conservan
+  **exactamente** la semántica user-scoped previa, y las policies restrictivas de
+  `00081` no les aplican. El `organization_id` **nunca se infiere del usuario**.
+- Sobre las filas con Organización, `00081` añade lectura por membresía activa más
+  policies **RESTRICTIVE** de guardia de tenencia en `operational_cases`, `case_facts`,
+  `case_artifacts`, `case_approvals` y `operational_case_events`, y hace la escritura
+  server-only. La unique `(id, organization_id)` es el destino de los FK compuestos
+  que hacen estructuralmente imposible que una fila hija cruce de tenant.
+- `operational_cases.runtime_authority` (`legacy` / `gu_os`) es deliberadamente
+  *nullable* y **sin default**: un Caso de relación se crea en `legacy` porque el
+  sistema legacy sigue decidiendo, y la autoridad solo se mueve por una operación
+  gobernada autorizada — nunca implícitamente al crear el Caso.
+- `case_relationships` (`00083`) expresa relaciones Caso↔Caso tipadas
+  (`duplicate_of`, `superseded_by`, `split_from`, `transaction_association`) con una
+  sola arista activa por `(from, to, type)`. Las relaciones se representan como
+  aristas: **no mutan las filas de Caso**.
+
+**Qué NO implica esto.** El cron y el runtime de casos descritos arriba siguen siendo
+el camino de los casos operativos user-scoped. La admisión que crea Casos Oportunidad
+sombra a partir de `source_events` **no la ejecuta hoy ninguna ruta HTTP ni cron**:
+vive en `apps/web/src/lib/relationship-admission/` y se ejercita por selftests, evals y
+verificadores operados a mano contra staging. Ver [`docs/architecture.md`](../architecture.md).
 
 ---
 
@@ -1057,12 +1109,16 @@ Ingestion responde: "como nace el conocimiento del sistema". Para un nuevo clien
 
 ### Estado actual
 
-Hoy no existe una Ingestion Layer general dentro de Gu OS. Lo mas cercano es:
+Hoy no existe una Ingestion Layer **general** dentro de Gu OS — eso sigue siendo cierto. Pero ya no es cierto que no exista **ninguna** ruta de admision estructurada. Lo mas cercano hoy:
 
 - BigQuery como fuente estructurada para consultas.
-- Integraciones OAuth (Google Calendar, GitHub).
+- Integraciones OAuth (Google Calendar, GitHub, Gmail).
 - Tools especificas.
 - Binding manual de `organization_id`.
+- **`source_events` (era forward):** un inbox de eventos de origen con `dedup_key` unico por Organizacion, y claim con fencing y expiracion (`pending` / `processing` / `completed` / `failed`). Es admision acotada a Relationship Operations, con `organization_policies` como politica de admision **versionada**, no un conector generico.
+- **Legacy gateway (R1 SL-1):** lecturas **acotadas por capacidad** contra Traditional Gu, con allowlist de colecciones en codigo, chequeo de binding por Organizacion en cada lectura y provenance. No es ingesta masiva: no hay capacidad que devuelva un documento crudo ni que acepte un nombre de coleccion, y ninguna llega a una escritura.
+
+Ambas piezas son **acotadas por diseno** y no reemplazan el `SourceConnector` generico descrito abajo.
 
 ### Futuro previsto
 
@@ -1133,7 +1189,12 @@ El agente no debe mezclar usuarios, organizaciones ni permisos. Hay tres mecanis
 
 | Area | Regla |
 |---|---|
-| Supabase | RLS por `auth.uid()` / `user_id` |
+| Supabase — plano personal | RLS por `auth.uid()` / `user_id` |
+| Supabase — plano de Organizacion (`00080`+) | RLS por **membresia activa** (`is_active_org_member`), no por propiedad de fila; escritura solo `service_role`; `organization_tool_secrets` sin lectura para `authenticated` |
+| `operational_cases` | Hibrida: `organization_id` NULL conserva la semantica user-scoped; las filas con Organizacion suman policies **RESTRICTIVE** de guardia de tenencia y FK compuestos contra cruce de tenant |
+| Autorizacion de negocio | `authorizeOrgAction` en el servidor. RLS es el piso, no la autorizacion completa. Una membresia `inactive` no otorga nada |
+| Autoridad de runtime | `operational_cases.runtime_authority` es *nullable* y sin default: solo se mueve por una operacion gobernada autorizada |
+| Lectura de Traditional Gu | Solo lectura, por capacidad, con allowlist de colecciones en codigo y chequeo de binding por Organizacion en cada lectura. Ninguna ruta a escritura |
 | Integraciones OAuth | Tokens por usuario en `user_integrations`, cifrados |
 | MCP (diferido) | Transporte externo, no 4ª pestaña: conectar bajo Conexiones; tools solo vía catálogo governado tras allowlist (finding 27 / Technical Plan §28.14). Cerrado hasta sandboxing + necesidad real. |
 | BigQuery usuario regular | Debe filtrar por `organization_id` |
@@ -1177,7 +1238,12 @@ El agente no debe mezclar usuarios, organizaciones ni permisos. Hay tres mecanis
 | Que tipos de procedimiento existen | `operational_case_types` | Supabase |
 | Donde viven los archivos originales | Buckets privados / SOR externo + metadata | Object Storage / externo + Supabase |
 | Donde vive texto o Markdown extraido | Derivado asociado a archivo/fuente | Supabase; schema general previsto |
-| Que hechos y artefactos produjo un caso | `case_facts`, `case_artifacts`, `artifact_inputs` | Previsto (impact plane) |
+| Que hechos y artefactos produjo un caso | `case_facts`, `case_artifacts`, `artifact_inputs` | Supabase (`00070`); implementado y escrito desde runtime |
+| Quien es el tenant nativo y quien pertenece a el | `organizations`, `organization_memberships` | Supabase; RLS por membresia activa |
+| Que Organizacion es dueña de un caso | `operational_cases.organization_id` (NULL = legacy user-scoped) | Supabase |
+| Que runtime decide sobre una Oportunidad | `operational_cases.runtime_authority` (`legacy` / `gu_os`) | Supabase; sin default, solo por operacion gobernada |
+| Como se relacionan dos casos entre si | `case_relationships` (arista tipada, no mutacion) | Supabase |
+| Que identidad externa corresponde a que Organizacion | `external_identity_bindings` | Supabase; solo service role |
 | Que vista se comparte con un usuario interno/externo | Vista autorizada sobre facts/artifacts | Previsto; nunca segundo SOR |
 | Que costo IA tuvo una instancia de caso | `ai_usage_events.operational_case_id` | Supabase; implementado |
 | Que memoria operacional del negocio existira | `brain_*` | Previsto |
