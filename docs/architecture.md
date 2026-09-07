@@ -222,9 +222,9 @@ Selección de la era legacy congelada:
 - `00068_evidence_records.sql` — evidencia append-only de gates (replay/lab) pinneada a `artifact_hash`; `detail_jsonb` pasa por scrubber de secretos.
 - `00080_organizations_core.sql` — substrato multi-tenant: `organizations`, `organization_memberships`, `organization_feature_flags`, `organization_tool_secrets` y `contacts`, con RLS por membresía (EXISTS) más políticas de service-role.
 - `00081_operational_cases_organization.sql` — agrega `organization_id` y `runtime_authority` (`legacy` / `gu_os`) a `operational_cases`, y la unique `(id, organization_id)` sobre la que se apoyan los FK compuestos de tenancy de las tablas hijas.
-- `00082_external_identity_bindings.sql` — `external_identity_bindings`: referencias externas opacas hacia Case/contacto, con unique de routing global.
+- `00082_external_identity_bindings.sql` — `external_identity_bindings`: identidades externas opacas de Traditional Gu mapeadas estructuralmente a Organization / membresía / contacto / Case — exactamente una referencia tipada, con FK compuestos que garantizan misma-Organization sin triggers — más un unique global para las identidades críticas de routing. Introduce también el primer `bootstrap_organization(...)` idempotente (resolve-or-create), solo para `service_role`.
 - `00083_case_relationships.sql` — `case_relationships`: vocabulario tipado de relaciones Case↔Case (ADR-109), con `uq_case_relationships_active_edge` (una arista activa por `(from, to, type)`).
-- `00084_bootstrap_organization_provenance.sql` — función `bootstrap_organization(...)` para el alta gobernada de una Organization piloto.
+- `00084_bootstrap_organization_provenance.sql` — reemplaza la firma original de `bootstrap_organization` por la versión con provenance: **dropea explícitamente** la de dos argumentos (un `CREATE OR REPLACE` dejaría un overload alcanzable, y con él la ruta que guardaba la clave sin normalizar) y crea la de tres. La clave legacy **normalizada** es la identidad de routing; la representación **cruda** (`users/<ownerUid>`) queda registrada como provenance en la misma operación de creación. No crea membresía y sigue siendo solo `service_role`.
 
 Era forward (aplicada por el CLI de Supabase):
 
