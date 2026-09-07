@@ -35,6 +35,7 @@
  *  - **assert a runtime transition.** S1 §8.7 keeps business closure and
  *    runtime status distinct.
  */
+import { runWithAiUsageContext } from "@agents/agent";
 import {
   createCaseRelationship,
   getOperationalCase,
@@ -45,6 +46,7 @@ import {
   findClosureForResolution,
   type DbClient,
 } from "@agents/db";
+import type { ContinuityJudge, ContinuityJudgeInput, ContinuityProposal } from "./continuity-judge";
 import type {
   CaseRelationship,
   CaseRelationshipActorKind,
@@ -385,4 +387,47 @@ function describeFailure(error: unknown): string {
     return typeof shaped.code === "string" ? `${shaped.code}: ${message}` : message;
   }
   return String(error);
+}
+
+/**
+ * Asks the continuity judge whether two Opportunities share one objective,
+ * with the model call correlated to the Organization that incurred it.
+ *
+ * This is the ONLY runtime path in this Slice that reaches a model, and it
+ * deliberately returns a **proposal**, never a resolution. Nothing here writes
+ * anything: turning a proposal into a governed determination is a separate
+ * decision — by a human, or by an already-governed path — and
+ * `resolveCanonicalization` is what consumes that determination.
+ *
+ * Why not wire it straight into the executor: SL-3 explicitly declines to
+ * invent a trigger for when Gu should decide that two Opportunities are one.
+ * ADR-109 §7 leaves survivor and reconciliation algorithms downstream, and no
+ * approved source defines the trigger, so building one here would be inventing
+ * product truth this Slice does not own.
+ *
+ * The correlation wrapper is the §2 baseline's correlation-coverage
+ * requirement, which applies from SL-2 onward: `organizationId` is the only
+ * dimension available, since the judgment precedes any Case-level work.
+ * Callback-scoped rather than `bindAiUsageContext`, so this never leaves its
+ * attribution behind in a caller's async context.
+ */
+export async function proposeContinuity(
+  db: DbClient,
+  params: {
+    organizationId: string;
+    userId: string;
+    judge: ContinuityJudge;
+    input: ContinuityJudgeInput;
+  }
+): Promise<ContinuityProposal | null> {
+  if (!(await isRelationshipOpsEnabled(db, params.organizationId))) return null;
+  return runWithAiUsageContext(
+    {
+      userId: params.userId,
+      organizationId: params.organizationId,
+      channel: "cron",
+    },
+    db,
+    () => params.judge.judge(params.input)
+  );
 }

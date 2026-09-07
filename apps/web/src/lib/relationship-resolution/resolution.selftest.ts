@@ -38,9 +38,17 @@ import {
   validateOpportunityClosure,
   type OpportunityClosureFactValue,
 } from "@agents/types";
+import { readFileSync } from "node:fs";
+import * as nodePath from "node:path";
+import { fileURLToPath } from "node:url";
+import { recordOpenRouterCallUsage, setAiUsageRecorder } from "@agents/agent";
+import type { AiUsageEventInput } from "@agents/types";
 import { createFakeDb, type FakeDb } from "../relationship-testing/fake-db";
+import type { ContinuityJudge } from "./continuity-judge";
+import { buildContinuityPrompt, normalizeContinuityProposal } from "./continuity-judge";
 import {
   findIncompleteResolutions,
+  proposeContinuity,
   resolveCanonicalization,
   type ResolutionRequest,
 } from "./resolve";
@@ -53,6 +61,15 @@ const OWNER_UID = "owner-uid-0000000000000001";
 const CASE_A = "case-aaaa";
 const CASE_B = "case-bbbb";
 const CASE_FOREIGN = "case-ffff";
+
+/** A blank Opportunity summary the prompt/inertness checks build on. */
+const EMPTY_SUMMARY = {
+  objective: null,
+  objectiveCategory: null,
+  requirements: [] as readonly string[],
+  propertyContext: null,
+  recentMessages: [] as readonly string[],
+};
 
 // ============================================================
 // Harness
@@ -822,6 +839,157 @@ test("findClosureForResolution answers 'did MY half complete', not 'is it closed
   );
 });
 
+
+// ── The model-mediated half: correlation, inertness, and the eval set ──
+
+test("the continuity judgment is correlated, not dropped", async () => {
+  // §2 baseline correlation-coverage, which applies from SL-2 onward. What is
+  // under test is the CONTEXT this Slice binds around the call, not the
+  // metering helper itself — so the judge meters exactly as production does.
+  const captured: AiUsageEventInput[] = [];
+  setAiUsageRecorder((event) => {
+    captured.push(event);
+  });
+  try {
+    const db = makeDb();
+    const metering: ContinuityJudge = {
+      async judge() {
+        await recordOpenRouterCallUsage({
+          modelId: "openai/gpt-5.4-mini",
+          modelRole: "relationship_continuity_judge",
+          operation: "classification",
+          usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 },
+        });
+        return {
+          same_objective: true,
+          confidence: "high" as const,
+          conflicting_facts: false,
+          rationale: "same listing",
+        };
+      },
+    };
+
+    const proposal = await proposeContinuity(db.client, {
+      organizationId: PILOT_ORG,
+      userId: ADVISOR,
+      judge: metering,
+      input: { left: EMPTY_SUMMARY, right: EMPTY_SUMMARY },
+    });
+    assert.equal(proposal?.same_objective, true);
+
+    assert.equal(
+      captured.length,
+      1,
+      "the continuity model call is metered, not dropped for want of a context"
+    );
+    assert.equal(captured[0].organizationId, PILOT_ORG);
+    assert.equal(captured[0].userId, ADVISOR);
+    assert.equal(
+      captured[0].modelRole,
+      "relationship_continuity_judge",
+      "attributable as its own role, distinct from admission's interpreter"
+    );
+  } finally {
+    setAiUsageRecorder(null);
+  }
+});
+
+test("SA-3.9 with relationship_ops off the judge is never even called", async () => {
+  const db = makeDb({ relationshipOps: false });
+  let called = false;
+  const judge: ContinuityJudge = {
+    async judge() {
+      called = true;
+      return null;
+    },
+  };
+  const proposal = await proposeContinuity(db.client, {
+    organizationId: PILOT_ORG,
+    userId: ADVISOR,
+    judge,
+    input: { left: EMPTY_SUMMARY, right: EMPTY_SUMMARY },
+  });
+  assert.equal(proposal, null);
+  assert.equal(called, false, "flags off means no model spend, not a discarded answer");
+});
+
+test("a malformed judge response is no judgment, never a fabricated one", () => {
+  // The conservative outcome matters here: no judgment means no resolution,
+  // and a missed duplicate is recoverable while a false merge is not.
+  assert.equal(normalizeContinuityProposal({ same_objective: "yes" }), null);
+  assert.equal(normalizeContinuityProposal(null), null);
+  assert.equal(
+    normalizeContinuityProposal({
+      same_objective: false,
+      confidence: "low",
+      conflicting_facts: false,
+      rationale: "nothing shared",
+    })?.same_objective,
+    false
+  );
+});
+
+test("the judge prompt never receives ids, policy or a survivor question", () => {
+  const prompt = buildContinuityPrompt({
+    left: { ...EMPTY_SUMMARY, objective: "comprar casa" },
+    right: { ...EMPTY_SUMMARY, objective: "comprar casa" },
+  });
+  for (const leaked of [PILOT_ORG, CASE_A, CASE_B, OWNER_UID, ADVISOR]) {
+    assert.ok(!prompt.includes(leaked), `identifier leaked into the prompt: ${leaked}`);
+  }
+  assert.ok(
+    prompt.includes("Do not decide which record should survive"),
+    "direction is not a semantic question and is not asked"
+  );
+});
+
+test("the eval set is well formed and its two bars are stated", () => {
+  const here = nodePath.dirname(fileURLToPath(import.meta.url));
+  const set = JSON.parse(
+    readFileSync(nodePath.join(here, "eval", "continuity-scenarios.json"), "utf8")
+  ) as {
+    failure_rate_bar: number;
+    false_merge_bar: number;
+    recorded?: Record<string, unknown>;
+    scenarios: Array<{
+      id: string;
+      expected: { same_objective: boolean };
+      false_merge_trap?: boolean;
+    }>;
+  };
+
+  assert.ok(set.scenarios.length >= 12, "a set this small proves little");
+  assert.equal(
+    new Set(set.scenarios.map((sc) => sc.id)).size,
+    set.scenarios.length,
+    "scenario ids are unique"
+  );
+  assert.ok(set.failure_rate_bar > 0 && set.failure_rate_bar < 1);
+  assert.equal(
+    set.false_merge_bar,
+    0,
+    "the asymmetry the risk table declares is encoded as a bar, not a preference"
+  );
+  assert.ok(
+    set.scenarios.some((sc) => sc.expected.same_objective === true) &&
+      set.scenarios.some((sc) => sc.expected.same_objective === false),
+    "both directions are represented"
+  );
+  assert.ok(
+    set.scenarios.filter((sc) => sc.false_merge_trap).length >= 3,
+    "the costly direction is deliberately provoked"
+  );
+  for (const sc of set.scenarios) {
+    assert.ok(
+      !sc.false_merge_trap || sc.expected.same_objective === false,
+      `a false-merge trap must expect distinct: ${sc.id}`
+    );
+  }
+  assert.ok(
+    typeof set.recorded?.barEstablishedBy === "string",
+    "the set records when its bar was fixed relative to the first run"
+  );
+});
 // ============================================================
 
 async function main(): Promise<void> {

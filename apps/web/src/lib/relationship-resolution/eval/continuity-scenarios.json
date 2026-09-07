@@ -1,0 +1,354 @@
+{
+  "recorded": {
+    "values": "INVENTED. Every Opportunity pair below is synthetic. R1 SL-3's Definition of Done says hosted evidence uses shadow traffic, controlled or pilot-derived as available, and that organically occurring live duplicates are NOT a prerequisite — so this set is built rather than harvested. The shapes are modelled on S1 §8.6 (duplicate), §8.5.3 (continuity uncertainty), AC-15 (conflicting facts) and EC-05 (a substantial criteria change may still be one objective), and on the opening forms S1 §8.4.3 names. No production lead, message, contact or property is reproduced here.",
+    "gap": "This set is wholly synthetic, which is a real limitation and is stated rather than hidden: it measures whether the judge follows the approved continuity semantics, not how it behaves on the actual distribution of Alebrixe conversations. Pilot-derived pairs enter the same way SL-2's real openings did — captured under an explicit bounded authorization, redacted, and labelled by human review independently of the model's own output, with `modelSaid` never copied into `expected`.",
+    "barEstablishedBy": "Stated on 2026-09-07, BEFORE this set was run even once, per Methodology §14.1 and the SL-3 Definition of Done. It is frozen: if the judge misses it, the finding is reported, the bar is not moved."
+  },
+  "failure_rate_bar": 0.2,
+  "false_merge_bar": 0.0,
+  "bar_rationale": "Two bars, because the two error directions are not equally costly. The Slice's own risk table says a FALSE MERGE is worse than a missed one, since it conflates two real objectives and hands one advisor a responsibility that was never theirs; a missed duplicate merely leaves two Opportunities standing, which is recoverable and which the next determination can fix. So: at most 20% overall failures across the semantic set — looser than SL-2's 15%, because sameness-of-objective is a harder and more contestable judgment than presence-of-objective — and ZERO scenarios labelled distinct may be judged same_objective, including the false_merge_trap cases built specifically to invite the error.",
+  "scenarios": [
+    {
+      "id": "same-property-two-channels",
+      "label": "One prospect asked about the same listing through the portal and then on WhatsApp",
+      "input": {
+        "left": {
+          "objective": "comprar la casa del anuncio en Country Club",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["3 recámaras", "presupuesto ~4.5M"],
+          "propertyContext": "casa en venta, Country Club",
+          "recentMessages": ["Hola, vi la casa del anuncio, ¿sigue disponible?"]
+        },
+        "right": {
+          "objective": "quiere ver la casa de Country Club",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["3 recámaras"],
+          "propertyContext": "casa en venta, Country Club",
+          "recentMessages": ["Buenas, me interesa la casa que publicaron en Country Club, ¿puedo verla?"]
+        }
+      },
+      "expected": { "same_objective": true }
+    },
+    {
+      "id": "same-objective-different-detail",
+      "label": "The same objective, stated vaguely once and specifically the other time",
+      "input": {
+        "left": {
+          "objective": "busca casa para su familia",
+          "objectiveCategory": "buy_residential",
+          "requirements": [],
+          "propertyContext": null,
+          "recentMessages": ["Quiero comprar una casa"]
+        },
+        "right": {
+          "objective": "comprar casa de 3 recámaras en el norte para la familia",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["3 recámaras", "zona norte", "presupuesto 4M"],
+          "propertyContext": null,
+          "recentMessages": ["Ya lo platiqué con mi esposa, buscamos 3 recámaras en el norte, hasta 4 millones"]
+        }
+      },
+      "expected": { "same_objective": true }
+    },
+    {
+      "id": "ec05-budget-raised",
+      "label": "EC-05 — the budget went up; still one evolving objective",
+      "input": {
+        "left": {
+          "objective": "comprar casa en el norte",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["presupuesto 3M", "zona norte"],
+          "propertyContext": null,
+          "recentMessages": ["Mi tope son 3 millones"]
+        },
+        "right": {
+          "objective": "comprar casa en el norte",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["presupuesto 4.5M", "zona norte"],
+          "propertyContext": null,
+          "recentMessages": ["Ya lo pensamos mejor, podemos estirarnos a 4.5"]
+        }
+      },
+      "expected": { "same_objective": true }
+    },
+    {
+      "id": "ec05-zone-changed",
+      "label": "EC-05 — the zone changed after visiting; still one objective",
+      "input": {
+        "left": {
+          "objective": "comprar casa en Cumbres",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["Cumbres", "3 recámaras"],
+          "propertyContext": null,
+          "recentMessages": ["Nos gusta Cumbres"]
+        },
+        "right": {
+          "objective": "comprar casa en Valle Oriente",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["Valle Oriente", "3 recámaras"],
+          "propertyContext": null,
+          "recentMessages": ["Después de ver las de Cumbres preferimos buscar por Valle Oriente"]
+        }
+      },
+      "expected": { "same_objective": true }
+    },
+    {
+      "id": "ac15-conflicting-budget",
+      "label": "AC-15 — the two records state budgets that cannot both be current",
+      "input": {
+        "left": {
+          "objective": "comprar depa cerca del centro",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["presupuesto 2.2M", "centro"],
+          "propertyContext": null,
+          "recentMessages": ["Traigo 2.2 para un departamento por el centro"]
+        },
+        "right": {
+          "objective": "comprar departamento en el centro",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["presupuesto 1.8M", "centro"],
+          "propertyContext": null,
+          "recentMessages": ["Mi presupuesto real es 1.8, no más"]
+        }
+      },
+      "expected": { "same_objective": true, "conflicting_facts": true }
+    },
+    {
+      "id": "buy-or-rent-same-need",
+      "label": "Buying or renting the same family home — one objective under consideration",
+      "input": {
+        "left": {
+          "objective": "comprar casa para mudarse en enero",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["mudanza en enero", "3 recámaras"],
+          "propertyContext": null,
+          "recentMessages": ["Queremos comprar antes de enero"]
+        },
+        "right": {
+          "objective": "rentar casa mientras deciden comprar",
+          "objectiveCategory": "rent_residential",
+          "requirements": ["mudanza en enero", "3 recámaras"],
+          "propertyContext": null,
+          "recentMessages": ["Si no encontramos para comprar a tiempo, rentamos mientras tanto"]
+        }
+      },
+      "expected": { "same_objective": true }
+    },
+    {
+      "id": "timeline-changed",
+      "label": "Urgency changed from immediate to six months out",
+      "input": {
+        "left": {
+          "objective": "comprar casa urgente",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["urgente", "zona sur"],
+          "propertyContext": null,
+          "recentMessages": ["Lo necesito ya"]
+        },
+        "right": {
+          "objective": "comprar casa en zona sur",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["en 6 meses", "zona sur"],
+          "propertyContext": null,
+          "recentMessages": ["Cambió el plan, sería como en 6 meses"]
+        }
+      },
+      "expected": { "same_objective": true, "conflicting_facts": true }
+    },
+    {
+      "id": "same-listing-different-wording",
+      "label": "Two very differently worded messages about the same specific listing",
+      "input": {
+        "left": {
+          "objective": "información de la casa de Contry",
+          "objectiveCategory": "buy_residential",
+          "requirements": [],
+          "propertyContext": "casa en venta, Contry, 3 recámaras",
+          "recentMessages": ["¿Precio?"]
+        },
+        "right": {
+          "objective": "quiere agendar visita a la casa de Contry",
+          "objectiveCategory": "buy_residential",
+          "requirements": [],
+          "propertyContext": "casa en venta, Contry, 3 recámaras",
+          "recentMessages": ["Buenas tardes, ¿sería posible agendar para conocer la propiedad de Contry este sábado?"]
+        }
+      },
+      "expected": { "same_objective": true }
+    },
+    {
+      "id": "distinct-buy-and-list",
+      "label": "Buying a home AND separately listing a property they own",
+      "input": {
+        "left": {
+          "objective": "comprar casa para su familia",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["3 recámaras", "zona norte"],
+          "propertyContext": null,
+          "recentMessages": ["Buscamos casa para nosotros"]
+        },
+        "right": {
+          "objective": "poner en venta el departamento que renta actualmente",
+          "objectiveCategory": "sell_or_list_property",
+          "requirements": ["departamento en el centro", "quiere avalúo"],
+          "propertyContext": null,
+          "recentMessages": ["Aparte, quiero vender el depto que tengo rentado en el centro"]
+        }
+      },
+      "expected": { "same_objective": false }
+    },
+    {
+      "id": "distinct-home-and-commercial-lease",
+      "label": "A residential purchase and an unrelated commercial lease",
+      "input": {
+        "left": {
+          "objective": "comprar casa habitación",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["3 recámaras"],
+          "propertyContext": null,
+          "recentMessages": ["Queremos una casa para vivir"]
+        },
+        "right": {
+          "objective": "rentar local para su negocio",
+          "objectiveCategory": "rent_commercial",
+          "requirements": ["120 m2", "sobre avenida"],
+          "propertyContext": null,
+          "recentMessages": ["Necesito un local sobre avenida para el negocio"]
+        }
+      },
+      "expected": { "same_objective": false }
+    },
+    {
+      "id": "distinct-parallel-purchases",
+      "label": "Two purchases pursued in parallel, one for a daughter",
+      "input": {
+        "left": {
+          "objective": "comprar casa para la familia en Monterrey",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["Monterrey", "4 recámaras"],
+          "propertyContext": null,
+          "recentMessages": ["La casa para nosotros la queremos en Monterrey"]
+        },
+        "right": {
+          "objective": "comprar un departamento pequeño para su hija en Guadalajara",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["Guadalajara", "1 recámara", "cerca de la universidad"],
+          "propertyContext": null,
+          "recentMessages": ["También quiero comprar algo chico en Guadalajara para mi hija que entra a la universidad"]
+        }
+      },
+      "expected": { "same_objective": false }
+    },
+    {
+      "id": "distinct-vacation-vs-residence",
+      "label": "A vacation rental and a primary-residence purchase",
+      "input": {
+        "left": {
+          "objective": "rentar casa en la playa para Semana Santa",
+          "objectiveCategory": "vacation_rental",
+          "requirements": ["Semana Santa", "playa", "8 personas"],
+          "propertyContext": null,
+          "recentMessages": ["Buscamos algo en la playa para Semana Santa"]
+        },
+        "right": {
+          "objective": "comprar casa para vivir en Monterrey",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["Monterrey", "3 recámaras"],
+          "propertyContext": null,
+          "recentMessages": ["Queremos comprar nuestra casa aquí en Monterrey"]
+        }
+      },
+      "expected": { "same_objective": false }
+    },
+    {
+      "id": "distinct-land-vs-house",
+      "label": "Buying land to build, and separately renting while they build",
+      "input": {
+        "left": {
+          "objective": "comprar un terreno para construir",
+          "objectiveCategory": "land",
+          "requirements": ["300 m2", "con servicios"],
+          "propertyContext": null,
+          "recentMessages": ["Buscamos terreno para construir"]
+        },
+        "right": {
+          "objective": "rentar una bodega para su empresa",
+          "objectiveCategory": "rent_commercial",
+          "requirements": ["500 m2", "parque industrial"],
+          "propertyContext": null,
+          "recentMessages": ["Necesitamos bodega en el parque industrial"]
+        }
+      },
+      "expected": { "same_objective": false }
+    },
+    {
+      "id": "trap-thin-evidence-both-sides",
+      "label": "TRAP — both records are near-empty openers with nothing to connect them",
+      "input": {
+        "left": {
+          "objective": null,
+          "objectiveCategory": null,
+          "requirements": [],
+          "propertyContext": null,
+          "recentMessages": ["Hola, información"]
+        },
+        "right": {
+          "objective": null,
+          "objectiveCategory": null,
+          "requirements": [],
+          "propertyContext": null,
+          "recentMessages": ["Buenas, quisiera informes"]
+        }
+      },
+      "expected": { "same_objective": false },
+      "false_merge_trap": true,
+      "note": "Two empty openers look identical precisely because neither says anything. Merging them would conflate two unrelated prospects on the strength of no evidence at all — the exact failure the Slice's risk table calls worse than a missed duplicate."
+    },
+    {
+      "id": "trap-generic-objective-nothing-else",
+      "label": "TRAP — the same generic objective text, no other overlap",
+      "input": {
+        "left": {
+          "objective": "busca casa",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["zona sur", "presupuesto 2M"],
+          "propertyContext": null,
+          "recentMessages": ["Busco casa por el sur, hasta 2 millones"]
+        },
+        "right": {
+          "objective": "busca casa",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["Saltillo", "presupuesto 6M"],
+          "propertyContext": null,
+          "recentMessages": ["Busco casa en Saltillo, presupuesto amplio, como 6 millones"]
+        }
+      },
+      "expected": { "same_objective": false },
+      "false_merge_trap": true,
+      "note": "Identical summary strings, different city and a triple budget gap. A judge that anchors on the objective label rather than the evidence merges these."
+    },
+    {
+      "id": "trap-same-property-different-prospects",
+      "label": "TRAP — two different prospects asking about the same listing",
+      "input": {
+        "left": {
+          "objective": "comprar la casa anunciada en Cumbres",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["crédito bancario", "familia de 4"],
+          "propertyContext": "casa en venta, Cumbres",
+          "recentMessages": ["¿Sigue disponible? Somos familia de 4 y vamos con crédito"]
+        },
+        "right": {
+          "objective": "comprar la casa anunciada en Cumbres como inversión",
+          "objectiveCategory": "buy_residential",
+          "requirements": ["pago de contado", "para rentar"],
+          "propertyContext": "casa en venta, Cumbres",
+          "recentMessages": ["Me interesa como inversión, pagaría de contado para ponerla en renta"]
+        }
+      },
+      "expected": { "same_objective": false },
+      "false_merge_trap": true,
+      "note": "The strongest trap in the set: a shared property context is the signal most likely to be mistaken for a shared objective. Two buyers wanting the same house are two objectives, and merging them would close one real prospect's responsibility under another's."
+    }
+  ]
+}

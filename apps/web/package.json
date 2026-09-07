@@ -19,6 +19,7 @@
     "test:admission": "tsx src/lib/relationship-admission/admission.selftest.ts",
     "test:resolution": "tsx src/lib/relationship-resolution/resolution.selftest.ts",
     "eval:admission": "tsx src/lib/relationship-admission/eval/run-admission-eval.ts",
+    "eval:continuity": "tsx src/lib/relationship-resolution/eval/run-continuity-eval.ts",
     "test:engagement-policies": "tsx src/lib/engagement-policies/registry.selftest.ts",
     "test:work-view": "tsx src/lib/operations/work-view-labels-ui.selftest.ts",
     "test:durable-work-view": "tsx src/lib/operations/durable-work-view-labels-ui.selftest.ts",

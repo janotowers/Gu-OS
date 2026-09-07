@@ -61,6 +61,13 @@ export const DEFAULT_OPERATIONAL_CONVERSATION_CLASSIFIER_MODEL_ID =
  * configuración: override con `RELATIONSHIP_ADMISSION_MODEL_ID`.
  */
 export const DEFAULT_RELATIONSHIP_ADMISSION_MODEL_ID = "openai/gpt-5.4-mini";
+/**
+ * Default del juez de continuidad duplicado/supersesión (R1 SL-3).
+ * Mismo modelo que admisión por defecto: ningún artefacto de gobierno
+ * prescribe uno, y la tarea es de la misma clase (clasificación semántica
+ * corta con salida JSON). Override con `RELATIONSHIP_CONTINUITY_MODEL_ID`.
+ */
+export const DEFAULT_RELATIONSHIP_CONTINUITY_MODEL_ID = "openai/gpt-5.4-mini";
 /** Default vision (analyze_property_images y tools de foto). */
 export const DEFAULT_IMAGE_VISION_MODEL_ID = "openai/gpt-4.1-mini";
 /** Default redacción comercial (prepare_listing_description_draft). */
@@ -98,6 +105,11 @@ export const OPERATIONAL_CONVERSATION_CLASSIFIER_MODEL_ID =
 export const RELATIONSHIP_ADMISSION_MODEL_ID =
   process.env.RELATIONSHIP_ADMISSION_MODEL_ID?.trim() ||
   DEFAULT_RELATIONSHIP_ADMISSION_MODEL_ID;
+
+/** Juez de continuidad SL-3 (env override > default). */
+export const RELATIONSHIP_CONTINUITY_MODEL_ID =
+  process.env.RELATIONSHIP_CONTINUITY_MODEL_ID?.trim() ||
+  DEFAULT_RELATIONSHIP_CONTINUITY_MODEL_ID;
 
 /** Vision / análisis de imágenes (env override > default). */
 export const IMAGE_VISION_MODEL_ID =
