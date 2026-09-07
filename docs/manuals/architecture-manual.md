@@ -211,7 +211,12 @@ Ese modelo conceptual dejo de ser enteramente futuro. Lo que ya existe y lo que 
 | **Team:** con quien comparte trabajo o conocimiento | **Previsto** | No hay tabla de equipos |
 | **DRI:** quien responde por el outcome | **Previsto** como concepto de runtime | Hoy vive en artefactos de desarrollo (Slice Plan), no en el schema |
 
-La autorizacion de negocio no la hace RLS sola: las escrituras del plano de Organizacion pasan por `authorizeOrgAction` en el servidor. **Una membresia `inactive` conserva identidad resoluble y no otorga nada** — la autorizacion se evalua siempre contra `status='active'` en el momento de la accion.
+La autorizacion de negocio no la hace RLS sola — pero tampoco es un solo camino. `packages/db/src/queries/organizations.ts` separa dos deliberadamente:
+
+- **Mutaciones de negocio desde rutas de servidor**, sobre filas propiedad de una Organizacion: pasan por **`authorizeOrgAction`**, la guarda determinista que revalida **membresia y rol en el momento de la accion** — nunca heredados de un claim de sesion, de una fila de binding ni de una decision previa. Su vocabulario de acciones es cerrado: una accion desconocida se **rechaza**, no se permite.
+- **Aprovisionamiento / bootstrap / backfill** — `bootstrapOrganizationFromLegacyKey`, `ensureOrganizationMembership`, `setMembershipStatus`: **no** llaman a `authorizeOrgAction`, y eso **no los deja sin autorizar**. Son caminos internos gobernados por `service_role`, con sus propias garantias: el bootstrap es solo `service_role` (el privilegio EXECUTE de la funcion SQL esta restringido) y **no crea membresia** como efecto secundario; `ensureOrganizationMembership` es no-mutante ante conflicto a proposito, para que un re-run jamas reviva una membresia desactivada ni pise un rol que un administrador cambio; reactivar o cambiar rol es una decision explicita y aparte (`setMembershipStatus`). No deben describirse como flujos de autorizacion de usuario/runtime.
+
+**Una membresia `inactive` conserva identidad resoluble y no otorga nada** — la autorizacion de usuario/runtime se evalua siempre contra `status='active'` en el momento de la accion.
 
 Para leads, la propiedad logica es de la organizacion aunque el sistema externo hoy la resuelva indirectamente mediante el usuario `super-admin`. Gu OS puede empezar con el adapter `lead -> receiving user -> external org_id`; el contrato futuro preferido es `lead.organization_id` + `lead.assigned_to_user_id`. El sistema externo sigue siendo SOR de intake/asignacion mientras Gu OS referencia `external_lead_id`, `external_org_id` y el assignee vigente.
 
@@ -1198,7 +1203,7 @@ El agente no debe mezclar usuarios, organizaciones ni permisos. Hay tres mecanis
 | Supabase — plano personal | RLS por `auth.uid()` / `user_id` |
 | Supabase — plano de Organizacion (`00080`+) | RLS por **membresia activa** (`is_active_org_member`), no por propiedad de fila; escritura solo `service_role`; `organization_tool_secrets` sin lectura para `authenticated` |
 | `operational_cases` | Hibrida: `organization_id` NULL conserva la semantica user-scoped; las filas con Organizacion suman policies **RESTRICTIVE** de guardia de tenencia y FK compuestos contra cruce de tenant |
-| Autorizacion de negocio | `authorizeOrgAction` en el servidor. RLS es el piso, no la autorizacion completa. Una membresia `inactive` no otorga nada |
+| Autorizacion de negocio | RLS es el piso, no la autorizacion completa, y hay **dos caminos**: las mutaciones de negocio desde rutas de servidor pasan por `authorizeOrgAction` (revalida membresia + rol en el momento; vocabulario cerrado, fail-closed); el aprovisionamiento/bootstrap/backfill **no** lo llama y se gobierna por `service_role` con sus propias garantias. Ver §3. Una membresia `inactive` no otorga nada |
 | Autoridad de runtime | `operational_cases.runtime_authority` es *nullable* y sin default: solo se mueve por una operacion gobernada autorizada |
 | Lectura de Traditional Gu | Solo lectura, por capacidad, con allowlist de colecciones en codigo y chequeo de binding por Organizacion en cada lectura. Ninguna ruta a escritura |
 | Integraciones OAuth | Tokens por usuario en `user_integrations`, cifrados |
