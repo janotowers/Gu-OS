@@ -978,9 +978,15 @@ Estado:
 
 Este subsistema dejó de ser exclusivamente user-scoped, **sin romper nada de lo anterior**:
 
-- `operational_cases.organization_id` es *nullable*. Las filas con `NULL` conservan
-  **exactamente** la semántica user-scoped previa, y las policies restrictivas de
-  `00081` no les aplican. El `organization_id` **nunca se infiere del usuario**.
+- `operational_cases.organization_id` es *nullable*, y **nunca se infiere del usuario**.
+  Las guardas **RESTRICTIVE** de `00081` **sí participan en la evaluación de toda fila**,
+  incluidas las legacy: están escritas de modo que `organization_id is null` las
+  satisfaga — la guardia de tenencia es
+  `organization_id is null or is_active_org_member(organization_id)`, y las de escritura
+  son `organization_id is null`. El efecto es que **para las filas con `NULL` preservan
+  la semántica user-scoped previa**, no que dejen de aplicarse. El `with check` de la
+  guardia de UPDATE hace trabajo real ahí: impide que un dueño autenticado **adopte** su
+  propio Caso legacy dentro de una Organización asignándole `organization_id`.
 - Sobre las filas con Organización, `00081` añade lectura por membresía activa más
   policies **RESTRICTIVE** de guardia de tenencia en `operational_cases`, `case_facts`,
   `case_artifacts`, `case_approvals` y `operational_case_events`, y hace la escritura
