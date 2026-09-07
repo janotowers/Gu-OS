@@ -47,8 +47,8 @@ This is not a waterfall.
 - A Feature / Business Spec owns intended behavior. It is a behavioral contract and may be capability-sized; it is not a backlog unit, and one Spec may be realized through several Slices.
 - An ADR owns a consequential architecture decision.
 - A Technical Plan translates approved behavior/architecture into implementation intent, and indexes slices and sequencing.
-- The initiative's Slice Plan owns the durable Slice contracts: inspectable outcome, acceptance traceability, Definition of Done, Release Scope, estimate and readiness.
-- Tasks own bounded execution work. They are derived just in time once a Slice is Ready, Planned and Executable, live in the agent runtime / PR / commit sequence, and are not canonical Markdown truth.
+- A Slice Plan owns the durable Slice contracts: inspectable outcome, acceptance traceability, Definition of Done, Release Scope, estimate and readiness. It normally integrates the Slices of one Roadmap Increment; an Initiative is optional and only sometimes the unit a Slice Plan serves ([Methodology](docs/development/agentic-product-software-development-methodology.md) §4.1, §10.1).
+- Tasks own bounded execution work. They are derived just in time once a Slice is READY, Planned and Executable, live in the agent runtime / PR / commit sequence, and are not canonical Markdown truth.
 - Code/migrations/config own implemented reality.
 - Tests/evals/readiness/release evidence own verification truth.
 - Implementation may reveal that a governing artifact is wrong or stale; surface and repair the owning artifact instead of creating silent design drift.
@@ -156,6 +156,21 @@ There is **no default requirement for human approval of every Task / Vertical Sl
 **Selecting a Slice into an Execution Cycle schedules already-approved work. Cycle planning is not an additional approval gate** — it does not re-approve product behavior, architecture, Slice scope, agent Tasks or code edits. A Planned Slice may start as soon as it is Executable (prerequisites actually satisfied, capacity available), with no further routine approval before Task planning. What cycle planning does add is a **confirmed human Accountable / DRI** per Slice — required before the Slice executes, not before it is ready — who remains responsible for outcome and escalation without becoming a line-by-line code approver.
 
 Do not cross approved scope, relax authority, or redefine intended behavior merely to complete the implementation.
+
+### Development continuity
+
+**Finishing the current Task, PR, Slice or Execution Cycle is not by itself a stopping condition.** After a meaningful completion, reassess development state under the [Methodology](docs/development/agentic-product-software-development-methodology.md) — especially §10.5 (READY Horizon), §12.3 (Development Continuity Loop) and §12.4 (planning authority) — and identify the next legitimate action. Inside existing approved authority that means:
+
+- Planned work that is Executable proceeds into just-in-time Task planning **without routine human approval**;
+- a prerequisite that is team-controlled, already governed and within execution authority is **advanced**, not left passively blocked;
+- READY-horizon replenishment is performed **proactively**, not only once current work runs out;
+- when a new Execution Cycle is needed, the Cycle proposal is **prepared proactively** rather than waiting to be asked what comes next.
+
+The decision policy itself is canonical in §12.3 and is deliberately not restated here.
+
+**Stop only when** the next meaningful action crosses a genuine human-authority boundary, or no legitimate progress is currently possible. When stopping or escalating, state the exact boundary or blocker, the governing artifact or authority when material, and the smallest concrete human decision or action required. A generic *"done — let me know what you want to do next"* is not a valid stopping condition while legitimate development work can still be derived.
+
+**Continuity never widens authority.** It is a rule about not stalling, not about deciding more. Do not silently settle consequential product behavior, architecture, security/tenancy/authority, external-effect authority, economics, release risk or release authority, accepted-risk decisions, or changes to governing dependencies — the loop stalling is never a reason to. For **material model/eval acceptance thresholds**, follow §14.1. Do not treat an unsettled consequential product-quality or accepted-risk threshold as ordinary engineering authority.
 
 ## 10. Scoped instructions
 
