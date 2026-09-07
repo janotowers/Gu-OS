@@ -1,0 +1,403 @@
+{
+  "slice": "SL-3",
+  "artifact": "RS-2 hosted evidence — duplicate & supersession resolution",
+  "ranAt": "2026-09-07T14:35:39.620Z",
+  "guOsEnvironment": "staging",
+  "guOsProjectRef": "wdtjqlbsxwiijasicint",
+  "legacySource": "NOT REACHED. Zero Traditional Gu reads and zero Traditional Gu writes: SL-3's hosted contract is about Gu OS relationship and closure mechanics, and no source read would strengthen it.",
+  "organizationDigest": "sha256:eab41f21d4c319b6",
+  "ownerUserDigest": "sha256:16489b62fa9cdf77",
+  "scenarioRunDigest": "sha256:3c6e35f84d8b9f8b",
+  "behaviorStage": "shadow — no assisted mode, no live mode, no runtime-authority transfer, no prospect-facing effect",
+  "scenarioData": "WHOLLY SYNTHETIC controlled shadow Opportunities created by this run for the pilot Organization, stamped context_jsonb.scenario_kind = 'sl3_t8_controlled'. No prospect, message, contact, property or legacy identifier was read or reproduced. The Definition of Done permits controlled shadow data and states that organically occurring live duplicates are not a prerequisite.",
+  "environmentMutations": "none — this verifier reads flags and configuration and never writes them",
+  "durableWrites": "operational_cases (4 controlled shadow Opportunities), case_facts (their objectives, and the two governed closures), case_relationships (2 lineage edges), operational_case_events (4 narrations). Retained deliberately as audit evidence; ending an edge is a status transition and nothing here is deleted.",
+  "indexAndConstraintEvidence": "not observable through the target API — PostgREST exposes no catalog. M-RESOLUTION-IDENTITY is evidenced BEHAVIOURALLY instead: the repeat of each determination converges on one edge, one closure and one narration per side, which is what those partial unique indexes exist to guarantee.",
+  "provenanceIdentity": "case_relationships:<relationship_id>",
+  "preflight": [
+    {
+      "assertion": "preflight",
+      "label": "the Organization resolves in the declared Gu OS environment",
+      "ok": true,
+      "detail": "Alebrixe (active)"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the declared Case owner is an active member",
+      "ok": true,
+      "detail": "role=advisor"
+    },
+    {
+      "assertion": "preflight",
+      "label": "relationship_ops is enabled for this Organization",
+      "ok": true,
+      "detail": "enabled=true"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the global lead_opportunity Case type is registered",
+      "ok": true,
+      "detail": "id=sha256:e8447e1bd49e086a"
+    },
+    {
+      "assertion": "preflight",
+      "label": "case_relationships exposes the typed lineage shape TD-7 specifies",
+      "ok": true,
+      "detail": "12 columns readable"
+    },
+    {
+      "assertion": "preflight",
+      "label": "case_facts exposes the provenance and supersession columns closure uses",
+      "ok": true,
+      "detail": "6 columns readable"
+    },
+    {
+      "assertion": "preflight",
+      "label": "operational_case_events is readable for both-timeline narration",
+      "ok": true,
+      "detail": "3 columns readable"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "ec06-ac15-duplicate",
+      "kind": "duplicate",
+      "title": "Two Opportunities for one objective, with conflicting recorded facts (EC-06, AC-15)",
+      "governing": "S1 §8.6, §8.10, §8.16; EC-06; AC-15; SA-3.1",
+      "cases": {
+        "closing": "sha256:7378af5fcae188eb",
+        "surviving": "sha256:e73770be24931cdb"
+      },
+      "continuityJudgment": {
+        "ran": true,
+        "proposal": {
+          "same_objective": true,
+          "confidence": "high",
+          "conflicting_facts": true,
+          "rationale": "Both records describe the same goal of buying a 3-bedroom house in the north zone; only the budget differs."
+        },
+        "model": "openai/gpt-5.4-mini",
+        "path": "proposeContinuity — the deployed path: flag re-read, call wrapped in the Organization-scoped AI-usage context"
+      },
+      "result": {
+        "status": "resolved",
+        "relationshipId": "sha256:176365b05c259384",
+        "closureFactId": "sha256:1998b19b74c5ff56",
+        "narratedBothTimelines": true,
+        "firstCompletion": true
+      },
+      "repeat": {
+        "status": "resolved",
+        "relationshipId": "sha256:176365b05c259384",
+        "closureFactId": "sha256:1998b19b74c5ff56",
+        "narratedBothTimelines": true,
+        "firstCompletion": false
+      },
+      "relationship": {
+        "id": "sha256:176365b05c259384",
+        "type": "duplicate_of",
+        "status": "active",
+        "actorKind": "human"
+      },
+      "checks": [
+        {
+          "assertion": "premise",
+          "label": "the pair carries conflicting facts on the same key before resolution",
+          "ok": true,
+          "detail": "opportunity.objective: closing=1 surviving=1 differ=true"
+        },
+        {
+          "assertion": "premise",
+          "label": "both Cases are ongoing and unrelated before resolution",
+          "ok": true,
+          "detail": "closing=active surviving=active priorEdges=0"
+        },
+        {
+          "assertion": "premise",
+          "label": "neither Case carries a business closure before resolution",
+          "ok": true,
+          "detail": "closing=0 surviving=0"
+        },
+        {
+          "assertion": "SA-3.1",
+          "label": "the governed determination is applied and reported as a completed resolution",
+          "ok": true,
+          "detail": "status=resolved firstCompletion=true narratedBothTimelines=true"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "both Cases survive resolution — neither is deleted",
+          "ok": true,
+          "detail": "closing=present surviving=present"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "no history is discarded — every pre-resolution fact row still exists",
+          "ok": true,
+          "detail": "before=3 stillPresent=3 lost=0"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "no history is rewritten — pre-resolution fact values are unchanged",
+          "ok": true,
+          "detail": "compared=3 rewritten=0"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "the pair is related by a typed, directed, active duplicate_of edge",
+          "ok": true,
+          "detail": "type=duplicate_of status=active direction=closing→surviving org=sha256:eab41f21d4c319b6"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "the edge carries traceability — actor, reason, evidence refs and provenance",
+          "ok": true,
+          "detail": "actor_kind=human reason=present evidence_refs=5 provenance=3"
+        },
+        {
+          "assertion": "AC-15",
+          "label": "exactly one ongoing canonical responsibility — only the non-canonical Case is closed",
+          "ok": true,
+          "detail": "closingClosures=1 survivingClosures=0"
+        },
+        {
+          "assertion": "AC-15",
+          "label": "the closure records outcome=duplicate with reason, evidence and provenance",
+          "ok": true,
+          "detail": "outcome=duplicate reason=same_objective_canonicalized counterpart=sha256:e73770be24931cdb actor_kind=human evidence_refs=5 source_kind=user source_ref_names_edge=true"
+        },
+        {
+          "assertion": "AC-15",
+          "label": "the surviving Case keeps its ongoing responsibility untouched by the closure",
+          "ok": true,
+          "detail": "status=active closures=0"
+        },
+        {
+          "assertion": "SA-3.3",
+          "label": "lineage is queryable from EITHER Case as typed structured data",
+          "ok": true,
+          "detail": "fromClosing=1 fromSurviving=1; typed columns only, no free-text parsing"
+        },
+        {
+          "assertion": "SA-3.4",
+          "label": "neither Case row is mutated — no lifecycle, ownership, workflow or scheduling column moves",
+          "ok": true,
+          "detail": "columnsCompared=12 closingMoved=[] survivingMoved=[]"
+        },
+        {
+          "assertion": "SA-3.5",
+          "label": "a relationship event is appended to BOTH Cases' timelines, exactly once each",
+          "ok": true,
+          "detail": "closing=1 surviving=1"
+        },
+        {
+          "assertion": "SA-3.5",
+          "label": "each narration reads correctly from its own side of the edge",
+          "ok": true,
+          "detail": "closingSide=from survivingSide=to"
+        },
+        {
+          "assertion": "SA-3.6",
+          "label": "both sides' conflicting facts survive resolution, each attributable to its own Case",
+          "ok": true,
+          "detail": "closing=1 surviving=1; neither side's value was reconciled away"
+        },
+        {
+          "assertion": "SA-3.7",
+          "label": "repeating the same determination converges rather than resolving twice",
+          "ok": true,
+          "detail": "status=resolved sameEdge=true sameClosure=true firstCompletion=false"
+        },
+        {
+          "assertion": "SA-3.7",
+          "label": "after the repeat there is still exactly one edge, one closure and one narration per side",
+          "ok": true,
+          "detail": "edges=1 closures=1 narrations=1/1"
+        },
+        {
+          "assertion": "SA-3.12",
+          "label": "the incomplete-resolution recovery read runs hosted and reports nothing owed for a completed resolution",
+          "ok": true,
+          "detail": "incomplete=0"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "sa311-supersession",
+      "kind": "supersession",
+      "title": "A durable responsibility intentionally replaced by a successor Opportunity (SA-3.11)",
+      "governing": "S1 §8.10, §8.16; ADR-109 §§4, 7, 8; AC-6 §11.4; SA-3.11",
+      "cases": {
+        "closing": "sha256:7d58a9fd2dd92610",
+        "surviving": "sha256:a34dbfb56a4a4f59"
+      },
+      "continuityJudgment": {
+        "ran": false,
+        "why": "supersession is not a sameness judgment. S1 approves `superseded` for a reason OTHER than duplicate correction, and ADR-109 §7 leaves the determination downstream; asking the continuity judge here would be asking the wrong question."
+      },
+      "result": {
+        "status": "resolved",
+        "relationshipId": "sha256:156c57802e3900ff",
+        "closureFactId": "sha256:6cf5c4edcf34460b",
+        "narratedBothTimelines": true,
+        "firstCompletion": true
+      },
+      "repeat": {
+        "status": "resolved",
+        "relationshipId": "sha256:156c57802e3900ff",
+        "closureFactId": "sha256:6cf5c4edcf34460b",
+        "narratedBothTimelines": true,
+        "firstCompletion": false
+      },
+      "relationship": {
+        "id": "sha256:156c57802e3900ff",
+        "type": "superseded_by",
+        "status": "active",
+        "actorKind": "human"
+      },
+      "checks": [
+        {
+          "assertion": "premise",
+          "label": "the pair carries conflicting facts on the same key before resolution",
+          "ok": true,
+          "detail": "opportunity.objective: closing=1 surviving=1 differ=true"
+        },
+        {
+          "assertion": "premise",
+          "label": "both Cases are ongoing and unrelated before resolution",
+          "ok": true,
+          "detail": "closing=active surviving=active priorEdges=0"
+        },
+        {
+          "assertion": "premise",
+          "label": "neither Case carries a business closure before resolution",
+          "ok": true,
+          "detail": "closing=0 surviving=0"
+        },
+        {
+          "assertion": "SA-3.1",
+          "label": "the governed determination is applied and reported as a completed resolution",
+          "ok": true,
+          "detail": "status=resolved firstCompletion=true narratedBothTimelines=true"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "both Cases survive resolution — neither is deleted",
+          "ok": true,
+          "detail": "closing=present surviving=present"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "no history is discarded — every pre-resolution fact row still exists",
+          "ok": true,
+          "detail": "before=2 stillPresent=2 lost=0"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "no history is rewritten — pre-resolution fact values are unchanged",
+          "ok": true,
+          "detail": "compared=2 rewritten=0"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "the pair is related by a typed, directed, active superseded_by edge",
+          "ok": true,
+          "detail": "type=superseded_by status=active direction=closing→surviving org=sha256:eab41f21d4c319b6"
+        },
+        {
+          "assertion": "EC-06",
+          "label": "the edge carries traceability — actor, reason, evidence refs and provenance",
+          "ok": true,
+          "detail": "actor_kind=human reason=present evidence_refs=4 provenance=3"
+        },
+        {
+          "assertion": "AC-15",
+          "label": "exactly one ongoing canonical responsibility — only the non-canonical Case is closed",
+          "ok": true,
+          "detail": "closingClosures=1 survivingClosures=0"
+        },
+        {
+          "assertion": "AC-15",
+          "label": "the closure records outcome=superseded with reason, evidence and provenance",
+          "ok": true,
+          "detail": "outcome=superseded reason=replaced_by_successor_opportunity counterpart=sha256:a34dbfb56a4a4f59 actor_kind=human evidence_refs=4 source_kind=user source_ref_names_edge=true"
+        },
+        {
+          "assertion": "AC-15",
+          "label": "the surviving Case keeps its ongoing responsibility untouched by the closure",
+          "ok": true,
+          "detail": "status=active closures=0"
+        },
+        {
+          "assertion": "SA-3.3",
+          "label": "lineage is queryable from EITHER Case as typed structured data",
+          "ok": true,
+          "detail": "fromClosing=1 fromSurviving=1; typed columns only, no free-text parsing"
+        },
+        {
+          "assertion": "SA-3.4",
+          "label": "neither Case row is mutated — no lifecycle, ownership, workflow or scheduling column moves",
+          "ok": true,
+          "detail": "columnsCompared=12 closingMoved=[] survivingMoved=[]"
+        },
+        {
+          "assertion": "SA-3.5",
+          "label": "a relationship event is appended to BOTH Cases' timelines, exactly once each",
+          "ok": true,
+          "detail": "closing=1 surviving=1"
+        },
+        {
+          "assertion": "SA-3.5",
+          "label": "each narration reads correctly from its own side of the edge",
+          "ok": true,
+          "detail": "closingSide=from survivingSide=to"
+        },
+        {
+          "assertion": "SA-3.6",
+          "label": "both sides' conflicting facts survive resolution, each attributable to its own Case",
+          "ok": true,
+          "detail": "closing=1 surviving=1; neither side's value was reconciled away"
+        },
+        {
+          "assertion": "SA-3.7",
+          "label": "repeating the same determination converges rather than resolving twice",
+          "ok": true,
+          "detail": "status=resolved sameEdge=true sameClosure=true firstCompletion=false"
+        },
+        {
+          "assertion": "SA-3.7",
+          "label": "after the repeat there is still exactly one edge, one closure and one narration per side",
+          "ok": true,
+          "detail": "edges=1 closures=1 narrations=1/1"
+        },
+        {
+          "assertion": "SA-3.11",
+          "label": "a directed superseded_by edge plus a superseded closure, both histories intact",
+          "ok": true,
+          "detail": "edge=superseded_by direction=closing→surviving outcome=superseded historyLost=0 historyRewritten=0"
+        },
+        {
+          "assertion": "SA-3.12",
+          "label": "the incomplete-resolution recovery read runs hosted and reports nothing owed for a completed resolution",
+          "ok": true,
+          "detail": "incomplete=0"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "totals": {
+    "checks": 48,
+    "failed": 0,
+    "passed": true
+  },
+  "notExercised": [
+    "Gu OS production — nothing deployed, migrated or read there.",
+    "Hosted RLS enforcement — this run holds a service-role credential, which bypasses row-level security by design. SA-3.8's tenancy assertion is evidenced by the DB-backed cross-tenant suite (`npm run test:rls`), not by this run.",
+    "SA-3.12's fault injection — slice-local and deterministic by contract. What is hosted here is the recovery READ, so 'safely retryable' is observed against the real database rather than an in-memory fake.",
+    "Hosted AI-usage correlation — the continuity judgment runs through `proposeContinuity`, so the Organization-scoped usage context IS bound on the hosted path, but with AI_USAGE_METERING_ENABLED unset the meter drops the event by design and `ai_usage_events` holds no row. Correlation BEHAVIOUR is proven by the deterministic executor-level selftest; no governing acceptance or DoD clause requires it hosted. Same position SL-2 recorded.",
+    "Human-reviewed merge/split data movement — deferred post-R1; no code path performs it (SA-3.10, deterministic).",
+    "assisted and live behavior stages, and any prospect-facing effect — out of scope for a shadow Slice and never enabled."
+  ]
+}

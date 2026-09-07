@@ -71,6 +71,7 @@ import {
   listCaseRelationships,
   type DbClient,
 } from "@agents/db";
+import { RELATIONSHIP_CONTINUITY_MODEL_ID } from "@agents/agent";
 import { ADMISSION_FACT_KEYS } from "@agents/types";
 import {
   createOpenRouterContinuityJudge,
@@ -499,7 +500,9 @@ async function runScenario(
     continuityJudgment = {
       ran: true,
       proposal,
-      model: process.env.RELATIONSHIP_CONTINUITY_MODEL_ID ?? "default (configuration)",
+      // The resolved id, not the override variable: evidence has to say which
+      // model actually judged, and reading the unset env var recorded nothing.
+      model: RELATIONSHIP_CONTINUITY_MODEL_ID,
       path: "proposeContinuity — the deployed path: flag re-read, call wrapped in the Organization-scoped AI-usage context",
     };
     console.log(
