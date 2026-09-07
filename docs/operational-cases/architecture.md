@@ -31,7 +31,7 @@ flowchart TB
   end
 
   subgraph Instancias
-    CASE["operational_cases<br/>id, user_id, case_type,<br/>status, current_step,<br/>next_action_at, due_at,<br/>context_jsonb, version"]
+    CASE["operational_cases<br/>id, user_id, case_type,<br/>status, current_step,<br/>next_action_at, due_at,<br/>context_jsonb, version,<br/>organization_id?, runtime_authority?"]
     EVT["operational_case_events<br/>append-only timeline"]
   end
 
@@ -55,6 +55,8 @@ flowchart TB
 - **Tipo de caso (`operational_case_types`)** define el "qué procedimiento es" (`property_optioning`, `lead_qualification`, etc.) y a qué skill compuesta apunta por default.
 - **Instancia (`operational_cases`)** es la unidad viva. Tiene estado, paso actual, deadline, contexto y versión para optimistic locking.
 - **Eventos (`operational_case_events`)** son la historia append-only. Reconstrucción completa siempre disponible.
+
+Los dos campos con `?` en el diagrama son **opcionales por diseño** y se explican en §2.3: un Caso sin ellos es exactamente el Caso user-scoped que este subsistema siempre tuvo.
 
 ### 2.1 Paso del flujo, habilidad raíz y `current_step`
 
@@ -94,6 +96,57 @@ No toda creación usa este subsistema. `case_workflow` materializa una
 Readiness y conexiones usan los resolvers compartidos de Studio; una
 integración disponible no debe evaluarse con lógica distinta en Ajustes.
 
+### 2.3 Tenencia por Organización y autoridad de runtime
+
+La migración `00081` añadió dos columnas a `operational_cases`. Ambas son
+**opcionales y aditivas**: no cambian el comportamiento de ningún Caso existente.
+
+**`organization_id` — nullable.** Un Caso con `organization_id = NULL` conserva
+**exactamente** la semántica user-scoped descrita en el resto de este documento. El
+valor **nunca se infiere del usuario**: se pasa explícitamente o no se pasa.
+
+Precisión sobre el mecanismo, porque es una frontera de seguridad: las guardas
+**RESTRICTIVE** que introduce `00081` **sí participan en la evaluación de toda fila**,
+incluidas las legacy. Lo que preserva el comportamiento anterior es cómo están
+escritas — la guardia de tenencia es
+`organization_id is null or is_active_org_member(organization_id)` y las de escritura
+son `organization_id is null` — de modo que **para las filas con `NULL` las guardas
+preservan la semántica legacy user-scoped**, no que dejen de aplicarse. Y ahí siguen
+haciendo trabajo real: el `with check` de la guardia de UPDATE impide que un dueño
+autenticado **adopte** su propio Caso legacy dentro de una Organización asignándole
+`organization_id`.
+
+Sobre las filas que sí tienen Organización:
+
+- lectura por **membresía activa** (`is_active_org_member`), no por propiedad de fila;
+- policies **RESTRICTIVE** de guardia de tenencia en `operational_cases`, `case_facts`,
+  `case_artifacts`, `case_approvals` y `operational_case_events`;
+- escritura **solo desde el servidor** (service role + `authorizeOrgAction`);
+- la unique `(id, organization_id)` es el destino de los **FK compuestos** que hacen
+  estructuralmente imposible que una fila hija pertenezca a otro tenant que su Caso.
+  Es una garantía del schema, no una convención de código.
+
+**`runtime_authority` (`legacy` / `gu_os`) — nullable y sin default.** Dice *qué
+runtime decide* sobre una Oportunidad. La ausencia de default es deliberada: un Caso
+de relación se crea en `legacy` porque el sistema legacy sigue decidiendo, y la
+autoridad solo se mueve mediante una **operación gobernada autorizada** — nunca
+implícitamente al crear el Caso, y nunca por el hecho de que Gu OS pueda leerlo.
+
+**Relaciones entre Casos.** `case_relationships` (`00083`) representa vínculos
+Caso↔Caso tipados — `duplicate_of`, `superseded_by`, `split_from`,
+`transaction_association` — con una sola arista activa por `(from, to, type)` y FK
+compuestos que obligan a que ambos Casos sean de la misma Organización. Es una
+**arista, no una mutación**: resolver un duplicado no reescribe filas de Caso, que es
+lo que permite reconstruir el linaje.
+
+**Alcance de runtime — importante.** Nada de lo anterior cambia el cron ni el runtime
+de casos descritos en §4. La **admisión** que crea Casos Oportunidad sombra a partir
+de `source_events` **no la ejecuta hoy ninguna ruta HTTP ni ningún cron**: vive en
+`apps/web/src/lib/relationship-admission/`, no la importa ninguna route ni runner, y se
+ejercita por selftests, evals y verificadores operados a mano contra staging. Lo mismo
+aplica a la resolución duplicado/supersesión. Este subsistema, tal como corre hoy,
+sigue siendo el camino de los Casos operativos user-scoped.
+
 ---
 
 ## 3. Ciclo de vida de un caso
@@ -124,6 +177,14 @@ Estados:
 | `paused` | El humano interno lo detuvo a propósito; el cron lo ignora. |
 | `completed` | Todos los pasos completos. El caso es solo lectura/auditoría. |
 | `failed` | Error fatal o se excedió un timeout duro sin recuperación posible. |
+
+**Sobre el estado inicial.** El diagrama muestra el camino que corre hoy en el
+producto: un humano abre el Caso. Existe además un **segundo camino de creación ya
+implementado** — la admisión de Relationship Operations materializa un Caso Oportunidad
+sombra a partir de un `source_event`, con `organization_id` y `runtime_authority='legacy'`
+(§2.3). Se omite del diagrama a propósito, porque **ninguna ruta HTTP ni cron lo ejecuta
+hoy**: se ejercita por verificadores operados a mano contra staging. Dibujarlo como una
+transición del ciclo de vida sugeriría un flujo de runtime que no existe.
 
 ---
 
