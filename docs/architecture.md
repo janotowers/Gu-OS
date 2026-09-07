@@ -87,30 +87,35 @@ flowchart TD
   CRON["Runners cron externos<br/>scheduled-tasks · heartbeat · operational-cases"]
   BOOK["Visitante /book<br/>(token opaco, sin login)"]
 
-  AUTH["Supabase Auth (JWT)<br/>web · Telegram por lookup"]
-  SVC["service role (solo servidor)<br/>CRON_SECRET · resolución de token"]
+  ID["Resolución de identidad Gu OS<br/>web: JWT de Supabase Auth<br/>Telegram: lookup en telegram_accounts"]
+  RUNNER["Runner autorizado por CRON_SECRET<br/>service role"]
+  BOOKSVC["Resolución del token opaco<br/>service role, sin sesión del visitante"]
 
   LG["LangGraph Runtime + tools<br/>canales: web · telegram · cron · heartbeat · case_runner"]
 
   PG[("Supabase Postgres (RLS)")]
-  EXT["APIs externas<br/>GitHub · Google Calendar · Gmail · BigQuery<br/>EasyBroker · Ungga · host OS (bash + file tools)"]
+  GCAL["Google Calendar API<br/>FreeBusy · crear evento"]
+  EXT["Otras APIs externas y host<br/>GitHub · Gmail · BigQuery<br/>EasyBroker · Ungga · host OS (bash + file tools)"]
   TGU["Traditional Gu<br/>(Firestore / Mongo)"]
 
-  WEB --> AUTH
-  TG --> AUTH
-  CRON --> SVC
-  BOOK --> SVC
+  WEB --> ID
+  TG --> ID
+  ID --> LG
 
-  AUTH --> LG
-  SVC --> LG
+  CRON --> RUNNER
+  RUNNER --> LG
+
+  BOOK --> BOOKSVC
+  BOOKSVC -- "resuelve user_id y tokens del dueño" --> PG
+  BOOKSVC -- "reserva pública: nunca entra al agente" --> GCAL
 
   LG --> PG
+  LG --> GCAL
   LG --> EXT
   LG -- "legacy gateway<br/>solo lectura, por capacidad" --> TGU
-
-  SVC -- "reserva pública: no pasa por el agente" --> PG
-  SVC -- "FreeBusy · crear evento" --> EXT
 ```
+
+**Los únicos caminos que entran a LangGraph son `ID → LG` y `RUNNER → LG`.** La reserva pública termina en Postgres y en la API de Google: no existe ninguna ruta dirigida de `/book` al agente.
 
 Planos durables en Postgres (agrupados; la lista completa de migraciones vive en *Modelo de datos*):
 
