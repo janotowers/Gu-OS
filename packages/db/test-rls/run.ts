@@ -1350,6 +1350,193 @@ async function main(): Promise<void> {
     });
 
     // ---------------------------------------------------------------
+    console.log("\nSL-4 Case Subjects — M-SUBJECTS (TD-14)");
+
+    // Technical Plan §8 names the case this section owes: "a Subject/external-ref
+    // cross-attachment case (a `case_subjects` row cannot be created under
+    // another Case, and a `case_subject_external_refs` row cannot attach to a
+    // Subject of another Case or Organization)".
+    //
+    // The point of proving it HERE rather than in the module selftest is that
+    // TD-14's containment is structural, not procedural: it is a composite
+    // foreign key, and a composite FK's MATCH SIMPLE semantics — including the
+    // fact that a NULL subject_id skips the check entirely — are PostgreSQL
+    // behaviour. A fake client asserting them would only agree with itself.
+
+    const subject = async (caseId: string, kind: "commitment" | "visit") =>
+      (
+        await client.query<{ id: string }>(
+          `insert into public.case_subjects (case_id, subject_kind, source_kind, label)
+           values ($1, $2, 'derived', 'fixture subject') returning id`,
+          [caseId, kind]
+        )
+      ).rows[0].id;
+
+    const commitmentA = await subject(f.orgCaseA, "commitment");
+    const commitmentA2 = await subject(f.orgCaseA, "commitment");
+    const commitmentB = await subject(f.orgCaseB, "commitment");
+
+    await t("tenancy is derived: case_subjects carries no organization column at all", async () => {
+      // Not a style check. TD-14 removes the mismatch SURFACE — a table with no
+      // organization_id cannot disagree with its parent Case about the tenant,
+      // so there is no second tenancy mechanism to keep in sync.
+      const { rows } = await client.query<{ column_name: string }>(
+        `select column_name from information_schema.columns
+          where table_schema = 'public'
+            and table_name in ('case_subjects', 'case_subject_external_refs')
+            and column_name = 'organization_id'`
+      );
+      assert.equal(rows.length, 0);
+    });
+
+    await t("a subject fact cannot point at another Case's subject (composite FK)", async () => {
+      const code = await errorCode(() =>
+        client.query(
+          `insert into public.case_facts
+             (case_id, user_id, fact_key, value_jsonb, source_kind, subject_id)
+           values ($1, $2, 'commitment.due', '{"v":1}'::jsonb, 'derived', $3)`,
+          [f.orgCaseA, f.creatorA, commitmentB]
+        )
+      );
+      assert.equal(code, FK_VIOLATION, "cross-Case, and therefore cross-Organization, is unreachable");
+    });
+
+    await t("an external ref cannot attach to a Subject of another Case or Organization", async () => {
+      const code = await errorCode(() =>
+        client.query(
+          `insert into public.case_subject_external_refs
+             (subject_id, case_id, source_system, ref_kind, external_ref, source_kind)
+           values ($1, $2, 'legacy_gu', 'legacy_appointment', 'opaque-1', 'integration')`,
+          [commitmentB, f.orgCaseA]
+        )
+      );
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    await t("SA-4.4 two same-key facts under DIFFERENT subjects coexist as current", async () => {
+      // The identity TD-14 point 1 establishes is (case_id, fact_key, subject_id).
+      // Two Commitments both carrying `commitment.due` must not collapse into
+      // one another — losing a promise the brokerage made is exactly the risk
+      // the Slice contract names.
+      const due = (subjectId: string, value: string) =>
+        client.query(
+          `insert into public.case_facts
+             (case_id, user_id, fact_key, value_jsonb, source_kind, subject_id)
+           values ($1, $2, 'commitment.due', to_jsonb($3::text), 'derived', $4)`,
+          [f.orgCaseA, f.creatorA, value, subjectId]
+        );
+      await due(commitmentA, "2026-09-11");
+      await due(commitmentA2, "2026-09-12");
+      const { rows } = await client.query<{ subject_id: string }>(
+        `select subject_id from public.case_facts
+          where case_id = $1 and fact_key = 'commitment.due'
+            and superseded_by is null and subject_id is not null`,
+        [f.orgCaseA]
+      );
+      assert.equal(rows.length, 2, "no structural collapse; supersession stays code-managed per subject");
+      assert.equal(new Set(rows.map((r) => r.subject_id)).size, 2);
+    });
+
+    await t("SA-4.10 a case-level fact is unaffected — NULL subject skips the FK entirely", async () => {
+      // MATCH SIMPLE: with subject_id NULL the composite constraint is not
+      // checked. That is what makes this column additive for every existing
+      // caller rather than a migration they all have to learn about.
+      await client.query(
+        `insert into public.case_facts
+           (case_id, user_id, fact_key, value_jsonb, source_kind)
+         values ($1, $2, 'opportunity.viability', '{"v":"viable"}'::jsonb, 'derived')`,
+        [f.orgCaseA, f.creatorA]
+      );
+      const { rows } = await client.query<{ subject_id: string | null }>(
+        `select subject_id from public.case_facts
+          where case_id = $1 and fact_key = 'opportunity.viability' and superseded_by is null`,
+        [f.orgCaseA]
+      );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].subject_id, null);
+    });
+
+    await t("case_subjects rows are structurally immutable — no UPDATE, no DELETE", async () => {
+      assert.equal(
+        await errorCode(() =>
+          client.query("update public.case_subjects set label = 'edited' where id = $1", [commitmentA])
+        ),
+        RAISE_EXCEPTION,
+        "lifecycle belongs in subject-scoped facts, not in the identity row"
+      );
+      assert.equal(
+        await errorCode(() =>
+          client.query("delete from public.case_subjects where id = $1", [commitmentA])
+        ),
+        RAISE_EXCEPTION
+      );
+    });
+
+    await t("external-ref attachment is idempotent and append-only", async () => {
+      const attach = () =>
+        client.query(
+          `insert into public.case_subject_external_refs
+             (subject_id, case_id, source_system, ref_kind, external_ref, source_kind)
+           values ($1, $2, 'legacy_gu', 'legacy_appointment', 'opaque-2', 'integration')`,
+          [commitmentA, f.orgCaseA]
+        );
+      await attach();
+      assert.equal(await errorCode(attach), UNIQUE_VIOLATION, "re-discovery is a no-op conflict, not a duplicate row");
+      assert.equal(
+        await errorCode(() =>
+          client.query(
+            "update public.case_subject_external_refs set external_ref = 'x' where subject_id = $1",
+            [commitmentA]
+          )
+        ),
+        RAISE_EXCEPTION
+      );
+    });
+
+    await t("cross-tenant read: subjects follow the parent Case, in all four directions", async () => {
+      const visible = async (user: string, caseId: string) =>
+        (
+          await asRole(client, { sub: user, role: "authenticated" }, () =>
+            client.query("select id from public.case_subjects where case_id = $1", [caseId])
+          )
+        ).rowCount;
+
+      assert.equal(await visible(f.creatorA, f.orgCaseA), 2, "an active Org A member reads Org A subjects");
+      assert.equal(await visible(f.memberA2, f.orgCaseA), 2, "a second active Org A member too");
+      assert.equal(await visible(f.memberB, f.orgCaseA), 0, "an Org B member cannot");
+      assert.equal(await visible(f.revokedA, f.orgCaseA), 0, "a revoked Org A member cannot");
+      assert.equal(await visible(f.legacyUser, f.orgCaseA), 0, "a non-member cannot");
+      assert.equal(await visible(f.creatorA, f.orgCaseB), 0, "and Org A cannot reach Org B");
+    });
+
+    await t("a user JWT cannot write a subject or an external ref", async () => {
+      // Subjects are created by the Supervisor through a service-role helper.
+      // Membership grants READ; every write stays server-authorized (00081).
+      const insertCode = await asRole(client, { sub: f.creatorA, role: "authenticated" }, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.case_subjects (case_id, subject_kind, source_kind)
+             values ($1, 'commitment', 'derived')`,
+            [f.orgCaseA]
+          )
+        )
+      );
+      assert.equal(insertCode, RLS_VIOLATION);
+
+      const refCode = await asRole(client, { sub: f.creatorA, role: "authenticated" }, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.case_subject_external_refs
+               (subject_id, case_id, source_system, ref_kind, external_ref, source_kind)
+             values ($1, $2, 'legacy_gu', 'calendar_event', 'opaque-3', 'integration')`,
+            [commitmentA, f.orgCaseA]
+          )
+        )
+      );
+      assert.equal(refCode, RLS_VIOLATION);
+    });
+
+    // ---------------------------------------------------------------
     console.log("\nscope — the Work Plane must be untouched by SL-0");
 
     await t("work_items / work_item_attempts / artifact_inputs keep exactly their CURRENT policies", async () => {

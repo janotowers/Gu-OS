@@ -20,6 +20,7 @@ import {
   createWorkItemsFromTemplates,
   getCaseApprovalById,
   getCurrentCaseFacts,
+  getCurrentSubjectFacts,
   getLatestAccountAssetVersionByKey,
   getLatestCaseApproval,
   getPublishedDefinition,
@@ -327,18 +328,65 @@ export async function recordCaseFactsAndApplyImpact(
     sourceKind: CaseFactSourceKind;
     /** Procedencia (tool call id, mensaje, origen del merge…). */
     sourceRef?: string | null;
+    /**
+     * Alcance de sujeto (TD-14 punto 4, R1 SL-4). Cuando viene:
+     *
+     *   - la comparación no-op consulta los hechos vigentes DEL SUJETO, no los
+     *     del Caso — si no, dos compromisos con `commitment.due` distinto se
+     *     leerían como el mismo hecho;
+     *   - **el motor de impacto no corre.** Un hecho con alcance de sujeto no
+     *     puede ser una entrada declarada: `impact_dependencies` y
+     *     `approvals[].evidence_inputs` son cadenas estáticas dentro de
+     *     definiciones publicadas inmutables, así que no pueden nombrar un
+     *     sujeto por instancia. Correrlo haría match falso contra una
+     *     dependencia del Caso que se llame igual;
+     *   - el gate de v2 y de definición pineada deja de aplicar, porque sólo
+     *     existe para el paso de impacto que ya no ocurre.
+     *
+     * Ausente: comportamiento existente, sin cambios.
+     */
+    subjectId?: string | null;
   }
 ): Promise<RecordCaseFactsResult | null> {
   const { userId, opCase } = params;
+  const subjectId = params.subjectId ?? null;
   const entries = Object.entries(params.factPatch).filter(
     ([, value]) => value !== undefined
   );
   if (entries.length === 0) return null;
+
+  const prefix = params.factKeyPrefix ?? "property.";
+
+  if (subjectId !== null) {
+    const subjectFacts = await getCurrentSubjectFacts(
+      db,
+      userId,
+      opCase.id,
+      subjectId
+    );
+    const changed: string[] = [];
+    for (const [key, value] of entries) {
+      const factKey = `${prefix}${key}`;
+      const prior = subjectFacts.get(factKey);
+      if (prior && sameNormalizedValue(prior.value_jsonb, value)) continue;
+      await insertCaseFact(db, {
+        userId,
+        caseId: opCase.id,
+        factKey,
+        value,
+        sourceKind: params.sourceKind,
+        sourceRef: params.sourceRef ?? null,
+        subjectId,
+      });
+      changed.push(factKey);
+    }
+    return { recorded: changed, impact: [] };
+  }
+
   if (!(await isWorkPlaneV2Enabled(db, userId))) return null;
   const graph = await loadPinnedGraph(db, opCase);
   if (!graph) return null;
 
-  const prefix = params.factKeyPrefix ?? "property.";
   const currentFacts = await getCurrentCaseFacts(db, userId, opCase.id);
 
   const changedKeys: string[] = [];

@@ -73,6 +73,15 @@ export interface CaseFact {
   confidence: number | null;
   superseded_by: string | null;
   recorded_at: string;
+  /**
+   * NULL = case-level fact, which is every fact written before R1 SL-4 and
+   * every fact every case-level caller writes. Non-null = subject-scoped
+   * (TD-14): fact identity becomes `(case_id, fact_key, subject_id)`, so two
+   * Commitments can each carry `commitment.due` without superseding one
+   * another. Optional on the type because every existing construction site
+   * predates the column.
+   */
+  subject_id?: string | null;
 }
 
 export interface CaseArtifact {
