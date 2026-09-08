@@ -1,6 +1,6 @@
 # Gu OS Agentic Product & Software Development Methodology
 
-> **Version:** v0.4.3  
+> **Version:** v0.4.4  
 > **Status:** Canonical development methodology  
 > **Scope:** Tool-agnostic, product-portable operating method for humans + coding agents  
 > **Intended repo path:** `docs/development/agentic-product-software-development-methodology.md`
@@ -1143,7 +1143,7 @@ Adoption is itself brownfield. Do not stop engineering to rewrite all historical
 
 | **Order** | **Action**                                                                                                                                                                                                                                                                                                                                                                   |
 |-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Next 1    | Maintain this Methodology (current v0.4.3) as the canonical development method, including the four-layer agent instruction architecture, proportional test/eval-first guidance, the Slice / Execution Cycle planning model, and the Development Continuity Loop with its READY Horizon and Roadmap Increment graduation.                                                       |
+| Next 1    | Maintain this Methodology (current v0.4.4) as the canonical development method, including the four-layer agent instruction architecture, proportional test/eval-first guidance, the Slice / Execution Cycle planning model, and the Development Continuity Loop with its READY Horizon and Roadmap Increment graduation.                                                       |
 | Next 2    | ~~Align the existing root `AGENTS.md` with the current canonical Methodology.~~ **Done in v0.4.3** (Section 23.8): the stale pre-v0.4.0 artifact-chain wording is corrected, and the root contract now activates the Development Continuity Loop, its stopping condition and the autonomy-is-not-authority rule by reference to Sections 4.1, 10.1, 10.5, 12.3, 12.4 and 14.1 — without copying them into always-on context. Keeping that contract concise and current remains ongoing maintenance rather than a completed programme.                                                                                              |
 | Next 3    | ~~Reconcile document organization with the clarified taxonomy.~~ **Done in v0.4.1** (Section 23.6): durable Relationship Operations Specs moved to `product/operating-domains/relationship-operations/specs/`, R1 delivery/discovery/provenance artifacts to `product/roadmap-increments/r1-relationship-operations-v1/`, and the unused `product/initiatives/` tree removed. |
 | Next 4    | Continue empirical calibration with subsequent Slices and Cycles (Section 17.1), including the READY Horizon and Execution Cycle defaults, which are operating starting points rather than invariants.                                                                                                                                                                       |
@@ -1250,6 +1250,19 @@ v0.4.3 makes **one narrow authority rule explicitly canonical** and **closes one
 **What was stale and is repaired.** The root contract's artifact chain still said the *initiative's* Slice Plan owns the durable Slice contracts, which predates v0.4.1 making an Initiative optional and a Slice Plan normally scoped to one Roadmap Increment (Section 10.1). It also wrote the readiness attribute as `Ready` rather than the canonical `READY` (Section 12.2). Both are corrected.
 
 **Scope boundaries of this release.** No human-authority model, Execution Cycle semantics, READY / Planned / Executable definition, READY Horizon rule, Release Scope, stopping-condition policy or Section 12.3 decision case changed. The root `CLAUDE.md` and both app-scoped agent files are unchanged — the adapter pattern already works and nothing here contradicts the web-scoped contract. Historical version notes in Sections 23.1–23.7 are preserved as written: the alignment genuinely was open through v0.4.2, and those entries are not rewritten to suggest otherwise.
+
+# 23.9 v0.4.4 update note
+
+v0.4.4 is a **coherence-only patch**. It corrects two statements in this document that had fallen out of step with what the document itself already asserted elsewhere. It settles nothing, and it changes no method.
+
+**What it repairs.**
+
+1. **Section 1.1 — obsolete Gu OS path example.** The *Gu OS-specific mapping* row still offered `docs/product/initiatives/...` as a **current** example of how Gu OS applies the method, while Section 4.1 and Section 23.6 both record that tree as retired in v0.4.1 — and it no longer exists in the repository. The row now names the actual current paths, `docs/product/operating-domains/...` and `docs/product/roadmap-increments/...`. The `initiatives` provenance is **preserved in the same row**, and the retirement record in Sections 4.1, 23.6 and 23 is untouched: the example was stale, the history was not.
+2. **Appendix B — stale open-follow-up statement.** The root `AGENTS.md` row still described aligning that contract with the Methodology as an **open follow-up**, even though v0.4.3 completed it and Sections 11.2 and 23.8 already record it as resolved — as does the root contract itself. The row now matches. The v0.4.3 note in Section 23.8 is unchanged; it correctly describes what that version did.
+
+**What it explicitly does not introduce.** No new methodology concept, artifact, lifecycle stage or human gate. No change to authority boundaries, READY / Planned / Executable semantics, the Definition of Ready, the READY Horizon, Execution Cycle semantics, the Accountable / DRI rule, Release Scope or the Done boundary, Roadmap Increment graduation, verification layers, eval-threshold authority (Section 14.1), or any Development Continuity Loop behavior or stopping condition. No product, architecture or runtime behavior changed, and no repository contract or template was modified by this version.
+
+**Historical version notes preserved.** Sections 23.1–23.8 are unchanged. Statements elsewhere that describe what v0.4.3 introduced or resolved remain written as v0.4.3; only pointers naming the **active** version move to v0.4.4.
 
 # 24. Working glossary
 

@@ -40,8 +40,10 @@ LangGraph loop:
    tool narrowing is skipped. The agent still receives configured tools that pass
    normal availability checks (`user_tool_settings`, integrations, env flags,
    intent filters, risk/HITL rules).
-6. The main agent model (`openai/gpt-4o-mini` by default) receives the resulting
-   prompt and available tools, then decides which tool calls to make.
+6. The main agent model (`openai/gpt-5.4-mini` by default —
+   `DEFAULT_MAIN_AGENT_MODEL_ID` in `packages/agent/src/model.ts`, overridable
+   with `MAIN_AGENT_MODEL_ID`) receives the resulting prompt and available
+   tools, then decides which tool calls to make.
 
 So there are two separate model responsibilities:
 

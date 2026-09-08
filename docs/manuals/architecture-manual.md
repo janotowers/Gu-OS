@@ -1340,7 +1340,7 @@ El agente no debe mezclar usuarios, organizaciones ni permisos. Hay tres mecanis
 
 Estas preguntas no bloquean el entendimiento del sistema actual, pero conviene resolverlas antes de escalar multi-organizacion:
 
-1. **Modelo organizacional nativo:** cuando migrar de `user_id` como unidad principal a `organizations` + memberships + RLS por org.
+1. **Absorcion de lo user-scoped en el modelo de Organizacion:** el substrato nativo **ya existe** (`organizations`, `organization_memberships`, `contacts`, `organization_feature_flags`, `organization_tool_secrets`, con RLS por membresia — migraciones `00080`-`00084`), y `operational_cases` es hibrida con `organization_id` nullable. La pregunta abierta ya no es *si* migrar, sino **cuando y como se absorben las rutas todavia user-scoped** (sesion, memoria personal, skills y ajustes por usuario, y las filas legacy con `organization_id` NULL), en que orden y con que ruta de compatibilidad. La adopcion en runtime sigue siendo **parcial**: ninguna route HTTP ni cron ejerce hoy autorizacion por Organizacion (ver [`../architecture.md`](../architecture.md), *Tenencia por Organizacion*).
 2. **Multi-org por usuario:** si un usuario podra operar varias inmobiliarias desde una sola cuenta.
 3. **Fuente directa vs warehouse:** cuando leer directo Firebase/Mongo vs BigQuery.
 4. **Ingestion Layer:** primer connector real y politica de consent/dry-run.

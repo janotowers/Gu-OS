@@ -67,9 +67,16 @@ A later implementation can invalidate an outdated Technical Plan, but it cannot 
 | Knowledge ownership | [`manuals/knowledge-scope-and-ownership.md`](manuals/knowledge-scope-and-ownership.md) | Platform, industry, organization, team and user scopes |
 | AI-native improvement loops | [`manuals/ai-native-loops.md`](manuals/ai-native-loops.md) | Observe → Decide → Act → Evaluate → Learn and governed change |
 | External agentic principles | [`manuals/agentic-principles-alignment.md`](manuals/agentic-principles-alignment.md) | Reference mapping of external patterns to Gu OS; not implementation authority |
+| Architectural decisions | [`adr/README.md`](adr/README.md) | Short accepted decision records and reevaluation criteria |
+
+## Supporting explanatory and reference documents
+
+These are **not canonical**. They are listed so they can be found and correctly classified, not so they can be cited as authority. Where any of them differs from the artifact that owns the relevant truth — per *Authority by question* and *Canonical documents by topic* above — **the owning artifact wins**, and the reference material is context or provenance only (see *Status vocabulary*: Reference, Historical).
+
+| Topic | Document | Role and precedence |
+| --- | --- | --- |
 | Narrative explanation of the system | [`manuals/gu-os-understanding.md`](manuals/gu-os-understanding.md) | **Explanatory only.** Accessible Spanish walkthrough for understanding Gu OS. Not product-intent, architecture or runtime authority; where it differs from the PRD or a current-state source, those win |
 | Dated agent-architecture analysis | [`manuals/gu-os-agent-architecture-analysis.md`](manuals/gu-os-agent-architecture-analysis.md) | **Historical / Reference.** Design-space analysis of the repository at the commit and date pinned in its header. Analytical value only; never a statement of what runs today |
-| Architectural decisions | [`adr/README.md`](adr/README.md) | Short accepted decision records and reevaluation criteria |
 
 ## Artifact lifecycle
 

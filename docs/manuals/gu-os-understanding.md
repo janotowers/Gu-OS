@@ -593,7 +593,14 @@ y [`docs/operational-cases/plan.md`](../operational-cases/plan.md).
 
 **Fuera de Gu OS** tu sistema operativo ya distingue roles (`super-admin`, `vendedor`) y agrupa usuarios con `organization_id` / `org_name` en tablas como `users_light` en Firebase/BigQuery.
 
-**Dentro de Gu OS hoy** la sesión y la memoria personal van **por usuario** (tu login). Lo que **ata** las preguntas de negocio a **tu inmobiliaria** es lo que configuraste en **Business Brain** / Ajustes: el `organization_id` que deben usar las consultas al warehouse. La visión de producto es **un solo login** y que ese enlace sea **automático**, pero eso es evolución de integración.
+**Dentro de Gu OS hoy** conviven cuatro cosas distintas; conviene no mezclarlas:
+
+1. **Sesión y memoria personal:** van **por usuario** (tu login). No son de la organización.
+2. **Enlace de negocio al warehouse:** lo que **ata** las preguntas de negocio a **tu inmobiliaria** sigue siendo lo que configuraste en **Business Brain** / Ajustes — el `organization_id` que deben usar las consultas al warehouse.
+3. **Substrato nativo de Organización (R1) — ya implementado en schema:** existen `organizations`, `organization_memberships`, `contacts`, `organization_feature_flags` y `organization_tool_secrets`, con **RLS por membresía activa** y escritura solo desde servidor (migraciones `00080`–`00084`). Es real, no un plan.
+4. **Adopción en runtime — todavía parcial:** ese substrato **aún no gobierna el producto**. Ninguna route HTTP ni cron ejerce hoy autorización por Organización; los módulos existen y se ejercitan con selftests, evals y verificadores operados a mano. Por eso el punto 2 sigue siendo el enlace de negocio efectivo.
+
+La visión de producto es **un solo login** con ese enlace **automático** sobre el substrato del punto 3; falta la adopción del punto 4, no la base de datos. Detalle de tenencia y políticas: [`../architecture.md`](../architecture.md) (*Tenencia por Organización*).
 
 Personal interna (Ungga) puede tener modo especial para ver varias organizaciones en consultas; eso es **política explícita**, no algo que el modelo “adivine”.
 
@@ -615,9 +622,9 @@ Personal interna (Ungga) puede tener modo especial para ver varias organizacione
 
 ## 10. Preguntas abiertas (normales a esta altura)
 
-- **¿Cuándo las skills serán “de la organización” compartidas por varios usuarios sin duplicar config?** Depende de **organizaciones + membresías** en base de datos (roadmap V3). Para texto propio por cuenta ya hay `account_skills` V1 (mínimo viable: tabla + UI + override en runtime); compartir entre cuentas de la misma organización sigue siendo V3.
+- **¿Cuándo las skills serán “de la organización” compartidas por varios usuarios sin duplicar config?** Ya **no depende de crear** organizaciones + membresías: ese substrato existe en schema con RLS (§8, punto 3). Lo que falta es **adopción en runtime y diseño de autoridad** — quién puede publicar o versionar un playbook compartido, con qué revisión, y cómo se resuelve la precedencia entre skill global, de organización y de usuario sin habilitar código arbitrario. Para texto propio por cuenta ya hay `account_skills` V1 (mínimo viable: tabla + UI + override en runtime).
 - **¿Las skills propias V2 deben ser solo de negocio?** No. Deben admitir por diseño `business`, `personal` y `shared`, porque el usuario real mezcla trabajo inmobiliario con vida personal. La diferencia debe estar en permisos, fuentes de datos y visibilidad, no en prohibir skills personales propias.
-- **¿Un mismo usuario podrá estar en varias organizaciones?** Hoy el producto piensa **una** organización por usuario en el binding de negocio; multi-org es decisión futura.
+- **¿Un mismo usuario podrá estar en varias organizaciones?** `organization_memberships` **no lo impide estructuralmente**, pero eso no es soporte multi-org: el binding de negocio sigue siendo **una** organización por usuario y ninguna route lo ejerce todavía. Qué significa multi-org en producto (selector de contexto, precedencia, alcance de memoria y de casos) es **decisión futura**.
 - **¿La Brain Layer reemplaza al warehouse?** No: el warehouse sigue siendo la **verdad tabular**; la Brain Layer suma **capa cognitiva y operacional** (páginas, relaciones, señales, playbooks promovidos).
 - **¿Hay que implementar `account_skills` antes de Brain Layer?** No el V2 completo para las primeras capas (`brain_pages`, `brain_links`, `brain_signals`). El V1 mínimo ya existe. Sí hay que cerrar el modelo de materialización antes de automatizar bien la promoción `Pattern -> Skill`.
 

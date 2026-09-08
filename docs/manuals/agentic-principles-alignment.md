@@ -30,7 +30,7 @@ Este documento captura:
 |--------|---------------|------------------------|
 | **LLM Wiki** (Andrej Karpathy, [gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)) | Wiki persistente mantenido por LLM: raw inmutable, compilación, Ingest/Query/Lint; conocimiento que **compone** en lugar de redescubrirse cada query | Informa Brain Layer (compiled truth, timeline, dream cycle, ingestion). Mapping en [`business-brain-evolution-roadmap.md`](../business-brain-evolution-roadmap.md) Inspiration 2 y [`gbrain-evaluation-and-plan.md`](../brain/gbrain-evaluation-and-plan.md) §1.1. Gu OS rechaza Obsidian-as-product y index-only-without-RAG. |
 | **Thin Harness, Fat Skills** (Garry Tan, 2026-04-09) | Cinco definiciones (skill, harness, resolver, latent/deterministic, diarization); arquitectura de tres capas; loop de auto-mejora; guia skill vs code | Valida skills + tools + routing + separacion juicio/ejecucion. Brain Layer y Pattern→Skill son la frontera pendiente. |
-| **Homebrew for Personal AI** (Garry Tan, 2026-04-11) | Markdown como codigo; recipes como paquetes distribuibles; el agente implementa capacidades nativas desde una spec | Valida `SKILL.md` + `references/` + `account_skills`. Capability packs (V3+) y recipe distribution quedan como direccion futura, no como producto hoy. |
+| **Homebrew for Personal AI** (Garry Tan, 2026-04-11) | Markdown como codigo; recipes como paquetes distribuibles; el agente implementa capacidades nativas desde una spec | Valida `SKILL.md` + `references/` + `account_skills`. Capability packs y recipe distribution quedan como direccion futura, no como producto hoy, y sin secuencia asignada en el roadmap vigente. |
 | **Skill Development Cycle** (GBrain repo, `skill-development.md`) | Discovery → draft → quality bar → activation; MECE ownership; no promover sin evidencia | Mapea a Skill Lab + N0–N5 + rúbrica `skill-authoring`; quality bar instrumentable en [`testing-framework.md`](../operational-cases/testing-framework.md) §13. |
 | **How to Build a Self-Improving Company with AI** (Tom Blomfield, [YC](https://www.youtube.com/watch?v=X_JsIHUfUjc)) | Loops Observe → Decide → Act → Evaluate → Learn; company legibility; mejora recursiva y artefactos regenerables | Informa el contrato de [`ai-native-loops.md`](ai-native-loops.md), outcome economics, improvement authority y vistas regenerables. |
 | **How To Build A Company With AI From The Ground Up** (Diana Hu, [YC](https://www.youtube.com/watch?v=EN7frwQIbKc)) | IA como capa organizacional; open vs closed loops; empresa queryable; software factory; DRI y adopción progresiva | Refuerza la narrativa OS de Gu, el criterio closed-loop, la captura gobernada de decisiones/compromisos, la software factory interna y el patrón de piloto acotado. |
@@ -192,9 +192,9 @@ Adaptacion de la guia del ensayo *Thin Harness, Fat Skills* al stack Gu OS.
 | Recipe markdown | `SKILL.md` + `references/` | Hoy |
 | Fork trivial (editar markdown → cambia comportamiento) | Skills en Git + `account_skills` | Hoy (parcial) |
 | Agent como package manager | Selector + registry + skill-authoring API | Hoy (parcial) |
-| Sync diario "n nuevas recipes" | No existe | Futuro / optional V3+ |
+| Sync diario "n nuevas recipes" | No existe | Futuro / opcional; sin secuencia asignada |
 | Capability packs internos | Sin owner vigente: la numeracion V1-V4 del `business-brain-evolution-roadmap.md` quedo superseded | Abierto (requiere ubicarlo en el roadmap vigente) |
-| Implementacion nativa por cuenta sin codigo upstream | Parcial via `account_skills`; no generacion automatica de integraciones | V2+ |
+| Implementacion nativa por cuenta sin codigo upstream | Parcial via `account_skills`; no generacion automatica de integraciones | Parcial; el resto sin secuencia asignada |
 
 **Disciplina OpenClaw citada en el ensayo:** *"Si me pides algo dos veces, fallaste"* → codificar en skill o automatizar en cron/heartbeat. En Gu OS: usar [`skill-authoring`](../../skills/global/skill-authoring/SKILL.md), operational cases y scheduled tasks; no dejar procedimientos repetibles solo en conversacion.
 
@@ -211,7 +211,7 @@ Adaptacion de la guia del ensayo *Thin Harness, Fat Skills* al stack Gu OS.
 | Diarization / Brain | Baja (hoy) | Ejecutar plan Brain Layer Bloques 1–4 |
 | Self-learning loop | Baja (hoy) | Pattern → Skill con HITL; no auto-escribir skills sin revision |
 | Quality bar / Skill Lab | Parcial | Rúbrica + N0–N5 casos + Skill Lab documentado; falta UI unificada «Describe tu proceso» |
-| Recipe distribution | Emergente | Capability packs V3+; no marketplace abierto antes de sandbox |
+| Recipe distribution | Emergente | Capability packs como direccion futura; no marketplace abierto antes de sandbox |
 | HITL / tenant safety | Gu OS **por delante** del ensayo personal-agent | Preservar como invariante; no sacrificar por "thinness" |
 
 ---

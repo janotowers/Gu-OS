@@ -400,6 +400,8 @@ La versión v2 incluye el detalle fino por memoria, compaction por etapa, breakd
 
 **Diseño de referencia (copiar cuando se implemente v2):**
 
+> **Ejemplo ilustrativo, no una captura real.** Todos los valores del bloque siguiente son inventados para mostrar el *formato* propuesto: usuario, ids, timestamps, similitudes, umbrales y el `model:` que aparece en `[AGENT DECISION]`. No los leas como estado actual del runtime — los defaults vigentes de modelo viven en [`packages/agent/src/model.ts`](../../packages/agent/src/model.ts) (hoy `openai/gpt-5.4-mini` para el agente principal) y los umbrales vigentes en la sección *Constantes* de este documento.
+
 ```
 ================================================================
  TURN 2026-04-23T14:05:12.301Z   elapsed=2.30s
