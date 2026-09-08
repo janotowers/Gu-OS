@@ -74,5 +74,5 @@ Las acciones sensibles pasan por **HITL**. Los recetarios de captación y public
 | Presentación negocio / capas | [`gu-os-business-architecture-view.md`](gu-os-business-architecture-view.md) |
 | Principios agenticos (GStack) | [`agentic-principles-alignment.md`](agentic-principles-alignment.md) |
 | Casos operacionales (captación) | [`../operational-cases/architecture.md`](../operational-cases/architecture.md) |
-| Roadmap producto | [`../business-brain-evolution-roadmap.md`](../business-brain-evolution-roadmap.md) (Inspiration 2 = Karpathy LLM Wiki) |
+| Roadmap producto | [`../roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md) (el antiguo `business-brain-evolution-roadmap.md`, con Inspiration 2 = Karpathy LLM Wiki, quedó superseded) |
 | Patrón LLM Wiki (referencia) | [Gist Andrej Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) |

@@ -40,7 +40,7 @@ Lecturas profundas en el repo:
 - Plan Brain Layer: [`docs/brain/gbrain-evaluation-and-plan.md`](../brain/gbrain-evaluation-and-plan.md)
 - Skills y tools: [`docs/skills-tools-architecture.md`](../skills-tools-architecture.md)
 - Skill routing: [`docs/tools-design/skill-routing.md`](../tools-design/skill-routing.md)
-- Roadmap agente: [`docs/business-brain-evolution-roadmap.md`](../business-brain-evolution-roadmap.md)
+- Roadmap de producto vigente: [`docs/roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md) (el antiguo [`docs/business-brain-evolution-roadmap.md`](../business-brain-evolution-roadmap.md) quedó **superseded**; se cita aquí solo por procedencia)
 
 ---
 
@@ -193,7 +193,7 @@ Adaptacion de la guia del ensayo *Thin Harness, Fat Skills* al stack Gu OS.
 | Fork trivial (editar markdown → cambia comportamiento) | Skills en Git + `account_skills` | Hoy (parcial) |
 | Agent como package manager | Selector + registry + skill-authoring API | Hoy (parcial) |
 | Sync diario "n nuevas recipes" | No existe | Futuro / optional V3+ |
-| Capability packs internos | Roadmap V3+ en `business-brain-evolution-roadmap.md` | Planeado |
+| Capability packs internos | Sin owner vigente: la numeracion V1-V4 del `business-brain-evolution-roadmap.md` quedo superseded | Abierto (requiere ubicarlo en el roadmap vigente) |
 | Implementacion nativa por cuenta sin codigo upstream | Parcial via `account_skills`; no generacion automatica de integraciones | V2+ |
 
 **Disciplina OpenClaw citada en el ensayo:** *"Si me pides algo dos veces, fallaste"* → codificar en skill o automatizar en cron/heartbeat. En Gu OS: usar [`skill-authoring`](../../skills/global/skill-authoring/SKILL.md), operational cases y scheduled tasks; no dejar procedimientos repetibles solo en conversacion.
@@ -237,7 +237,7 @@ Este documento **no abre nuevos bloques de implementacion**. Refuerza prioridade
 2. **Medio plazo:** Brain Layer (Memory, Graph, Signal) segun plan existente.
 3. **Largo plazo:** Pattern mining → Skill con HITL; capability packs; distribucion interna de recipes.
 
-Cuando cambie el estado de una fila de la matriz (§7), actualizar este documento y, si aplica, Inspiration 3 en `business-brain-evolution-roadmap.md`.
+Cuando cambie el estado de una fila de la matriz (§7), actualizar este documento y, si aplica, el artefacto que posea esa verdad segun [`docs/README.md`](../README.md) — secuenciacion en [`docs/roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md), no en el `business-brain-evolution-roadmap.md` superseded.
 
 ---
 

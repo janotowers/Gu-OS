@@ -1322,7 +1322,8 @@ El agente no debe mezclar usuarios, organizaciones ni permisos. Hay tres mecanis
 | Heartbeat deterministic prefetchers | [`docs/heartbeat/deterministic-prefetchers.md`](../heartbeat/deterministic-prefetchers.md) |
 | Multi-proveedor LLM | [`docs/tools-design/model-providers.md`](../tools-design/model-providers.md) |
 | BigQuery env/setup | [`docs/env-bigquery-setup.md`](../env-bigquery-setup.md) |
-| Roadmap Business Brain / Skills / Heartbeat | [`docs/business-brain-evolution-roadmap.md`](../business-brain-evolution-roadmap.md) |
+| Secuenciacion de producto (vigente) | [`docs/roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md) |
+| Roadmap Business Brain / Skills / Heartbeat (superseded, solo procedencia) | [`docs/business-brain-evolution-roadmap.md`](../business-brain-evolution-roadmap.md) |
 | Brain Layer futura | [`docs/brain/gbrain-evaluation-and-plan.md`](../brain/gbrain-evaluation-and-plan.md) |
 | Indice documental | [`docs/README.md`](../README.md) |
 | Knowledge scope y ownership | [`docs/manuals/knowledge-scope-and-ownership.md`](knowledge-scope-and-ownership.md) |

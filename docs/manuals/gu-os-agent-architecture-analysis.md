@@ -1,5 +1,9 @@
 # Gu OS — Agent Architecture Analysis
 
+> **Status: Historical / Reference — a dated snapshot analysis, not current implementation authority.**
+> Every observation below describes the repository **at the pinned commit and date given under *Repository*** and was accurate then; the runtime has evolved since. Its value is analytical (the design-space lens, the risk register, the evidence classification), not as a statement of what runs today.
+> For **what actually runs now**, use the code plus [`../architecture.md`](../architecture.md) and [`architecture-manual.md`](architecture-manual.md); for **authority by type of truth**, [`../README.md`](../README.md). Where this document and a current-state source disagree, the current-state source wins — and the discrepancy tables below should be read as *findings recorded at snapshot time*, some of which have since been repaired.
+
 **Location:** `docs/manuals/gu-os-agent-architecture-analysis.md` (moved from repo root for consistency with other manuals).
 
 **Framework:** "Dive into Claude Code: The Design Space of Today's and Future AI Agent Systems" (arXiv [2604.14228v2](https://arxiv.org/abs/2604.14228), Jul 2026), used as an analytical lens — *not* as a benchmark to imitate.

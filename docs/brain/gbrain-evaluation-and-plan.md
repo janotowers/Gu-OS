@@ -173,7 +173,7 @@ Referencia local opcional: `C:\Users\janot\develop\gbrain-master\gbrain-master`.
 ### Lo que NO decide
 
 - La estrategia de producto a largo plazo de Gu OS.
-- El roadmap de multi-tenancy organizacional (eso vive en `docs/business-brain-evolution-roadmap.md`).
+- El roadmap de multi-tenancy organizacional (la decision aceptada vive en [`../adr/ADR-101-organization-tenancy.md`](../adr/ADR-101-organization-tenancy.md) y la secuenciacion en [`../roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md); el antiguo `business-brain-evolution-roadmap.md` quedo superseded).
 - La fachada multi-LLM-provider (eso vive en `docs/tools-design/model-providers.md`).
 
 ### Marco mental rector `[v1.4]`

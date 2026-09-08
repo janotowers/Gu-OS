@@ -1,5 +1,9 @@
 # Gu OS — Guía para entender el sistema
 
+> **Estado:** documento **explicativo / divulgativo**. No es autoridad de intención de producto, de arquitectura ni de runtime.
+> - La **categoría y la intención de producto** las posee [`../product/PRD.md`](../product/PRD.md) (*«The AI Operating System for Real Estate»*, con **Gu** como el AI coworker). La frase «asistente operativo» que se usa abajo es una **entrada accesible**, deliberadamente más estrecha que esa categoría; donde ambas difieran, manda el PRD.
+> - Lo **implementado** lo poseen el código y [`../architecture.md`](../architecture.md); la arquitectura integrada, [`architecture-manual.md`](architecture-manual.md); la **secuenciación**, [`../roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md).
+
 Este documento está pensado para **entender** Gu OS con la cabeza, no para implementar. Va en **español narrativo**: primero la idea en lenguaje accesible, y cuando ayuda, un bloque breve “**Para quien quiera el detalle**” con términos técnicos y enlaces.
 
 Si buscas tablas, rutas de código y contratos de base de datos, usa el manual técnico: [`architecture-manual.md`](architecture-manual.md).
@@ -241,7 +245,7 @@ Esto es importante porque Gu OS no busca ayudar solo a “la empresa”; busca a
 
 **Progressive disclosure:** el cuerpo largo no se mete todo en el chat; el modelo puede pedir trozos con `read_skill_reference` cuando hace falta.
 
-**Para quien quiera el detalle:** [`docs/tools-design/skill-routing.md`](../tools-design/skill-routing.md) y el roadmap [`docs/business-brain-evolution-roadmap.md`](../business-brain-evolution-roadmap.md).
+**Para quien quiera el detalle:** [`docs/tools-design/skill-routing.md`](../tools-design/skill-routing.md) y el roadmap vigente [`docs/roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md).
 
 ### 5.6 “Compartido” (`shared`) vs negocio vs personal
 
@@ -456,7 +460,7 @@ Sí, pero cumplen roles distintos:
 
 | Documento | Qué cubre | Estado |
 |-----------|-----------|--------|
-| `business-brain-evolution-roadmap.md` | Evolución del agente actual: skills, skill registry, `business_brain`, Heartbeat, BigQuery, UI, futuro `account_skills`, futuro `organizations`. Incluye **Inspiration 2: Karpathy LLM Wiki** ([gist oficial](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)). | Es el roadmap del sistema existente. |
+| `business-brain-evolution-roadmap.md` | **Superseded.** Cubría la evolución del agente (skills, skill registry, `business_brain`, Heartbeat, BigQuery, UI, `account_skills`, `organizations`) e incluía **Inspiration 2: Karpathy LLM Wiki** ([gist oficial](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)). Hoy es solo un stub de redirección; ese cuerpo vive en el historial de Git. | Histórico / procedencia. La secuenciación de producto vigente es [`../roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md). |
 | `brain/gbrain-evaluation-and-plan.md` | Nueva Brain Layer inspirada en G Brain: Ingestion, Memory, Graph, Signal, Pattern, Skill, Workflow. Genealogía Karpathy → G Brain → Gu OS en §1.1. | Es el plan para agregar memoria/cognición operacional del negocio. |
 | `manuals/agentic-principles-alignment.md` | Ensayos GStack (Thin Harness / Homebrew) mapeados a Gu OS: matriz de alineación, skill vs code, qué no copiar. | Referencia filosófica transversal; no sustituye al plan Brain. |
 
@@ -599,7 +603,7 @@ Personal interna (Ungga) puede tener modo especial para ver varias organizacione
 
 | Si eres… | Empieza por… |
 |----------|----------------|
-| Producto / negocio | Secciones 1–8 de este documento; [`gu-os-glossary-commercial.md`](gu-os-glossary-commercial.md) para demos; resumen del roadmap en [`business-brain-evolution-roadmap.md`](../business-brain-evolution-roadmap.md). |
+| Producto / negocio | Secciones 1–8 de este documento; [`gu-os-glossary-commercial.md`](gu-os-glossary-commercial.md) para demos; intención de producto en [`../product/PRD.md`](../product/PRD.md) y secuenciación en [`../roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md). |
 | Diseño de skills / operación | Sección 5 de este documento (especialmente §5.9 diagrama) + `company-data` / `memory-curate` en `skills/global/`. |
 | Ingeniería | [`architecture-manual.md`](architecture-manual.md) + [`architecture.md`](../architecture.md). |
 | Brain Layer / G Brain | [`docs/brain/gbrain-evaluation-and-plan.md`](../brain/gbrain-evaluation-and-plan.md) (plan, no guía divulgativa). §1.1 = genealogía Karpathy LLM Wiki. |

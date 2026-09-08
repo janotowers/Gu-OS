@@ -4,52 +4,58 @@ overview: "Añadir memoria a largo plazo al agente mediante dos procesos indepen
 todos:
   - id: sql-migration
     content: Crear migración SQL para tabla `memories` (con content_hash, embedding_model, embedding_dim) y columnas nuevas en `agent_sessions` (last_flushed_at, last_flushed_message_id, last_user_input_embedding, last_message_at). RLS y función RPC `match_memories`.
-    status: pending
+    status: completed
   - id: db-memories-queries
     content: Crear packages/db/src/queries/memories.ts con saveMemory (ON CONFLICT por content_hash), searchMemories (RPC) e incrementRetrievalCount. Exportar desde index.ts.
-    status: pending
+    status: completed
   - id: db-session-watermark-queries
     content: Extender packages/db/src/queries/sessions.ts con getFlushState, updateFlushWatermark y updateLastUserInputEmbedding. Exportar desde index.ts.
-    status: pending
+    status: completed
   - id: embeddings-ts
     content: Crear packages/agent/src/embeddings.ts con generateEmbedding() — fetch a OpenRouter /v1/embeddings, model `google/gemini-embedding-001`, 1536 dims, manejo de error/timeout.
-    status: pending
+    status: completed
   - id: memory-injection-node
     content: Crear packages/agent/src/nodes/memory_injection_node.ts — factory que recibe { db, userId }, usa el último HumanMessage, comparte el embedding con la extracción (topic-shift), reescribe el primer SystemMessage (prepend del bloque [MEMORIA DEL USUARIO]), y es no-op en cron (autoApproveTools) y en resume HITL.
-    status: pending
+    status: completed
   - id: memory-flush
     content: Crear packages/agent/src/memory_flush.ts con flushSessionMemory({ db, userId, sessionId, reason }) — lee watermark, carga solo mensajes nuevos, llama Haiku vía createCompactionModel, parsea JSON, guarda con content_hash, actualiza watermark. Idempotente y silencioso ante fallo de parseo.
-    status: pending
+    status: completed
   - id: graph-state-extension
     content: Extender packages/agent/src/state.ts con `memoryFlushPending: boolean` (reducer replace) para que el nodo de inyección pueda marcar el fire-and-forget que hará el caller al terminar runAgent.
-    status: pending
+    status: completed
   - id: graph-update
     content: Actualizar packages/agent/src/graph.ts para añadir memory_injection_node al inicio (__start__ → memory_injection → compaction → agent → ...), y propagar `memoryFlushPending` en el estado devuelto a runAgent.
-    status: pending
+    status: completed
   - id: agent-index-export
     content: Exportar flushSessionMemory y los tipos nuevos desde packages/agent/src/index.ts.
-    status: pending
+    status: completed
   - id: chat-route-flush
     content: En apps/web/src/app/api/chat/route.ts, tras runAgent — si NO hay pendingConfirmation — dispara POST fire-and-forget `flushSessionMemory` cuando aplique (shift, cuenta, idle). Añadir catch-up PRE-await cuando detecte sesión fría.
-    status: pending
+    status: completed
   - id: telegram-route-flush
     content: Replicar el mismo patrón en apps/web/src/app/api/telegram/webhook/route.ts (extraer a un helper compartido para no duplicar lógica).
-    status: pending
+    status: completed
   - id: confirm-route-no-flush
     content: Documentar que apps/web/src/app/api/chat/confirm/route.ts NO dispara flush (es un resume HITL del mismo turno; el flush se disparará cuando el turno realmente termine).
-    status: pending
+    status: completed
   - id: cron-exclusion
     content: Verificar en packages/agent/src/graph.ts que memory_injection_node es no-op si state.autoApproveTools; en apps/web/src/app/api/cron/scheduled-tasks/route.ts NO llamar a flushSessionMemory.
-    status: pending
+    status: completed
   - id: serverless-note
     content: Añadir nota de despliegue para Vercel — usar `waitUntil` si se detecta entorno serverless para que el fire-and-forget no sea matado antes de terminar. Fallback .catch() en procesos Node largos.
-    status: pending
+    status: completed
 isProject: false
 ---
 
 # Plan — Memoria de largo plazo
 
+> **Estado:** **Implementado y conectado** (Web + Telegram). Los `todos` del frontmatter quedaron marcados `completed` porque cada uno es verificable en código: migración [`00005_memories.sql`](../../packages/db/supabase/migrations/00005_memories.sql) (tabla `memories`, RLS, RPC `match_memories`, watermark en `agent_sessions`), [`packages/db/src/queries/memories.ts`](../../packages/db/src/queries/memories.ts), `getFlushState` / `updateFlushWatermark` / `updateLastUserInputEmbedding` en [`packages/db/src/queries/sessions.ts`](../../packages/db/src/queries/sessions.ts), [`packages/agent/src/embeddings.ts`](../../packages/agent/src/embeddings.ts), [`nodes/memory_injection_node.ts`](../../packages/agent/src/nodes/memory_injection_node.ts), [`memory_flush.ts`](../../packages/agent/src/memory_flush.ts), `memoryFlushPending` en [`state.ts`](../../packages/agent/src/state.ts), el cableado del grafo en [`graph.ts`](../../packages/agent/src/graph.ts) y los disparadores de [`apps/web/src/lib/memory/trigger.ts`](../../apps/web/src/lib/memory/trigger.ts) usados por `/api/chat` y el webhook de Telegram. **Cron y resume HITL son no-op**; **Heartbeat** usa la excepción curada descrita abajo.
+>
+> **Este documento sigue siendo un plan**, no la autoridad de runtime: para lo que corre hoy manda el código y [`docs/architecture.md`](../architecture.md); lo que aquí aparece como *roadmap v2* o *futuro* no está implementado.
+
 Este documento describe el **diseño y la implementación** de la memoria de largo plazo. El bloque siguiente es el **prompt original** usado para generar un primer borrador; se conserva por contexto, pero si entra en conflicto con las secciones posteriores, **prevalece lo documentado bajo *Diseño vigente***. Esa es la misma convención que usa `docs/memory/short_memory_plan.md`.
+
+> **Qué NO es esta memoria.** No confundir con: **memoria corta / compaction** (ventana del turno — [`short_memory_plan.md`](./short_memory_plan.md)); **checkpointer / continuidad HITL** (estado del grafo por `thread_id`, tablas `checkpoints*`); **estado operacional de Cases / Work** (lo que está pasando en el negocio); ni **Business Brain / conocimiento organizacional** (lo que la organización sabe — [`../brain/gbrain-evaluation-and-plan.md`](../brain/gbrain-evaluation-and-plan.md)). Esta memoria guarda hechos duraderos **sobre el usuario operador**, tipados `episodic` / `semantic` / `procedural`, extraídos por flush y recuperados por embedding + inyección.
 
 > **Plan complementario**: para curación de hechos ya guardados (UI + skill `memory-curate`), endurecimiento del extractor frente a datos transaccionales de negocio, y TTL/decay con HITL, ver [`memory_curation_plan.md`](./memory_curation_plan.md). La curación y el extractor endurecido **ya están reflejados en código**; el estado detallado y los próximos pasos del roadmap están en ese archivo. Ese documento NO reemplaza este plan; aborda problemas detectados en producción tras la implementación inicial.
 

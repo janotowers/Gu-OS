@@ -52,8 +52,9 @@ Agregar un `compaction_node` al loop del agente para prevenir **Context Rot**, c
 - **`GraphState`** centralizado en [`packages/agent/src/state.ts`](../../packages/agent/src/state.ts): `messages`, `sessionId`, `userId`, `systemPrompt`, `pendingConfirmation`, `autoApproveTools`, `compactionCount`, `iterationCount`.
 - **`messages`** usa el reducer estándar de LangGraph **`messagesStateReducer`**: hace append como antes, pero además entiende **`RemoveMessage`** y reemplazo por `id`, necesario para que la etapa 2 pueda borrar mensajes viejos, no solo concatenar un resumen.
 - **Topología del grafo** en [`packages/agent/src/graph.ts`](../../packages/agent/src/graph.ts):
-  - `__start__` → `compaction` → `agent` → (`tools` | `__end__`)
+  - `__start__` → `memory_injection` → `compaction` → `agent` → (`tools` | `__end__`)
   - `tools` → `compaction` → `agent` → …
+  - El nodo `memory_injection` se añadió **después** de este plan, al implementar la memoria larga personal ([`long_term_memory_plan.md`](./long_term_memory_plan.md)); corre una sola vez por turno, antes de compaction, y no cambia las etapas ni las responsabilidades descritas aquí.
 - **Checkpointer** por `thread_id` (Postgres o memoria); sin cambio de semántica respecto al diseño previo al compaction.
 - **Modelo de compaction:** [`createCompactionModel()`](../../packages/agent/src/model.ts) — default `anthropic/claude-haiku-4.5` vía OpenRouter, override opcional `COMPACTION_MODEL_ID`; separado del modelo principal del agente (`MAIN_AGENT_MODEL_ID` / `createChatModel`).
 
@@ -61,7 +62,8 @@ Agregar un `compaction_node` al loop del agente para prevenir **Context Rot**, c
 
 ```mermaid
 flowchart LR
-  startNode[__start__] --> compactionNode
+  startNode[__start__] --> memoryInjectionNode[memory_injection]
+  memoryInjectionNode --> compactionNode
   compactionNode --> agentNode
   agentNode -->|tools| toolsNode
   agentNode -->|end| endNode[__end__]
