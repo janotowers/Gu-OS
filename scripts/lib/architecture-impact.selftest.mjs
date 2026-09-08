@@ -324,6 +324,67 @@ function body({
   ok("a nested build-output manifest does not trigger");
 }
 
+// ------------------------------------------------------ executable POC code
+{
+  // `pocs/` is a historical directory name, not a runtime boundary. Its own
+  // README records easybroker-mls-cli as "usado en producción" by
+  // easybroker_search_listings / easybroker_search_closed_deals, and ungga-cli
+  // as the fallback for ungga_publish_listing. Excluding the directory let code
+  // that runs in production bypass the assessment entirely.
+  const { triggering, ignored } = classifyPaths([
+    "pocs/easybroker-mls-cli/src/search-mls.mjs",
+    "pocs/ungga-cli/src/publish-listing.mjs",
+    "pocs/ungga-api/src/client.mjs",
+    "pocs/easybroker-mls-cli/src/status-filter.selftest.mjs",
+  ]);
+  assert.equal(ignored.length, 0);
+  assert.equal(triggering.length, 4);
+  ok("executable POC sources trigger — pocs/ is not a runtime boundary");
+}
+{
+  assert.equal(requiresDeclaration(["pocs/easybroker-mls-cli/package.json"]), true);
+  assert.equal(requiresDeclaration(["pocs/easybroker-mls-cli/package-lock.json"]), true);
+  assert.equal(requiresDeclaration(["pocs/ungga-cli/package-lock.json"]), true);
+  ok("POC dependency manifests and their own lockfiles trigger");
+}
+{
+  // Future-proofing only: every executable POC source is .mjs today, but the
+  // rule covers the whole executable set so a TypeScript rewrite is not a hole.
+  assert.equal(requiresDeclaration(["pocs/ungga-cli/src/steps.ts"]), true);
+  assert.equal(requiresDeclaration(["pocs/ungga-cli/src/steps.js"]), true);
+  ok("POC .ts and .js sources trigger, not only .mjs");
+}
+{
+  // The boundary that keeps this from becoming a directory-wide sweep. Every
+  // path here is a real tracked file under pocs/.
+  const { triggering, ignored } = classifyPaths([
+    "pocs/README.md",
+    "pocs/easybroker-mls-cli/README.md",
+    "pocs/ungga-cli/.env.example",
+    "pocs/easybroker-mls-cli/.gitignore",
+    "pocs/avaclick/avaclick_catalogs.json",
+    "pocs/avaclick/manifest.json",
+    "pocs/ungga-cli/fixtures/listing.sample.json",
+    "pocs/ungga-api/openapi.yaml",
+  ]);
+  assert.equal(triggering.length, 0, `unexpected trigger: ${triggering.join(", ")}`);
+  assert.equal(ignored.length, 8);
+  ok("POC READMEs, env samples, data catalogs, fixtures and OpenAPI do NOT trigger");
+}
+{
+  // `manifest.json` is a data catalog, not a dependency manifest. The rule is
+  // name-scoped to package.json / package-lock.json at one level under pocs/,
+  // so a same-directory data file cannot borrow the manifest rule.
+  assert.equal(requiresDeclaration(["pocs/avaclick/manifest.json"]), false);
+  assert.equal(requiresDeclaration(["pocs/ungga-api/fixtures/listing.sample.json"]), false);
+  ok("a POC data file named manifest.json is not a dependency manifest");
+}
+{
+  // The documentation-only exemption is unchanged and still wins everywhere.
+  assert.equal(requiresDeclaration(["pocs/README.md", "docs/architecture.md"]), false);
+  ok("the documentation-only exemption is not weakened by the POC rule");
+}
+
 // ------------------------------------------------------------ parser details
 {
   assert.equal(stripHtmlComments("a <!-- b --> c"), "a  c");

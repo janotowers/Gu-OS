@@ -98,6 +98,24 @@ const IMPLEMENTATION_PATTERNS = [
   /^package-lock\.json$/,
   /^(apps|packages)\/[^/]+\/package\.json$/,
   /^turbo\.json$/,
+  // Executable POC code. `pocs/` is a historical directory name, NOT a runtime
+  // boundary — its own README opens by calling these "utilidades y experimentos
+  // fuera del runtime del agente" and then immediately records that
+  // `easybroker-mls-cli` is "usado en producción por easybroker_search_listings
+  // y easybroker_search_closed_deals (provider easybroker_web)", and that
+  // `ungga-cli` is the fallback for `ungga_publish_listing`. Excluding the
+  // directory let a change to code that runs in production bypass the
+  // assessment. The rule is semantic — executable code that can affect
+  // implemented behavior — not "directories whose names sound like production".
+  //
+  // No list of which POCs are currently production-used is maintained here:
+  // that list would rot, and over-triggering is cheap. Scoped to executable
+  // sources and dependency manifests; READMEs, fixtures, catalogs, OpenAPI
+  // specs and env samples are deliberately excluded. POC manifests carry their
+  // own lockfile because POCs install separately (`npm run setup:pocs`), unlike
+  // the npm workspaces above which share the root lockfile.
+  /^pocs\/.+\.(ts|tsx|js|mjs)$/,
+  /^pocs\/[^/]+\/package(-lock)?\.json$/,
 ];
 
 /**
