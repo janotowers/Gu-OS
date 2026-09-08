@@ -59,6 +59,7 @@ Before copying anything, be clear which truth the new document would own (Method
 8. Keep the Slice Plan free of execution state. It carries **readiness**, never execution stage: the agent runtime owns Tasks and pre-PR execution, and GitHub owns branch/commit/PR/CI/merge/Actions state.
 9. Record the confirmed Accountable / DRI in the transitional execution register, not in the durable Slice contract — a Slice can be READY before anyone is assigned.
 10. Remember that closing every Slice is not the same claim as graduating the Roadmap Increment; graduation evidence belongs to the Roadmap (Methodology §17.2).
+11. Close each Slice with the **implemented-architecture documentation impact** assessment the template carries in §2 and §6. It asks which current-state claims the Slice invalidated — not whether documentation was edited — and `no material impact`, with the inspected artifacts named, is a legitimate answer. The rule itself lives in the template; it is not restated here.
 
 ## Relationship to Agile / backlog work
 

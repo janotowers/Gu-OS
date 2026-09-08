@@ -35,9 +35,10 @@ Do **not** create a separate Slice Plan per Spec, per ADR, per Architecture Anal
 
 State once what every Slice in this plan inherits, so individual contracts record only their delta.
 
-- **Baseline Definition of Done:** {{e.g. type-check / lint / validators green; module selftests wired and green; flags off ⇒ inert; documentation synchronization note}}
+- **Baseline Definition of Done:** {{e.g. type-check / lint / validators green; module selftests wired and green; flags off ⇒ inert}}
 - **Baseline evidence commands:** {{the specific repo scripts}}
 - **Baseline security/tenancy assertions:** {{what every Slice must not regress}}
+- **Implemented-architecture documentation impact:** assessed and recorded in the Slice's Done record (§6). The question is **which claims in documents that own current / implemented architecture truth this Slice invalidated, made incomplete or changed in meaning** — not whether anyone remembered to update documentation. Identify the owning artifact through the repository's documentation authority map. Both outcomes are legitimate, and a Slice is **not** expected to edit architecture documentation: the requirement is an accurate assessment of claim impact, not documentation churn.
 
 ## 3. Slice index
 
@@ -110,6 +111,13 @@ One short entry per completed Slice. State the environment reached, the Release 
 - **Evidence:** {{suites, counts, run links}}
 - **Verified:** {{material assertions}}
 - **Not exercised:** {{what this Slice deliberately did not prove, and why}}
+- **Implemented-architecture documentation impact:** {{one of the two:
+
+  **A — changed.** {{the owning current-state artifact(s), identified through the documentation authority map}} · {{what this Slice implemented that invalidated the previous claim}} · {{where the corrected truth landed}}
+
+  **B — no material impact.** {{which plausible owning current-state artifacts were inspected}} · {{why no current implemented-architecture claim was invalidated, made incomplete or changed in meaning}}
+
+  Recorded here rather than at readiness, because the answer depends on what implementation actually did. `docs-sync note` and `no docs changed` are not answers — neither names an artifact or a claim.}}
 
 ## 7. Change log
 
