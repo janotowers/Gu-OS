@@ -153,6 +153,8 @@ Those belong in Git history, architecture/topic documents and reference analyses
 
 ## 10. Supersession plan
 
+**Status: steps 1-4 are done.** This roadmap exists at `docs/roadmap/gu-os-evolution-roadmap.md`, `docs/README.md` points **Product sequencing** here, `docs/business-brain-evolution-roadmap.md` is now a short supersession stub, and the old body was left in Git history rather than copied into a second file. Step 5 is **ongoing**: incoming links are corrected as they are found. The list below is retained as the record of the plan.
+
 With this roadmap approved:
 
 1. Create `docs/roadmap/gu-os-evolution-roadmap.md` from this document.

@@ -3,10 +3,14 @@
 This document records why the agent currently uses a **pre-graph skill selector**
 instead of a Claude Code-style "main model loads skills directly" flow, what the
 trade-offs are, and how we intend to evolve it before adding many more skills.
-The canonical product/roadmap version of this model lives in
-[`docs/business-brain-evolution-roadmap.md`](../business-brain-evolution-roadmap.md)
-under **"Skill selection and tool availability model"**; this file is the deeper
-technical rationale.
+This file is the deeper technical rationale for the model. The product/roadmap
+version of it was originally written in `docs/business-brain-evolution-roadmap.md`
+under **"Skill selection and tool availability model"**; that document is now
+**superseded** and reduced to a redirection stub, so its body survives only in Git
+history. Current **product sequencing** authority is
+[`docs/roadmap/gu-os-evolution-roadmap.md`](../roadmap/gu-os-evolution-roadmap.md),
+and what the runtime actually does today is owned by the code plus
+[`docs/architecture.md`](../architecture.md).
 
 The context for this decision is the `company-data` skill and BigQuery: it is not
 only a formatting playbook. When it is active, the runtime also injects tenant
@@ -36,8 +40,10 @@ LangGraph loop:
    tool narrowing is skipped. The agent still receives configured tools that pass
    normal availability checks (`user_tool_settings`, integrations, env flags,
    intent filters, risk/HITL rules).
-6. The main agent model (`openai/gpt-4o-mini` by default) receives the resulting
-   prompt and available tools, then decides which tool calls to make.
+6. The main agent model (`openai/gpt-5.4-mini` by default —
+   `DEFAULT_MAIN_AGENT_MODEL_ID` in `packages/agent/src/model.ts`, overridable
+   with `MAIN_AGENT_MODEL_ID`) receives the resulting prompt and available
+   tools, then decides which tool calls to make.
 
 So there are two separate model responsibilities:
 

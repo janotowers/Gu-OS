@@ -23,7 +23,7 @@ El rediseño se trabajara por fases para no bloquear la mejora visual con la ins
 - Usar datos ya existentes de `agent_messages`, `tool_calls` y `memories`.
 - No mostrar razonamiento interno crudo; mostrar estados operativos curados.
 - Refuerzo por turno: correlacion `turn_id` en mensajes y tool calls (persistencia en DB: migracion Supabase [`00013_agent_turn_correlation.sql`](../../packages/db/supabase/migrations/00013_agent_turn_correlation.sql); **aplicada en los entornos Ungga activos**; nuevos clones/despliegues siguen el flujo habitual de migraciones desde el repo); respuesta de `/api/chat` con `memoryUsed` (corto/largo plazo y previews legibles) y secciones de Flujo, Habilidades, Herramientas, Aprendizajes recientes.
-- La caja expandible de contexto base debe separar lo pre-turno de la evidencia del turno: Business Brain cargado, habilidades disponibles para seleccion y herramientas configuradas van en "Contexto preparado"; skill elegida, tools ejecutadas y memoria aplicada van en las tarjetas del turno. El modelo canonico esta documentado en `docs/business-brain-evolution-roadmap.md` ("Skill selection and tool availability model").
+- La caja expandible de contexto base debe separar lo pre-turno de la evidencia del turno: Business Brain cargado, habilidades disponibles para seleccion y herramientas configuradas van en "Contexto preparado"; skill elegida, tools ejecutadas y memoria aplicada van en las tarjetas del turno. Ese modelo se escribio originalmente en `docs/business-brain-evolution-roadmap.md` ("Skill selection and tool availability model"), hoy **superseded** y reducido a un stub: el detalle tecnico vigente vive en [`../tools-design/skill-routing.md`](../tools-design/skill-routing.md) y lo implementado en [`../architecture.md`](../architecture.md).
 - Actividad del turno: datos de sesion + payload en el flujo de chat; timeline en vivo vía SSE (Fase 3, ver abajo).
 - Preparar el panel para mostrar presencia del colaborador: voz, adjuntos, actividad proactiva y estado de heartbeat (Fase 4 / paralelo).
 
@@ -76,7 +76,7 @@ flowchart LR
 
 ## Alineacion con roadmap Business Brain
 
-- La **correlacion persistente por turno** esta alineada con el roadmap tecnico (`docs/business-brain-evolution-roadmap.md`, seccion *Operational streaming* / *Turn correlation en la DB*): migracion `00013` (aplicada en los entornos Ungga activos), indices, escritura desde el agente.
+- La **correlacion persistente por turno** se alineo con el roadmap tecnico de entonces (`docs/business-brain-evolution-roadmap.md`, secciones *Operational streaming* / *Turn correlation en la DB*; ese documento quedo **superseded** y su cuerpo vive en el historial de Git): migracion `00013` (aplicada en los entornos Ungga activos), indices, escritura desde el agente.
 - **Heartbeat proactivo** ya cuenta con runtime base: cron `POST /api/cron/heartbeat`, tabla `heartbeat_runs`, canal `agent_sessions.channel='heartbeat'`, allowlist de herramientas solo-lectura y modelo configurable (`HEARTBEAT_MODEL_ID`). Settings muestra configuracion/historial; la consola debe mostrar presencia viva desde `heartbeat_runs`.
 - **Scheduled tasks** ya existen como herramienta conversacional y runner cron (`scheduled_tasks` + `scheduled_task_runs`). La consola debe mostrar su presencia como automatizaciones programadas por el usuario, separadas de Heartbeat.
 
