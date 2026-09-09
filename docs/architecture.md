@@ -30,6 +30,7 @@
 | Clasificador conversacional de casos (+ 2ª opinión HITL `unclear`) | `OPERATIONAL_CONVERSATION_CLASSIFIER_MODEL_ID` | `openai/gpt-5.4-mini` |
 | Intérprete semántico de admisión (R1) | `RELATIONSHIP_ADMISSION_MODEL_ID` | `openai/gpt-5.4-mini` |
 | Juez de continuidad duplicado/supersesión (R1) | `RELATIONSHIP_CONTINUITY_MODEL_ID` | `openai/gpt-5.4-mini` |
+| Supervisor de Caso — juicio de siguiente trabajo (R1) | `RELATIONSHIP_SUPERVISOR_MODEL_ID` | `openai/gpt-5.4-mini` |
 | Vision / fotos | `IMAGE_VISION_MODEL_ID` | `openai/gpt-4.1-mini` |
 | Copy de listing | `LISTING_COPY_MODEL_ID` | `openai/gpt-4.1-mini` |
 
@@ -123,14 +124,15 @@ Planos durables en Postgres (agrupados; la lista completa de migraciones vive en
 | --- | --- |
 | Agente | `profiles`, `agent_sessions`, `agent_messages`, `tool_calls`, `memories`, `user_tool_settings`, `user_skill_settings`, `user_integrations`, `telegram_*`, `calendar_booking_links` |
 | Proactivo | `scheduled_tasks`, `scheduled_task_runs`, `heartbeat_runs` |
-| Casos operacionales | `operational_case_types`, `operational_cases`, `operational_case_events`, `case_facts`, `case_artifacts`, `artifact_inputs`, `case_approvals` |
+| Casos operacionales | `operational_case_types`, `operational_cases`, `operational_case_events`, `case_facts`, `case_artifacts`, `artifact_inputs`, `case_approvals`, `case_subjects`, `case_subject_external_refs` |
 | Workflows ejecutables | `workflow_definitions`, `account_feature_flags`, `evidence_records` |
 | Organización (R1) | `organizations`, `organization_memberships`, `contacts`, `organization_feature_flags`, `organization_tool_secrets`, `organization_policies`, `source_events`, `external_identity_bindings`, `case_relationships` |
 | Observabilidad | `ai_usage_events` |
 
-Dos precisiones, porque la tabla de arriba muestra **schema** y el diagrama muestra **flujos que existen hoy**:
+Tres precisiones, porque la tabla de arriba muestra **schema** y el diagrama muestra **flujos que existen hoy**:
 
-- El plano de Organización **existe en schema con RLS activa, pero ninguna ruta HTTP ni cron ejecuta hoy admisión ni resolución de relaciones**. Esos módulos (`apps/web/src/lib/relationship-admission/`, `relationship-resolution/`) no los importa ninguna route ni runner: se ejercitan por selftests, evals y los verificadores **operados a mano** `npm run verify:admission` / `npm run verify:resolution` contra el entorno hospedado de staging. No existe un runtime de aplicación Gu OS desplegado; `deliver-staging` entrega **migraciones** a un proyecto Supabase.
+- El plano de Organización **existe en schema con RLS activa, pero ninguna ruta HTTP ni cron ejecuta hoy admisión, resolución de relaciones ni el supervisor de Caso**. Esos módulos (`apps/web/src/lib/relationship-admission/`, `relationship-resolution/`, `relationship-supervisor/`) no los importa ninguna route ni runner: se ejercitan por selftests, evals y los verificadores **operados a mano** `npm run verify:admission` / `npm run verify:resolution` / `npm run verify:supervisor` contra el entorno hospedado de staging. No existe un runtime de aplicación Gu OS desplegado; `deliver-staging` entrega **migraciones** a un proyecto Supabase.
+- **Sujetos de Caso** (`case_subjects`): identidad duradera de algo que el Caso rastrea y que tiene historia propia — hoy compromisos (R1 SL-4); visitas más adelante. La fila es un **ancla de identidad sin estado**: no lleva status ni fechas, y todo lo que cambia vive en `case_facts` con `subject_id`, de modo que un cambio **supersede** en vez de sobreescribir. La clave del hecho queda limpia (`commitment.due`, sin id embebido) porque la identidad la aporta la columna. La contención es estructural, no convencional: la FK compuesta `(subject_id, case_id)` impide que un hecho apunte al sujeto de otro Caso, y como ninguna de las dos tablas nuevas lleva `organization_id`, la tenencia se deriva del Caso padre y no existe superficie donde pueda discrepar.
 - El **legacy gateway sí está cableado** al runtime del agente (`apps/web/src/lib/agent/wire-tool-deps.ts` → `packages/agent/src/tools/legacy-gateway-adapters.ts`): lecturas acotadas por capacidad contra Traditional Gu, sin ninguna ruta de escritura.
 
 ## Integraciones OAuth (GitHub y Google Calendar)
@@ -260,6 +262,8 @@ Era forward (aplicada por el CLI de Supabase):
 
 - `20260906040233_admission_policy_and_source_events.sql` — `organization_policies` (política de admisión versionada, ADR-108) y `source_events` (inbox de eventos de origen con claim/fencing).
 - `20260907024941_resolution_artifact_identity.sql` — **solo índices**: `uq_case_facts_resolution_closure` y `uq_operational_case_events_relationship`, que dan identidad estructural a los dos artefactos no-arista que escribe una resolución duplicate/supersession.
+- `20260908234107_case_subjects_and_subject_facts.sql` — `case_subjects` (ancla de identidad **estructuralmente inmutable**, sin columnas de ciclo de vida), su hijo append-only `case_subject_external_refs`, y la columna aditiva `case_facts.subject_id` con **FK compuesta** `(subject_id, case_id)`. Ninguna de las dos tablas nuevas lleva `organization_id`: la tenencia se deriva del Caso padre.
+- `20260908235635_supervisor_wake_identity.sql` — **solo índice**: `uq_operational_case_events_supervisor_wake`, una reconsideración por `(Caso, wake lógico)`.
 
 ## Uso de IA (observabilidad interna)
 

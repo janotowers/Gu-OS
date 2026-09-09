@@ -998,6 +998,13 @@ Este subsistema dejó de ser exclusivamente user-scoped, **sin romper nada de lo
   `case_artifacts`, `case_approvals` y `operational_case_events`, y hace la escritura
   server-only. La unique `(id, organization_id)` es el destino de los FK compuestos
   que hacen estructuralmente imposible que una fila hija cruce de tenant.
+- `case_subjects` y `case_subject_external_refs` llevan las mismas guardas, pero **no
+  llevan `organization_id`**: usan la otra forma de tenencia hija que el kernel ya
+  tenía —la de `operational_case_events`— y **derivan** la Organización del Caso padre
+  por el FK `case_id`. Elimina la superficie del problema en vez de vigilarla: donde no
+  hay columna, no hay valor que pueda discrepar del padre. La FK **compuesta**
+  `(subject_id, case_id)` cierra el resto: un hecho o una referencia externa no puede
+  engancharse al sujeto de otro Caso, y por tanto de otro tenant.
 - `operational_cases.runtime_authority` (`legacy` / `gu_os`) es deliberadamente
   *nullable* y **sin default**: un Caso de relación se crea en `legacy` porque el
   sistema legacy sigue decidiendo, y la autoridad solo se mueve por una operación
@@ -1006,12 +1013,22 @@ Este subsistema dejó de ser exclusivamente user-scoped, **sin romper nada de lo
   (`duplicate_of`, `superseded_by`, `split_from`, `transaction_association`) con una
   sola arista activa por `(from, to, type)`. Las relaciones se representan como
   aristas: **no mutan las filas de Caso**.
+- `case_subjects` da **identidad duradera** a algo que el Caso rastrea y que tiene
+  historia propia —compromisos hoy, visitas más adelante— como un ancla **sin estado**:
+  no lleva status ni fechas, y todo lo que cambia vive en `case_facts` con `subject_id`,
+  de modo que un cambio supersede en vez de sobreescribir. La clave del hecho queda
+  limpia (`commitment.due`) porque la identidad la aporta la columna, no el string.
 
 **Qué NO implica esto.** El cron y el runtime de casos descritos arriba siguen siendo
-el camino de los casos operativos user-scoped. La admisión que crea Casos Oportunidad
-sombra a partir de `source_events` **no la ejecuta hoy ninguna ruta HTTP ni cron**:
-vive en `apps/web/src/lib/relationship-admission/` y se ejercita por selftests, evals y
-verificadores operados a mano contra staging. Ver [`docs/architecture.md`](../architecture.md).
+el camino de los casos operativos user-scoped. Ni la admisión que crea Casos Oportunidad
+sombra a partir de `source_events`, ni la resolución duplicado/supersesión, ni el
+**supervisor de Caso** que reconsidera una Oportunidad y registra postura, compromisos y
+Work `agent_proposed` en modo sombra, **las ejecuta hoy ninguna ruta HTTP ni cron**:
+viven en `apps/web/src/lib/relationship-admission/`, `relationship-resolution/` y
+`relationship-supervisor/`, y se ejercitan por selftests, evals y verificadores operados
+a mano contra staging. El `lead_opportunity` declara su habilidad raíz por
+`default_skill_slug` —el binding que el case-runner usaría— pero ese runner no lo invoca
+hoy. Ver [`docs/architecture.md`](../architecture.md).
 
 ---
 

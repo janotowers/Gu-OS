@@ -55,6 +55,7 @@ flowchart TB
 - **Tipo de caso (`operational_case_types`)** define el "qué procedimiento es" (`property_optioning`, `lead_qualification`, etc.) y a qué skill compuesta apunta por default.
 - **Instancia (`operational_cases`)** es la unidad viva. Tiene estado, paso actual, deadline, contexto y versión para optimistic locking.
 - **Eventos (`operational_case_events`)** son la historia append-only. Reconstrucción completa siempre disponible.
+- **Sujetos (`case_subjects`)** son la identidad duradera de algo que el Caso rastrea y que tiene historia propia: compromisos hoy, visitas más adelante. La fila es un **ancla de identidad sin estado** — no lleva status ni fechas — y todo lo que cambia vive en `case_facts` con `subject_id`, de modo que un cambio **supersede** en vez de sobreescribir y la historia queda reconstruible. Su hijo append-only `case_subject_external_refs` guarda referencias externas que llegan tarde o cambian, como un conjunto con procedencia por fila en vez de un valor que se reescribe.
 
 Los dos campos con `?` en el diagrama son **opcionales por diseño** y se explican en §2.3: un Caso sin ellos es exactamente el Caso user-scoped que este subsistema siempre tuvo.
 
@@ -120,11 +121,22 @@ Sobre las filas que sí tienen Organización:
 
 - lectura por **membresía activa** (`is_active_org_member`), no por propiedad de fila;
 - policies **RESTRICTIVE** de guardia de tenencia en `operational_cases`, `case_facts`,
-  `case_artifacts`, `case_approvals` y `operational_case_events`;
+  `case_artifacts`, `case_approvals`, `operational_case_events`, `case_subjects` y
+  `case_subject_external_refs`;
 - escritura **solo desde el servidor** (service role + `authorizeOrgAction`);
 - la unique `(id, organization_id)` es el destino de los **FK compuestos** que hacen
   estructuralmente imposible que una fila hija pertenezca a otro tenant que su Caso.
   Es una garantía del schema, no una convención de código.
+
+**Dos formas de tenencia hija, ambas estructurales.** Las tablas hijas más antiguas
+*denormalizan* la clave del tenant y la comparan contra el Caso padre. `case_subjects` y
+`case_subject_external_refs` usan la otra forma que el kernel ya tenía —la de
+`operational_case_events`— y **no llevan `organization_id` en absoluto**: la Organización se
+**deriva** del Caso padre a través del FK `case_id`. La diferencia importa porque elimina la
+superficie del problema en vez de vigilarla: donde no hay columna, no hay valor que pueda
+discrepar del padre. Sobre esa base, la FK **compuesta** `(subject_id, case_id)` en
+`case_facts` y en las referencias externas hace imposible que un hecho o una referencia se
+enganchen al sujeto de otro Caso —y por tanto de otro tenant— sin ningún trigger.
 
 **`runtime_authority` (`legacy` / `gu_os`) — nullable y sin default.** Dice *qué
 runtime decide* sobre una Oportunidad. La ausencia de default es deliberada: un Caso
@@ -139,13 +151,27 @@ compuestos que obligan a que ambos Casos sean de la misma Organización. Es una
 **arista, no una mutación**: resolver un duplicado no reescribe filas de Caso, que es
 lo que permite reconstruir el linaje.
 
+**Identidad del despertar del supervisor.** El índice parcial único
+`uq_operational_case_events_supervisor_wake` da identidad estructural a una
+reconsideración por `(Caso, wake lógico)`. Existe porque el lease optimista de
+`markCaseProcessing` cerca a un worker vencido fuera de la **fila del Caso** —la versión
+se movió— pero no fuera del timeline append-only, y porque una reconsideración
+*programada* no tiene fila de `source_events` sobre la cual colapsar. Una guarda
+leer-y-si-falta-escribir no cierra ninguno de los dos huecos bajo concurrencia, así que
+la identidad es del schema.
+
 **Alcance de runtime — importante.** Nada de lo anterior cambia el cron ni el runtime
 de casos descritos en §4. La **admisión** que crea Casos Oportunidad sombra a partir
 de `source_events` **no la ejecuta hoy ninguna ruta HTTP ni ningún cron**: vive en
 `apps/web/src/lib/relationship-admission/`, no la importa ninguna route ni runner, y se
 ejercita por selftests, evals y verificadores operados a mano contra staging. Lo mismo
-aplica a la resolución duplicado/supersesión. Este subsistema, tal como corre hoy,
-sigue siendo el camino de los Casos operativos user-scoped.
+aplica a la resolución duplicado/supersesión y al **supervisor de Caso**
+(`apps/web/src/lib/relationship-supervisor/`), que registra postura, compromisos y Work
+`agent_proposed` en modo sombra: está implementado y **no está cableado** a ninguna
+route ni runner, y su evidencia hospedada corre por `npm run verify:supervisor`. El
+`lead_opportunity` sí declara su habilidad raíz por `default_skill_slug`, que es el
+binding que el case-runner usaría —pero ese runner no lo invoca hoy. Este subsistema,
+tal como corre hoy, sigue siendo el camino de los Casos operativos user-scoped.
 
 ---
 
