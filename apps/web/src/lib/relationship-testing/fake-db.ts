@@ -23,14 +23,22 @@ import type { DbClient } from "@agents/db";
 
 type Row = Record<string, unknown>;
 
+/** One branch of a PostgREST `.or(...)` expression. */
+type OrBranch =
+  | { op: "eq"; column: string; value: unknown }
+  | { op: "lte"; column: string; value: string }
+  | { op: "gte"; column: string; value: string }
+  | { op: "is"; column: string };
+
 type Filter =
   | { kind: "eq"; column: string; value: unknown }
   | { kind: "neq"; column: string; value: unknown }
   | { kind: "lte"; column: string; value: unknown }
+  | { kind: "gte"; column: string; value: unknown }
   | { kind: "is"; column: string; value: null }
   | { kind: "in"; column: string; values: unknown[] }
-  /** PostgREST `.or("a.eq.1,b.eq.2")` — any branch matching is enough. */
-  | { kind: "or"; branches: Array<{ column: string; value: unknown }> };
+  /** PostgREST `.or("a.eq.1,b.is.null")` — any branch matching is enough. */
+  | { kind: "or"; branches: OrBranch[] };
 
 /**
  * Resolves a PostgREST column reference, including the `col->>key` JSON form
@@ -104,9 +112,14 @@ function matches(row: Row, filters: Filter[]): boolean {
     // `or` carries branches rather than a single column, so it is resolved
     // before the column lookup the other kinds share.
     if (filter.kind === "or") {
-      return filter.branches.some(
-        (branch) => columnValue(row, branch.column) === branch.value
-      );
+      return filter.branches.some((branch) => {
+        const value = columnValue(row, branch.column);
+        if (branch.op === "is") return value === null || value === undefined;
+        if (value === null || value === undefined) return false;
+        if (branch.op === "lte") return String(value) <= branch.value;
+        if (branch.op === "gte") return String(value) >= branch.value;
+        return value === branch.value;
+      });
     }
     const actual = columnValue(row, filter.column);
     if (filter.kind === "eq") return actual === filter.value;
@@ -115,6 +128,10 @@ function matches(row: Row, filters: Filter[]): boolean {
       // Timestamps are compared as ISO strings, which sort chronologically.
       if (actual === null || actual === undefined) return false;
       return String(actual) <= String(filter.value);
+    }
+    if (filter.kind === "gte") {
+      if (actual === null || actual === undefined) return false;
+      return String(actual) >= String(filter.value);
     }
     if (filter.kind === "in") return filter.values.includes(actual);
     return actual === null || actual === undefined;
@@ -294,6 +311,10 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
         filters.push({ kind: "lte", column, value });
         return self;
       },
+      gte: (column: string, value: unknown) => {
+        filters.push({ kind: "gte", column, value });
+        return self;
+      },
       is: (column: string, value: null) => {
         filters.push({ kind: "is", column, value });
         return self;
@@ -305,18 +326,25 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
       /**
        * PostgREST `.or("from_case_id.eq.X,to_case_id.eq.Y")`.
        *
-       * Only the `column.eq.value` branch form is parsed, because that is the
-       * only form the real helpers use. Anything else throws rather than
-       * silently matching nothing, which would let a lineage query pass for
-       * the wrong reason.
+       * Parses the branch forms the real helpers actually use — `eq`, `is.null`,
+       * `lte` and `gte`. `is.null` and `lte` arrived with the case lease
+       * (`markCaseProcessing` asks for "unleased OR lease expired"), which R1
+       * SL-4 is the first Slice to exercise through this fake. Anything else
+       * still throws rather than silently matching nothing, which would let a
+       * query pass for the wrong reason.
        */
       or: (expression: string) => {
-        const branches = expression.split(",").map((branch) => {
+        const branches: OrBranch[] = expression.split(",").map((branch) => {
           const parts = branch.split(".");
-          if (parts.length < 3 || parts[1] !== "eq") {
-            throw new Error(`fake-db: unsupported .or() branch: ${branch}`);
-          }
-          return { column: parts[0], value: parts.slice(2).join(".") };
+          const column = parts[0];
+          const op = parts[1];
+          // Values may be quoted by the caller (`col.lte."2026-01-01T00:00:00Z"`).
+          const raw = parts.slice(2).join(".").replace(/^"|"$/g, "");
+          if (op === "eq") return { op: "eq", column, value: raw };
+          if (op === "lte") return { op: "lte", column, value: raw };
+          if (op === "gte") return { op: "gte", column, value: raw };
+          if (op === "is" && raw === "null") return { op: "is", column };
+          throw new Error(`fake-db: unsupported .or() branch: ${branch}`);
         });
         filters.push({ kind: "or", branches });
         return self;

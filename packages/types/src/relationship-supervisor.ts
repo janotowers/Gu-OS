@@ -235,6 +235,33 @@ export const SUPERVISOR_UNCERTAINTY_KINDS: readonly SupervisorUncertaintyKind[] 
 export const SUPERVISOR_RECONSIDERED_EVENT_KIND = "supervisor_reconsidered" as const;
 
 /**
+ * `payload.kind` of the settlement that closes one reconsideration.
+ *
+ * A reconsideration is **two durable writes, not one**, for the same reason
+ * SL-3's canonicalization was: the first claims the wake under the
+ * M-WAKE-IDENTITY unique index, so a duplicate delivery conflicts *before* it
+ * can create Work or commitments; the second records what that reconsideration
+ * actually produced. The timeline is append-only, so the outcome cannot be
+ * folded back into the claim by editing it.
+ *
+ * A reconsideration with no settlement is therefore a **recoverable
+ * interrupted run**, not a corrupt one: the wake is claimed, nothing durable
+ * was silently half-created, and the gap is visible rather than inferred.
+ */
+export const SUPERVISOR_SETTLED_EVENT_KIND =
+  "supervisor_reconsideration_settled" as const;
+
+/** What one reconsideration produced. Written after the wake is claimed. */
+export interface SupervisorReconsiderationSettlement {
+  kind: typeof SUPERVISOR_SETTLED_EVENT_KIND;
+  v: 1;
+  wake_key: string;
+  yield_posture: SupervisorYieldPosture;
+  proposed_work_ids: readonly string[];
+  commitment_subject_ids: readonly string[];
+}
+
+/**
  * One reconsideration, as it lands on the Case timeline.
  *
  * Everything needed to reconstruct the decision is here, and nothing that would
