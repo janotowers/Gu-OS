@@ -110,7 +110,20 @@ export type SupervisorRefusalReason =
   | "case_not_supervisable"
   /** The Case belongs to a different Organization than the caller's context. */
   | "case_not_in_organization"
-  /** Another worker holds the per-Case lease right now. */
+  /**
+   * The per-Case lease could not be taken.
+   *
+   * Deliberately ONE reason, not two. A future `next_action_at` means both
+   * "another worker holds this" and "its own scheduled reconsideration has not
+   * arrived yet" — the CURRENT kernel uses one column for the lease and for the
+   * next wake, and nothing in the row separates them: a five-minute lease and a
+   * five-minute reconsideration are byte-identical. Splitting this into two
+   * reasons was tried and reverted, because the guess would have been wrong
+   * every time real contention occurred. The observable fact — how far in the
+   * future the wake sits — is reported by the caller instead of being guessed
+   * at here. The real cron never sees either case: it selects only Cases whose
+   * `next_action_at` has already passed.
+   */
   | "case_busy";
 
 /**
@@ -515,7 +528,11 @@ export async function runSupervisorWake(
       })
   );
 
-  const settled = settleProposal({ proposal, eligibility });
+  const settled = settleProposal({
+    proposal,
+    eligibility,
+    judgeModelId: request.judge.modelId,
+  });
 
   // ── 7. Claim the wake, BEFORE anything durable exists (SA-4.6).
   const record: SupervisorReconsiderationRecord = {
@@ -669,6 +686,8 @@ export async function runSupervisorWake(
 function settleProposal(params: {
   proposal: NextWorkProposal | null;
   eligibility: DeliveryEligibility;
+  /** Which model the judge uses. Null when no model is involved. */
+  judgeModelId: string | null;
 }): {
   posture: SupervisorPosture;
   rationale: string;
@@ -695,7 +714,8 @@ function settleProposal(params: {
     };
   }
 
-  const modelId = process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID?.trim() || null;
+  // From the judge, never from the environment: see NextWorkJudge.modelId.
+  const modelId = params.judgeModelId;
 
   if (proposal.capability_gap) {
     return {

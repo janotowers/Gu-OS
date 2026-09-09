@@ -136,6 +136,7 @@ const WITH_COMMITMENT: NextWorkProposal = {
 
 function judgeFor(scenarioId: string): NextWorkJudge {
   return {
+    modelId: null,
     async propose() {
       return scenarioId === "commitment-bearing-opportunity" ? WITH_COMMITMENT : QUIET;
     },
@@ -150,6 +151,7 @@ function judgeFor(scenarioId: string): NextWorkJudge {
  */
 function multiJudge(fake: FakeDb): NextWorkJudge {
   return {
+    modelId: null,
     async propose(input) {
       const scenario = SCENARIOS.find((s) =>
         input.recentMessages.length > 0
