@@ -125,6 +125,14 @@ Verification guidance:
 
 A coding agent saying “done” is not evidence. Report what was run, what passed/failed, and what remains unverified.
 
+**Background and polling work must be bounded and observable.** A monitor that fails must never be read as *the awaited condition is not satisfied yet*: absence of a signal is not a negative signal.
+
+- Establish that an external executable or capability is available **before** depending on it. A missing dependency is a failure, not a pending result.
+- Keep “not satisfied yet” distinguishable from dependency, query, parsing, authentication, execution or monitor failure. Where they cannot be told apart, treat the outcome as failure.
+- On monitor or tool failure, terminate or surface it explicitly — never keep waiting.
+- Give finite monitoring a deterministic terminal condition **and** a finite deadline, and release processes it no longer needs once that state is reached.
+- Before reporting completion or stopping at a human-authority boundary, inspect outstanding background work so nothing stale is left running unreported.
+
 For bugs, prefer:
 
 `Reproduce -> Isolate -> Classify cause -> Identify owning artifact -> Minimum justified repair -> Regression evidence -> Documentation reconciliation`
