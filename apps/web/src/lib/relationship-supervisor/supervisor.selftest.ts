@@ -230,10 +230,14 @@ function harness(overrides: FixtureOverrides = {}): FakeDb {
 /** A judge that says exactly what a test needs it to say, and counts calls. */
 function stubJudge(
   proposal: NextWorkProposal | null,
-  seen: SupervisorJudgeInput[] = []
+  seen: SupervisorJudgeInput[] = [],
+  modelId: string | null = null
 ): NextWorkJudge & { calls: SupervisorJudgeInput[] } {
   return {
     calls: seen,
+    // Null by default on purpose: a stub is not a model, and a fixture must not
+    // be able to make a reconsideration look as though a real one judged it.
+    modelId,
     async propose(input) {
       seen.push(input);
       return proposal;
@@ -381,11 +385,20 @@ async function main(): Promise<void> {
     );
   });
 
-  await t("a Case another worker holds is refused, not double-supervised", async () => {
+  await t("a Case with a future wake time is refused, not double-supervised", async () => {
     // A lease reaching into the future is the CURRENT convention for "busy".
     // Computed from real wall-clock rather than the injected NOW, because
     // `markCaseProcessing` is a DB helper that reads the real clock — pinning
     // it to a fixture instant would make the test pass or fail by calendar.
+    //
+    // ONE reason covers two situations, deliberately. A future `next_action_at`
+    // means both "another worker holds this" and "its own scheduled
+    // reconsideration has not arrived yet": the CURRENT kernel uses one column
+    // for the lease and for the next wake, and a five-minute lease is
+    // byte-identical to a five-minute reconsideration. Reporting two reasons
+    // was tried against the hosted run and reverted — the guess would be wrong
+    // every time real contention occurred. The verifier reports how far out the
+    // wake sits and lets the operator read it.
     const fake = harness({
       leaseUntil: new Date(Date.now() + 30 * 60_000).toISOString(),
     });
@@ -393,8 +406,9 @@ async function main(): Promise<void> {
     const result = await wake(fake.client, judge);
     assert.equal(result.status, "refused");
     assert.equal(result.status === "refused" ? result.reason : null, "case_busy");
-    assert.equal(judge.calls.length, 0);
+    assert.equal(judge.calls.length, 0, "no model spend on a Case we cannot lease");
     assert.equal(reconsiderations(fake).length, 0);
+    assert.equal(fake.tables.work_items.length, 0, "and nothing durable");
   });
 
   console.log("\nSA-4.1 / SA-4.2 deliberate no-op, recorded with rationale");
@@ -995,6 +1009,29 @@ async function main(): Promise<void> {
     assert.ok(normalizeNextWorkProposal(QUIET));
   });
 
+  await t("the record names the model that judged — from the judge, not the env", async () => {
+    // SL-3 discarded a hosted run over exactly this failure: its verifier read
+    // an unset override variable instead of the resolved constant and recorded
+    // a model name that said nothing. The resolved id now travels with the
+    // judge, so the record cannot be silently blank.
+    const fake = harness();
+    const result = await wake(
+      fake.client,
+      stubJudge(QUIET, [], "openai/gpt-5.4-mini")
+    );
+    assert.equal(result.status, "reconsidered");
+    if (result.status !== "reconsidered") return;
+    assert.equal(result.record.model_id, "openai/gpt-5.4-mini");
+  });
+
+  await t("a stub judge cannot make a reconsideration look model-judged", async () => {
+    const fake = harness();
+    const result = await wake(fake.client, stubJudge(QUIET));
+    assert.equal(result.status, "reconsidered");
+    if (result.status !== "reconsidered") return;
+    assert.equal(result.record.model_id, null);
+  });
+
   console.log("\nS2 §8.21 safe yield");
 
   await t("a reconsideration with no re-entry path is refused, not recorded", () => {
@@ -1304,6 +1341,7 @@ async function main(): Promise<void> {
       // under test is the CONTEXT the supervisor binds around it, not the
       // metering call itself.
       const metering: NextWorkJudge = {
+        modelId: "openai/gpt-5.4-mini",
         async propose() {
           await recordOpenRouterCallUsage({
             modelId: "openai/gpt-5.4-mini",

@@ -160,6 +160,17 @@ export interface SupervisorJudgeInput {
 }
 
 export interface NextWorkJudge {
+  /**
+   * Which model this judge actually uses, or null when no model is involved.
+   *
+   * Carried by the judge rather than read from the environment at record time.
+   * SL-3 discarded a hosted run over exactly this: its verifier read an unset
+   * override variable instead of the resolved constant, and recorded a model
+   * name that said nothing. Evidence has to say WHICH model judged, and only
+   * the judge knows. A stub returns null, so a fixture can never make a
+   * reconsideration look as though a real model produced it.
+   */
+  readonly modelId: string | null;
   /** Returns a proposal, or null when no judgment could be made. */
   propose(input: SupervisorJudgeInput): Promise<NextWorkProposal | null>;
 }
@@ -267,6 +278,9 @@ export function buildNextWorkPrompt(input: SupervisorJudgeInput): string {
  */
 export function createOpenRouterNextWorkJudge(): NextWorkJudge {
   return {
+    // The RESOLVED constant — env override when set, documented default
+    // otherwise — not `process.env` read at record time.
+    modelId: RELATIONSHIP_SUPERVISOR_MODEL_ID,
     async propose(input) {
       const apiKey = process.env.OPENROUTER_API_KEY;
       if (!apiKey) return null;

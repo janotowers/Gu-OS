@@ -83,7 +83,7 @@ import {
   getOperationalCase,
   getOrganizationById,
   getOrganizationFlag,
-  getPublishedDefinition,
+  getLatestPublishedDefinitionForUser,
   insertCaseFact,
   type DbClient,
 } from "@agents/db";
@@ -328,6 +328,22 @@ export async function phaseWake(
       console.log(
         `  coalesced ${entry.scenario} -> already reconsidered for ${today}` +
           ` (SA-4.6; nothing durable created)`
+      );
+    } else if (result.status === "refused" && result.reason === "case_busy") {
+      // Reported as the observable fact rather than as a guess. The kernel uses
+      // one column for the lease and for the next scheduled reconsideration, so
+      // "a worker holds it" and "it is not due yet" are indistinguishable from
+      // the row — and the honest thing is to say how far out the wake sits and
+      // let the operator read it, not to pick one and sound certain.
+      const row = await getOperationalCase(ctx.db, entry.id);
+      const dueAt = row?.next_action_at ?? null;
+      const hours = dueAt
+        ? ((new Date(dueAt).getTime() - Date.now()) / 3_600_000).toFixed(1)
+        : null;
+      console.log(
+        `  skipped ${entry.scenario} -> lease not taken; next_action_at=${dueAt ?? "null"}` +
+          (hours ? ` (${hours}h out)` : "") +
+          " — either a worker holds it or its own reconsideration is not due yet; nothing was written"
       );
     } else {
       console.log(`  ${result.status.toUpperCase()}  ${entry.scenario} -> ${result.reason}`);
@@ -667,13 +683,21 @@ async function main(): Promise<void> {
     caseType?.default_skill_slug ?? "none"
   );
 
+  // Resolved the way `createOperationalCase` itself resolves it — by case type,
+  // private-published over global-published — rather than by definition id. The
+  // first hosted run caught this: `getPublishedDefinition` takes a definition
+  // UUID, and passing the case-type slug failed with `invalid input syntax for
+  // type uuid`. It failed in PREFLIGHT, before any durable write, which is
+  // where a verifier defect should surface.
   const definition = caseType
-    ? await getPublishedDefinition(db, LEAD_OPPORTUNITY_CASE_TYPE, 1)
+    ? await getLatestPublishedDefinitionForUser(db, ownerUserId, LEAD_OPPORTUNITY_CASE_TYPE)
     : null;
   recordPreflight(
-    "the pinned lead_opportunity definition v1 is published",
+    "a published lead_opportunity definition resolves for this owner",
     Boolean(definition),
-    definition ? `status=${definition.status}` : "not found"
+    definition
+      ? `v${definition.version} status=${definition.status} scope=${definition.owner_scope}`
+      : "not found"
   );
 
   // The M-SUBJECTS shape has to exist before a wake can record a commitment.
