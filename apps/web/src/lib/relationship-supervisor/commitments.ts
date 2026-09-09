@@ -171,6 +171,24 @@ export async function recordCommitments(params: {
 }
 
 /**
+ * The stable keys of the commitments already tracked on this Case.
+ *
+ * The judge is told never to return one of these. Sameness of a promise is
+ * settled by this key, not by the prose summary, so handing the model the keys
+ * replaces a judgment it was being asked to make with a fact it can check.
+ */
+export function listTrackedCommitmentKeys(
+  commitments: readonly SubjectWithFacts[]
+): string[] {
+  const keys: string[] = [];
+  for (const entry of commitments) {
+    const key = entry.subject.attrs_jsonb?.[COMMITMENT_KEY_ATTR];
+    if (typeof key === "string" && key !== "") keys.push(key);
+  }
+  return keys;
+}
+
+/**
  * One line per open commitment, for the judge's context.
  *
  * Only commitments that are still open are shown. A fulfilled or cancelled one

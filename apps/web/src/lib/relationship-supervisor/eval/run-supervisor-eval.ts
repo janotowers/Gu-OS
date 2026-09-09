@@ -83,7 +83,20 @@ interface Scenario {
   must_propose_work?: boolean;
   must_not_propose_work?: boolean;
   must_detect_commitment?: boolean;
+  /** No commitment exists in this situation at all. Reporting one is FABRICATION. */
   must_not_detect_commitment?: boolean;
+  /**
+   * A commitment exists but is already tracked. Repeating it is REDUNDANCY —
+   * an ordinary semantic failure, not fabrication.
+   *
+   * The distinction is the one the frozen bar itself draws: `fabricated_work_bar`
+   * is zero because "one fabricated commitment silently misrepresents a promise
+   * the brokerage never made". A re-listed commitment misrepresents nothing —
+   * the promise is real and already recorded, and `recordCommitments` is
+   * idempotent on its key, so nothing durable is created twice. Scoring it as
+   * fabrication would let a redundancy breach a bar written for invention.
+   */
+  must_not_repeat_commitment?: boolean;
   must_report_capability_gap?: boolean;
   must_report_insufficient_evidence?: boolean;
   /** The judge must never suggest reaching the prospect. */
@@ -166,6 +179,13 @@ function scoreScenario(
         .join(" | ")}`
     );
   }
+  if (scenario.must_not_repeat_commitment && hasCommitment) {
+    violations.push(
+      `re-listed an already-tracked commitment: ${proposal.commitments
+        .map((c) => c.expected_outcome)
+        .join(" | ")}`
+    );
+  }
   if (scenario.expected_commitment_actor && hasCommitment) {
     const actors = proposal.commitments.map((c) => c.actor);
     if (!actors.includes(scenario.expected_commitment_actor as never)) {
@@ -202,15 +222,17 @@ function scoreScenario(
   return { violations, fabrication };
 }
 
-async function main(): Promise<void> {
-  loadWebEnvLocal();
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.error(
-      "eval:supervisor requires OPENROUTER_API_KEY — the point of this run is to exercise a real model."
-    );
-    process.exit(1);
-  }
+interface RunOutcome {
+  index: number;
+  results: ScenarioResult[];
+  failures: number;
+  failureRate: number;
+  fabrications: number;
+  noJudgment: number;
+  held: boolean;
+}
 
+async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
   const judge = createOpenRouterNextWorkJudge();
   const results: ScenarioResult[] = [];
 
@@ -227,39 +249,103 @@ async function main(): Promise<void> {
       passed,
     });
 
-    const mark = passed ? "ok  " : "FAIL";
-    console.log(
-      `  ${mark} ${scenario.id} — ${proposal ? proposal.posture : "null"}` +
-        (fabrication.length > 0 ? "  << FABRICATION" : "")
-    );
-    for (const line of [...violations, ...fabrication]) {
-      console.log(`       ${line}`);
-    }
-    if (!passed && proposal) {
-      console.log(`       rationale: ${proposal.rationale}`);
+    if (verbose || !passed) {
+      const mark = passed ? "ok  " : "FAIL";
+      console.log(
+        `  ${mark} ${scenario.id} — ${proposal ? proposal.posture : "null"}` +
+          (fabrication.length > 0 ? "  << FABRICATION" : "")
+      );
+      for (const line of [...violations, ...fabrication]) {
+        console.log(`       ${line}`);
+      }
+      if (!passed && proposal) {
+        console.log(`       rationale: ${proposal.rationale}`);
+      }
     }
   }
 
-  const total = results.length;
-  const failures = results.filter((r) => !r.passed);
-  const fabrications = results.filter((r) => r.fabrication.length > 0);
-  const failureRate = failures.length / total;
-  const noJudgment = results.filter((r) => r.proposal === null);
+  const failures = results.filter((r) => !r.passed).length;
+  const fabrications = results.filter((r) => r.fabrication.length > 0).length;
+  const failureRate = failures / results.length;
+  return {
+    index,
+    results,
+    failures,
+    failureRate,
+    fabrications,
+    noJudgment: results.filter((r) => r.proposal === null).length,
+    held:
+      failureRate <= evalSet.failure_rate_bar &&
+      fabrications <= evalSet.fabricated_work_bar,
+  };
+}
+
+async function main(): Promise<void> {
+  loadWebEnvLocal();
+  if (!process.env.OPENROUTER_API_KEY) {
+    console.error(
+      "eval:supervisor requires OPENROUTER_API_KEY — the point of this run is to exercise a real model."
+    );
+    process.exit(1);
+  }
+
+  // Model-mediated behavior is not a single number, and one run cannot tell a
+  // stable pass from a lucky one. `SUPERVISOR_EVAL_RUNS` repeats the whole set
+  // and reports how many runs held the bars, which is the honest shape of the
+  // evidence when the thing being measured is a judgment (Methodology §17.1 on
+  // variance). Default 1, so an ordinary check stays cheap.
+  const runCount = Math.max(1, Number(process.env.SUPERVISOR_EVAL_RUNS ?? 1));
+  const runs: RunOutcome[] = [];
+
+  for (let i = 1; i <= runCount; i += 1) {
+    if (runCount > 1) console.log(`\n— run ${i} of ${runCount} —`);
+    runs.push(await runOnce(i, runCount === 1));
+  }
+
+  const total = evalSet.scenarios.length;
+  const heldRuns = runs.filter((r) => r.held).length;
+  const rates = runs.map((r) => r.failureRate);
 
   console.log("");
-  console.log(`scenarios:        ${total}`);
+  console.log(`scenarios:        ${total} × ${runCount} run(s)`);
   console.log(
-    `failures:         ${failures.length} (${(failureRate * 100).toFixed(1)}%) ` +
-      `— bar ${(evalSet.failure_rate_bar * 100).toFixed(0)}%`
+    `failure rate:     ${rates
+      .map((r) => `${(r * 100).toFixed(1)}%`)
+      .join(", ")} — bar ${(evalSet.failure_rate_bar * 100).toFixed(0)}%`
   );
   console.log(
-    `fabrications:     ${fabrications.length} — bar ${evalSet.fabricated_work_bar}`
+    `fabrications:     ${runs.map((r) => r.fabrications).join(", ")} — bar ${
+      evalSet.fabricated_work_bar
+    }`
   );
-  if (noJudgment.length > 0) {
+  const noJudgment = runs.reduce((sum, r) => sum + r.noJudgment, 0);
+  if (noJudgment > 0) {
     console.log(
-      `no judgment:      ${noJudgment.length} — counted as failures, since a` +
-        ` missing judgment measures nothing about judgment`
+      `no judgment:      ${noJudgment} across all runs — counted as failures,` +
+        ` since a missing judgment measures nothing about judgment`
     );
+  }
+  console.log(`runs holding:     ${heldRuns} of ${runCount}`);
+
+  // Scenarios that fail in EVERY run are a systematic finding; ones that fail
+  // in some are instability. Reporting them apart matters, because only the
+  // first is something a prompt or a model change can be expected to fix.
+  const failsPerScenario = new Map<string, number>();
+  for (const run of runs) {
+    for (const result of run.results) {
+      if (!result.passed) {
+        failsPerScenario.set(result.id, (failsPerScenario.get(result.id) ?? 0) + 1);
+      }
+    }
+  }
+  if (failsPerScenario.size > 0) {
+    console.log("");
+    console.log("per-scenario failures (of runs):");
+    for (const [id, count] of [...failsPerScenario].sort((a, b) => b[1] - a[1])) {
+      console.log(
+        `  ${id}: ${count}/${runCount}${count === runCount ? "  (systematic)" : ""}`
+      );
+    }
   }
 
   const artifactPath = process.env.SUPERVISOR_EVAL_JSON;
@@ -277,17 +363,23 @@ async function main(): Promise<void> {
             "default (configuration)",
           failure_rate_bar: evalSet.failure_rate_bar,
           fabricated_work_bar: evalSet.fabricated_work_bar,
-          total,
-          failures: failures.length,
-          failureRate,
-          fabrications: fabrications.length,
-          results: results.map((r) => ({
-            id: r.id,
-            posture: r.proposal?.posture ?? null,
-            passed: r.passed,
-            violations: r.violations,
-            fabrication: r.fabrication,
-            rationale: r.proposal?.rationale ?? null,
+          scenarios: total,
+          runCount,
+          runsHoldingBothBars: heldRuns,
+          runs: runs.map((run) => ({
+            run: run.index,
+            failures: run.failures,
+            failureRate: run.failureRate,
+            fabrications: run.fabrications,
+            held: run.held,
+            results: run.results.map((r) => ({
+              id: r.id,
+              posture: r.proposal?.posture ?? null,
+              passed: r.passed,
+              violations: r.violations,
+              fabrication: r.fabrication,
+              rationale: r.proposal?.rationale ?? null,
+            })),
           })),
         },
         null,
@@ -298,16 +390,11 @@ async function main(): Promise<void> {
     console.log(`artifact:         ${artifactPath}`);
   }
 
-  const rateHeld = failureRate <= evalSet.failure_rate_bar;
-  const fabricationHeld = fabrications.length <= evalSet.fabricated_work_bar;
-
-  if (!rateHeld || !fabricationHeld) {
+  if (heldRuns < runCount) {
     console.error("");
-    if (!rateHeld) console.error("FAILED: semantic failure rate above the frozen bar.");
-    if (!fabricationHeld) {
-      console.error("FAILED: the supervisor manufactured work, a commitment or certainty.");
-      for (const r of fabrications) console.error(`  - ${r.id}: ${r.fabrication.join("; ")}`);
-    }
+    console.error(
+      `FAILED: ${runCount - heldRuns} of ${runCount} run(s) breached a frozen bar.`
+    );
     console.error(
       "The bars were stated before this set was first run and are not to be moved to fit a result."
     );
@@ -315,7 +402,9 @@ async function main(): Promise<void> {
   }
 
   console.log("");
-  console.log("supervisor eval: both frozen bars held.");
+  console.log(
+    `supervisor eval: both frozen bars held in all ${runCount} run(s).`
+  );
 }
 
 main().catch((error) => {

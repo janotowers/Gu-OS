@@ -131,6 +131,14 @@ export interface SupervisorJudgeInput {
   recentMessages: readonly string[];
   /** Open commitments already tracked, so they are not re-created. */
   openCommitments: readonly string[];
+  /**
+   * The stable keys of those commitments.
+   *
+   * Shown because "do not re-list what is tracked" is only actionable if the
+   * model can tell what counts as the same promise. Asking it to infer sameness
+   * from prose was asking for a judgment the executor already has an answer to.
+   */
+  trackedCommitmentKeys: readonly string[];
   /** Open, blocked and recently settled Work, summarized. */
   workSummary: readonly string[];
   /** What earlier reconsiderations concluded, oldest first. */
@@ -190,24 +198,36 @@ export function buildNextWorkPrompt(input: SupervisorJudgeInput): string {
     "Return ONLY compact JSON matching this shape:",
     '{"posture":"no_op|wait|gather_research_reconcile|work|targeted_human_input","diagnosis":string|null,"rationale":string,"insufficient_evidence":boolean,"capability_gap":string|null,"proposed_work":[{"work_type":string,"purpose":string,"durable":boolean}],"commitments":[{"expected_outcome":string,"actor":"gu|advisor|prospect|external","due_at":string|null,"due_stated":boolean,"key":string}],"reconsider_in_hours":number|null}',
     "",
+    "SHAPE RULES (a response that breaks one of these is discarded entirely):",
+    "- `proposed_work` MUST be empty when posture is `no_op` or `wait`.",
+    "- `proposed_work` MUST contain at least one item for every other posture.",
+    "",
     "Rules:",
     "- A wake-up is RECONSIDERATION, not action. A timer firing, a Case existing, or silence lasting N days is never by itself a reason to do anything.",
     "- Diagnose before choosing: name what currently constrains progress, or what real opportunity exists to advance it.",
     "- `no_op` is a correct, expected answer when no useful work exists. Do NOT manufacture activity to look busy. Choosing nothing deliberately is a better answer than inventing a task.",
     "- `wait` is for when something specific is expected from someone else and waiting is the strategy. `no_op` is for when nothing useful exists at all.",
     "- The best next work often improves the NEXT decision rather than producing the next interaction: verifying a fact, reconciling conflicting evidence, or gathering what is missing.",
+    "- CONTACT BEING UNAVAILABLE IS NOT A REASON TO DO NOTHING. Internal work that improves the next decision — verifying, researching, reconciling, preparing — stays fully worthwhile while the prospect cannot be contacted. Judge usefulness by what advances the objective, never by whether a message could be sent.",
+    "- A commitment that is DUE, or nearly due, is a reason to DO the work it requires — not a reason to wait. Waiting on your own obligation is how a promise gets missed.",
     "- Prefer stopping to looping. If earlier reconsiderations already tried the same thing without new information, change strategy, wait, or stop — do not repeat it.",
-    "- Only propose work that is bounded and clearly worth its cost. Do not propose research because research is possible.",
+    "- A technical failure of prior work is NOT a commercial signal. It says nothing about the prospect or the viability of the objective, and must never be read as the deal going badly.",
+    "- Read the Work list by STATUS. An item that is `todo` or running is already underway and needs nothing from you — proposing more work on it duplicates it. An item that is `blocked` or `failed` is unfinished responsibility, and resolving it — retry, replan, reconcile, or ask a human — is usually the useful work, unless something else is clearly more useful or nothing can be done about it yet.",
+    "- Stay inside THIS objective. If the evidence reveals a materially DIFFERENT commercial objective — for example the prospect also wants to sell or list something they own — that is not work to absorb here. Choose `targeted_human_input` and say a human must confirm it. Silently widening the objective is a serious error.",
+    "- Only propose work that is bounded and clearly worth its cost. Do not propose research because research is possible, and do not propose work merely because you have capabilities that are idle.",
+    "- Internal work is not a consolation prize for being unable to message. It has to genuinely advance the objective. If the only thing you can think of is bookkeeping, re-reading evidence you already have, restating something already recorded, or duplicating work that is ALREADY underway, the correct answer is `no_op` or `wait`.",
     "- `durable` is true only when the work must survive this session: it can fail and need retry, it waits on someone, or it produces a material effect. Ordinary reading and reasoning is not durable work.",
-    "- A commitment is a SPECIFIC expected outcome someone is reasonably relying on, with an actor, that would matter if forgotten. A vague intention is not a commitment. Do not re-list commitments that are already tracked.",
+    "- A commitment is a SPECIFIC expected outcome someone is reasonably relying on, with an actor, that would matter if forgotten. A vague intention is not a commitment.",
+    "- The commitment actor is WHO IS EXPECTED TO ACT: `gu` = Gu itself, the AI, acting autonomously; `advisor` = the human real-estate advisor or anyone on their team; `prospect` = the prospective client; `external` = a third party or external system. Attribute it to whoever actually made the promise — a promise the advisor typed is the advisor's, not Gu's.",
+    "- NEVER list a commitment that already appears under 'Commitments already tracked', and never reuse one of the tracked keys below. It is recorded; repeating it is an error even when the conversation mentions it again. `commitments` is for promises that are NOT yet tracked, and is usually empty.",
     "- `key` for a commitment must be short, lowercase, and stable across wake-ups for the SAME promise, so it is not recorded twice.",
     "- If the evidence is too thin to judge, say so with insufficient_evidence and choose no_op. Never fabricate certainty or unsupported work.",
-    "- If the situation needs a capability that is not listed as available, name it in capability_gap rather than inventing a workaround.",
+    "- You may only use capabilities LISTED as available. Before proposing any work, name to yourself which listed capability performs it; if you cannot, it is a capability gap. Checking a legal, registry or document status, contacting a third party, or reading anything outside the listed capabilities are all gaps, however ordinary they sound. Put the gap in capability_gap and choose `targeted_human_input`, `wait` or `no_op`. Never propose work you cannot actually perform.",
     "- rationale is one short sentence naming the evidence you used.",
     "",
     input.outboundAvailable
       ? "Prospect-facing contact is currently available."
-      : "Prospect-facing contact is NOT available right now. Choose only internal work, waiting, or nothing. Do not propose messaging the prospect.",
+      : "Prospect-facing contact is NOT available right now, so do not propose messaging the prospect. This restricts the CHANNEL, not the work: internal work remains as valuable as ever.",
     "",
     `Wake reason: ${input.wakeReason}`,
     `Objective: ${JSON.stringify(input.objective ?? "")}`,
@@ -219,9 +239,15 @@ export function buildNextWorkPrompt(input: SupervisorJudgeInput): string {
     section("Current facts", input.currentFacts),
     section("Recent messages (oldest first)", input.recentMessages),
     section("Commitments already tracked", input.openCommitments),
+    input.trackedCommitmentKeys.length > 0
+      ? `Tracked commitment keys — NEVER return any of these: ${input.trackedCommitmentKeys.join(", ")}`
+      : "",
     section("Work", input.workSummary),
     section("Earlier reconsiderations (oldest first)", input.postureHistory),
-    section("Capabilities available for internal work", input.availableCapabilities),
+    section(
+      "Capabilities available for internal work (EXHAUSTIVE — anything not on this list is a capability gap)",
+      input.availableCapabilities
+    ),
   ]
     .filter((line) => line !== "")
     .join("\n");

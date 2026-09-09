@@ -45,8 +45,8 @@ import {
   insertOperationalCaseEvent,
   isRelationshipOpsEnabled,
   listCurrentSubjectFactsByKind,
+  listWorkItemsForCase,
   markCaseProcessing,
-  summarizeCaseWork,
   updateOperationalCase,
   type DbClient,
 } from "@agents/db";
@@ -67,6 +67,7 @@ import {
   isShadowReachablePosture,
 } from "@agents/types";
 import {
+  listTrackedCommitmentKeys,
   recordCommitments,
   summarizeOpenCommitments,
   type RecordedCommitment,
@@ -458,7 +459,7 @@ export async function runSupervisorWake(
     opCase.id,
     "commitment"
   );
-  const workSummary = await summarizeCaseWork(db, userId, [opCase.id]);
+  const work = await listWorkItemsForCase(db, userId, opCase.id);
   const history = await listPostureHistory(db, opCase.id);
   const { objective, category } = readObjective(currentFacts);
 
@@ -466,7 +467,6 @@ export async function runSupervisorWake(
   const eligibility = resolveDeliveryEligibility({ currentFacts, now });
 
   // ── 6. The one semantic judgment.
-  const summary = workSummary.get(opCase.id);
   const proposal = await request.judge.propose({
     wakeReason: wake.reason,
     objective,
@@ -474,13 +474,14 @@ export async function runSupervisorWake(
     currentFacts: factLines(currentFacts),
     recentMessages: request.recentMessages ?? [],
     openCommitments: summarizeOpenCommitments(commitments),
-    workSummary: summary
-      ? [
-          `total: ${summary.total}`,
-          `blocked: ${summary.blocked}`,
-          ...Object.entries(summary.byStatus).map(([k, v]) => `${k}: ${v}`),
-        ]
-      : [],
+    trackedCommitmentKeys: listTrackedCommitmentKeys(commitments),
+    // S2 §8.2 compiles "open / blocked / recent Work", not counts of it. The
+    // work TYPES are what let the judge see that something it is about to
+    // propose is already in flight — asking it to avoid duplicating work it
+    // could not see was asking for a judgment it had no basis to make.
+    workSummary: work.map(
+      (item) => `${item.work_type} — ${item.status} (${item.origin})`
+    ),
     postureHistory: history.map(
       (r) => `${r.posture} — ${r.rationale}${r.uncertainty ? ` (${r.uncertainty})` : ""}`
     ),
@@ -550,7 +551,23 @@ export async function runSupervisorWake(
     now,
   });
 
-  const durable = settled.proposedWork.filter((w) => w.durable);
+  // Duplicate work is refused deterministically, not judged.
+  //
+  // S2 §8.16 ("not every thought becomes a Work Item"), EC-26 and AC-38 all
+  // forbid re-doing work that is already in flight, and Methodology §13 puts
+  // repeatable guarantees in code rather than in a prompt. The judge is shown
+  // the open Work and told not to duplicate it; this is what makes the outcome
+  // certain when it does anyway. Eval scoring deliberately measures the
+  // PROPOSAL, not this filter, so the guard makes behavior safe without making
+  // the measurement flattering.
+  const openWorkTypes = new Set(
+    work
+      .filter((item) => item.status !== "done" && item.status !== "cancelled")
+      .map((item) => item.work_type)
+  );
+  const durable = settled.proposedWork.filter(
+    (w) => w.durable && !openWorkTypes.has(w.work_type)
+  );
   let workIds: string[] = [];
   if (durable.length > 0 && opCase.workflow_definition_version !== null) {
     const created = await createWorkItemsFromTemplates(db, {

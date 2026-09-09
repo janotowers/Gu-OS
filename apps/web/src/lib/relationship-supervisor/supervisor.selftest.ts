@@ -517,6 +517,60 @@ async function main(): Promise<void> {
     }
   });
 
+  await t("work that duplicates an open item is refused, not created twice", async () => {
+    // Deterministic, not judged. The judge is shown the open Work and told not
+    // to duplicate it; this is what makes the outcome certain when it does
+    // anyway (S2 §8.16, EC-26, AC-38; Methodology §13).
+    const fake = harness();
+    fake.tables.work_items.push({
+      id: "existing-work",
+      case_id: CASE_ID,
+      user_id: ADVISOR,
+      work_type: "verify_budget",
+      status: "todo",
+      origin: "agent_proposed",
+      idempotency_key: "earlier:verify_budget",
+      priority: 100,
+      created_at: "2026-09-07T00:00:00.000Z",
+    });
+
+    const result = await wake(fake.client, stubJudge(WORKING));
+    assert.equal(result.status, "reconsidered");
+    assert.equal(
+      fake.tables.work_items.length,
+      1,
+      "the open item stands; no second one is created"
+    );
+    if (result.status === "reconsidered") {
+      assert.deepEqual(result.record.proposed_work_ids, []);
+      assert.equal(
+        result.record.yield_posture,
+        "work_underway",
+        "the posture is still work — the work exists, it just already existed"
+      );
+    }
+  });
+
+  await t("a completed item of the same type does not block new work", async () => {
+    // The guard is about work in flight. Work that finished is history, and
+    // refusing to ever repeat it would turn a duplicate guard into a
+    // once-per-Case rule nothing approves.
+    const fake = harness();
+    fake.tables.work_items.push({
+      id: "done-work",
+      case_id: CASE_ID,
+      user_id: ADVISOR,
+      work_type: "verify_budget",
+      status: "done",
+      origin: "agent_proposed",
+      idempotency_key: "earlier:verify_budget",
+      priority: 100,
+      created_at: "2026-09-07T00:00:00.000Z",
+    });
+    await wake(fake.client, stubJudge(WORKING));
+    assert.equal(fake.tables.work_items.length, 2);
+  });
+
   await t("non-durable proposed work creates no Work Item (S2 §8.16)", async () => {
     const fake = harness();
     await wake(
