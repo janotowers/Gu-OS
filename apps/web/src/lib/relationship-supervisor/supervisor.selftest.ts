@@ -43,6 +43,8 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { insertCaseFact, listCaseFacts, type DbClient } from "@agents/db";
+import { recordOpenRouterCallUsage, setAiUsageRecorder } from "@agents/agent";
+import type { AiUsageEventInput } from "@agents/types";
 import {
   COMMITMENT_FACT_KEYS,
   SHADOW_REACHABLE_POSTURES,
@@ -1287,6 +1289,68 @@ async function main(): Promise<void> {
     assert.ok(objective);
     assert.equal(objective?.superseded_by, null);
     assert.equal(objective?.subject_id, null);
+  });
+
+  console.log("\ncorrelation coverage (shared baseline, from SL-2)");
+
+  await t("the supervisor's model call is correlated to Organization AND Case", async () => {
+    const captured: AiUsageEventInput[] = [];
+    setAiUsageRecorder((event) => {
+      captured.push(event);
+    });
+    try {
+      const fake = harness();
+      // A judge that meters exactly the way the production one does. What is
+      // under test is the CONTEXT the supervisor binds around it, not the
+      // metering call itself.
+      const metering: NextWorkJudge = {
+        async propose() {
+          await recordOpenRouterCallUsage({
+            modelId: "openai/gpt-5.4-mini",
+            modelRole: "relationship_supervisor_next_work",
+            operation: "classification",
+            usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 },
+          });
+          return QUIET;
+        },
+      };
+      const result = await wake(fake.client, metering);
+      assert.equal(result.status, "reconsidered");
+
+      assert.equal(
+        captured.length,
+        1,
+        "the supervisor model call is metered, not dropped for want of a context"
+      );
+      assert.equal(captured[0].organizationId, PILOT_ORG);
+      assert.equal(captured[0].userId, ADVISOR);
+      assert.equal(
+        captured[0].modelRole,
+        "relationship_supervisor_next_work",
+        "the supervisor judge is attributable as its own role"
+      );
+      assert.equal(
+        captured[0].operationalCaseId,
+        CASE_ID,
+        "unlike admission, a reconsideration always has a Case — so it is bound, not left null"
+      );
+    } finally {
+      setAiUsageRecorder(null);
+    }
+  });
+
+  await t("with flags off there is no model call to correlate", async () => {
+    const captured: AiUsageEventInput[] = [];
+    setAiUsageRecorder((event) => {
+      captured.push(event);
+    });
+    try {
+      const fake = harness({ relationshipOps: false });
+      await wake(fake.client, stubJudge(QUIET));
+      assert.equal(captured.length, 0, "flags off ⇒ no model spend at all");
+    } finally {
+      setAiUsageRecorder(null);
+    }
   });
 
   console.log("\neval set");

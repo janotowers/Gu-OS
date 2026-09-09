@@ -66,6 +66,7 @@ import {
   SUPERVISOR_SETTLED_EVENT_KIND,
   isShadowReachablePosture,
 } from "@agents/types";
+import { runWithAiUsageContext } from "@agents/agent";
 import {
   listTrackedCommitmentKeys,
   recordCommitments,
@@ -467,35 +468,52 @@ export async function runSupervisorWake(
   const eligibility = resolveDeliveryEligibility({ currentFacts, now });
 
   // ── 6. The one semantic judgment.
-  const proposal = await request.judge.propose({
-    wakeReason: wake.reason,
-    objective,
-    objectiveCategory: category,
-    currentFacts: factLines(currentFacts),
-    recentMessages: request.recentMessages ?? [],
-    openCommitments: summarizeOpenCommitments(commitments),
-    trackedCommitmentKeys: listTrackedCommitmentKeys(commitments),
-    // S2 §8.2 compiles "open / blocked / recent Work", not counts of it. The
-    // work TYPES are what let the judge see that something it is about to
-    // propose is already in flight — asking it to avoid duplicating work it
-    // could not see was asking for a judgment it had no basis to make.
-    workSummary: work.map(
-      (item) => `${item.work_type} — ${item.status} (${item.origin})`
-    ),
-    postureHistory: history.map(
-      (r) => `${r.posture} — ${r.rationale}${r.uncertainty ? ` (${r.uncertainty})` : ""}`
-    ),
-    daysSinceLastInbound: request.lastInboundAt
-      ? Math.floor(
-          (now.getTime() - new Date(request.lastInboundAt).getTime()) / 86_400_000
-        )
-      : null,
-    // Always false in SL-4: the stage is shadow, so nothing prospect-facing is
-    // reachable regardless of what the eligibility gate says. Both facts are
-    // recorded, and the deterministic assertion is the one that binds.
-    outboundAvailable: false,
-    availableCapabilities: request.availableCapabilities ?? [],
-  });
+  //
+  // Wrapped in the ambient AI-usage context so the Organization AND the Case
+  // that incurred the call are what its cost correlates to — the shared-baseline
+  // correlation-coverage check that has applied since SL-2 (Technical Plan
+  // §7 (a), TD-10 (a)). Unlike admission, which runs before any Case exists,
+  // the supervisor always has one, so `operational_case_id` is available here
+  // and is bound rather than left null.
+  const proposal = await runWithAiUsageContext(
+    {
+      userId,
+      organizationId,
+      operationalCaseId: opCase.id,
+      channel: "case_runner",
+    },
+    db,
+    () =>
+      request.judge.propose({
+        wakeReason: wake.reason,
+        objective,
+        objectiveCategory: category,
+        currentFacts: factLines(currentFacts),
+        recentMessages: request.recentMessages ?? [],
+        openCommitments: summarizeOpenCommitments(commitments),
+        trackedCommitmentKeys: listTrackedCommitmentKeys(commitments),
+        // S2 §8.2 compiles "open / blocked / recent Work", not counts of it. The
+        // work TYPES are what let the judge see that something it is about to
+        // propose is already in flight — asking it to avoid duplicating work it
+        // could not see was asking for a judgment it had no basis to make.
+        workSummary: work.map(
+          (item) => `${item.work_type} — ${item.status} (${item.origin})`
+        ),
+        postureHistory: history.map(
+          (r) => `${r.posture} — ${r.rationale}${r.uncertainty ? ` (${r.uncertainty})` : ""}`
+        ),
+        daysSinceLastInbound: request.lastInboundAt
+          ? Math.floor(
+              (now.getTime() - new Date(request.lastInboundAt).getTime()) / 86_400_000
+            )
+          : null,
+        // Always false in SL-4: the stage is shadow, so nothing prospect-facing is
+        // reachable regardless of what the eligibility gate says. Both facts are
+        // recorded, and the deterministic assertion is the one that binds.
+        outboundAvailable: false,
+        availableCapabilities: request.availableCapabilities ?? [],
+      })
+  );
 
   const settled = settleProposal({ proposal, eligibility });
 
