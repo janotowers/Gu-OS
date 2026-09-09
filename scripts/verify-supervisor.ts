@@ -74,6 +74,7 @@
 
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import {
   createOperationalCase,
@@ -92,6 +93,7 @@ import {
   reconstructSituation,
   runSupervisorWake,
   summarizePostureDistribution,
+  type NextWorkJudge,
 } from "../apps/web/src/lib/relationship-supervisor";
 import {
   allPassed,
@@ -110,7 +112,7 @@ const LEAD_OPPORTUNITY_CASE_TYPE = "lead_opportunity";
 /** Stamped on every Case this verifier creates, so it is never mistaken for a lead. */
 const SCENARIO_KIND = "sl4_controlled";
 /** SA-4.3's "multiple days" as this run reads it: three is the smallest honest one. */
-const REQUIRED_DISTINCT_DAYS = 3;
+export const REQUIRED_DISTINCT_DAYS = 3;
 
 const preflight: HostedCheck[] = [];
 
@@ -155,7 +157,7 @@ interface ScenarioSeed {
   availableCapabilities: string[];
 }
 
-const SCENARIOS: ScenarioSeed[] = [
+export const SCENARIOS: ScenarioSeed[] = [
   {
     id: "quiescent-opportunity",
     title:
@@ -197,7 +199,7 @@ const SCENARIOS: ScenarioSeed[] = [
 // Phases
 // ============================================================================
 
-interface RunContext {
+export interface RunContext {
   db: DbClient;
   organizationId: string;
   ownerUserId: string;
@@ -222,7 +224,7 @@ async function findRunCases(
   );
 }
 
-async function phaseSeed(
+export async function phaseSeed(
   ctx: RunContext,
   caseTypeId: string,
   definitionId: string,
@@ -282,7 +284,10 @@ async function phaseSeed(
   );
 }
 
-async function phaseWake(ctx: RunContext): Promise<void> {
+export async function phaseWake(
+  ctx: RunContext,
+  judgeOverride?: NextWorkJudge
+): Promise<void> {
   const cases = await findRunCases(ctx);
   if (cases.length === 0) {
     throw new Error(`no controlled Cases for run "${ctx.runLabel}" — seed first.`);
@@ -293,7 +298,9 @@ async function phaseWake(ctx: RunContext): Promise<void> {
   // coalesces — and it makes it impossible for repeated runs to inflate the day
   // span the evidence reports.
   const today = new Date().toISOString().slice(0, 10);
-  const judge = createOpenRouterNextWorkJudge();
+  // Injectable so the phase I/O can be exercised without a model or a hosted
+  // environment. Production always takes the default.
+  const judge = judgeOverride ?? createOpenRouterNextWorkJudge();
 
   for (const entry of cases) {
     const scenario = SCENARIOS.find((s) => s.id === entry.scenario);
@@ -328,7 +335,7 @@ async function phaseWake(ctx: RunContext): Promise<void> {
   }
 }
 
-async function phaseVerify(
+export async function phaseVerify(
   ctx: RunContext,
   jsonPath: string | undefined
 ): Promise<boolean> {
@@ -723,7 +730,16 @@ async function main(): Promise<void> {
   console.log("SL-4 hosted verification passed.");
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+// Only run the CLI when this file IS the entry point. Without the guard, a test
+// that imports a phase would execute the whole verifier — including its
+// fail-closed target resolution — as an import side effect.
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}
