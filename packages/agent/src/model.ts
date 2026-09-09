@@ -68,6 +68,14 @@ export const DEFAULT_RELATIONSHIP_ADMISSION_MODEL_ID = "openai/gpt-5.4-mini";
  * corta con salida JSON). Override con `RELATIONSHIP_CONTINUITY_MODEL_ID`.
  */
 export const DEFAULT_RELATIONSHIP_CONTINUITY_MODEL_ID = "openai/gpt-5.4-mini";
+/**
+ * Default del intérprete de siguiente-trabajo del Case Supervisor (R1 SL-4).
+ * Mismo modelo por defecto que admisión y continuidad: ningún artefacto de
+ * gobierno prescribe uno, y la tarea es de la misma clase (juicio situacional
+ * corto con salida JSON estricta). Override con
+ * `RELATIONSHIP_SUPERVISOR_MODEL_ID`.
+ */
+export const DEFAULT_RELATIONSHIP_SUPERVISOR_MODEL_ID = "openai/gpt-5.4-mini";
 /** Default vision (analyze_property_images y tools de foto). */
 export const DEFAULT_IMAGE_VISION_MODEL_ID = "openai/gpt-4.1-mini";
 /** Default redacción comercial (prepare_listing_description_draft). */
@@ -110,6 +118,11 @@ export const RELATIONSHIP_ADMISSION_MODEL_ID =
 export const RELATIONSHIP_CONTINUITY_MODEL_ID =
   process.env.RELATIONSHIP_CONTINUITY_MODEL_ID?.trim() ||
   DEFAULT_RELATIONSHIP_CONTINUITY_MODEL_ID;
+
+/** Intérprete de siguiente-trabajo del supervisor SL-4 (env override > default). */
+export const RELATIONSHIP_SUPERVISOR_MODEL_ID =
+  process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID?.trim() ||
+  DEFAULT_RELATIONSHIP_SUPERVISOR_MODEL_ID;
 
 /** Vision / análisis de imágenes (env override > default). */
 export const IMAGE_VISION_MODEL_ID =

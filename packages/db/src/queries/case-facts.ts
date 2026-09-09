@@ -19,6 +19,17 @@ export interface InsertCaseFactInput {
   sourceKind: CaseFactSourceKind;
   sourceRef?: string | null;
   confidence?: number | null;
+  /**
+   * Scopes the fact to a `case_subjects` row (R1 SL-4, TD-14). Omitted or null
+   * = case-level, which is what every caller before SL-4 means and how they all
+   * keep behaving byte-identically.
+   *
+   * The consequence that matters: fact identity is `(case_id, fact_key,
+   * subject_id)`, so two Commitments can each carry a current `commitment.due`
+   * without one superseding the other. Supersession stays code-managed and
+   * per-scope — there is no unique constraint, matching the CURRENT design.
+   */
+  subjectId?: string | null;
 }
 
 export interface InsertCaseFactResult {
@@ -38,14 +49,24 @@ export async function insertCaseFact(
   db: DbClient,
   input: InsertCaseFactInput
 ): Promise<InsertCaseFactResult> {
-  const { data: priorData, error: priorError } = await db
+  const subjectId = input.subjectId ?? null;
+
+  // The subject predicate is what keeps the two scopes from colliding: a
+  // subject fact must never supersede a case-level fact of the same key, and a
+  // fact under one Commitment must never supersede one under another (TD-14
+  // point 1). With no subject the predicate is `IS NULL`, which is exactly the
+  // query every pre-SL-4 caller was already issuing.
+  const priorQuery = db
     .from("case_facts")
     .select("*")
     .eq("user_id", input.userId)
     .eq("case_id", input.caseId)
     .eq("fact_key", input.factKey)
-    .is("superseded_by", null)
-    .order("recorded_at", { ascending: false });
+    .is("superseded_by", null);
+  const { data: priorData, error: priorError } = await (subjectId === null
+    ? priorQuery.is("subject_id", null)
+    : priorQuery.eq("subject_id", subjectId)
+  ).order("recorded_at", { ascending: false });
   if (priorError) throw priorError;
   const priorRows = (priorData ?? []) as CaseFact[];
 
@@ -59,6 +80,7 @@ export async function insertCaseFact(
       source_kind: input.sourceKind,
       source_ref: input.sourceRef ?? null,
       confidence: input.confidence ?? null,
+      subject_id: subjectId,
     })
     .select("*")
     .single();
@@ -153,6 +175,13 @@ export async function insertCaseFactOnce(
   const fact = data as CaseFact;
 
   // ¿Hay otro vigente para esta clave que no sea el nuestro?
+  //
+  // Restringido a nivel de Caso (`subject_id is null`) desde R1 SL-4. Este
+  // helper es case-level por contrato — no acepta `subjectId` — y sin la
+  // restricción un hecho con alcance de sujeto que compartiera la clave
+  // contaría como "otro vigente" y degradaría esta evidencia a historia por un
+  // motivo que no es suyo. Para los llamadores actuales el comportamiento es
+  // idéntico: ninguno escribe sujetos.
   const { data: currentData, error: currentError } = await db
     .from("case_facts")
     .select("*")
@@ -160,6 +189,7 @@ export async function insertCaseFactOnce(
     .eq("case_id", input.caseId)
     .eq("fact_key", input.factKey)
     .is("superseded_by", null)
+    .is("subject_id", null)
     .order("recorded_at", { ascending: false });
   if (currentError) throw currentError;
   const others = ((currentData ?? []) as CaseFact[]).filter(
@@ -223,11 +253,26 @@ export async function getCaseFactById(
   return (data as CaseFact | null) ?? null;
 }
 
+/**
+ * Qué mitad del espacio de hechos se lee (TD-14).
+ *
+ * `case_level` es el default **deliberado**, no una comodidad: todo llamador
+ * anterior a SL-4 quiere hechos del Caso, y su contrato Map<fact_key, fact>
+ * sólo está libre de colisiones bajo esa restricción. Dejar el default en
+ * "todos" haría que un hecho de sujeto apareciera, sin aviso, en una lectura
+ * que nunca supo que los sujetos existen.
+ */
+export type CaseFactSubjectScope = "case_level" | "subject" | "all";
+
 export interface ListCaseFactsOptions {
   factKey?: string;
   /** Incluir filas reemplazadas (historia completa). Default: false. */
   includeSuperseded?: boolean;
   limit?: number;
+  /** Default: `case_level`. Ver `CaseFactSubjectScope`. */
+  subjectScope?: CaseFactSubjectScope;
+  /** Requerido cuando `subjectScope` es `subject`. */
+  subjectId?: string;
 }
 
 export async function listCaseFacts(
@@ -236,6 +281,10 @@ export async function listCaseFacts(
   caseId: string,
   opts: ListCaseFactsOptions = {}
 ): Promise<CaseFact[]> {
+  const scope = opts.subjectScope ?? "case_level";
+  if (scope === "subject" && !opts.subjectId) {
+    throw new Error("listCaseFacts: subjectScope 'subject' requires subjectId");
+  }
   let query = db
     .from("case_facts")
     .select("*")
@@ -245,6 +294,8 @@ export async function listCaseFacts(
     .limit(Math.max(1, Math.min(opts.limit ?? 500, 1000)));
   if (opts.factKey) query = query.eq("fact_key", opts.factKey);
   if (!opts.includeSuperseded) query = query.is("superseded_by", null);
+  if (scope === "case_level") query = query.is("subject_id", null);
+  if (scope === "subject") query = query.eq("subject_id", opts.subjectId as string);
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as CaseFact[];
@@ -253,6 +304,13 @@ export async function listCaseFacts(
 /**
  * Hechos vigentes del caso, uno por fact_key (el más reciente gana si una
  * corrida interrumpida dejó dos filas sin supersesión).
+ *
+ * Firma y semántica intactas desde SL-4 **porque** se restringe a
+ * `subject_id is null` (TD-14 punto 2). El plano de Impacto y el contexto del
+ * supervisor consumen este Map y sus dependencias declaradas son cadenas
+ * estáticas dentro de definiciones publicadas: no pueden nombrar un sujeto por
+ * instancia, así que un hecho de sujeto aquí sólo podría colisionar con uno del
+ * Caso que sí es una entrada declarada.
  */
 export async function getCurrentCaseFacts(
   db: DbClient,
@@ -263,6 +321,30 @@ export async function getCurrentCaseFacts(
   const byKey = new Map<string, CaseFact>();
   for (const row of rows) {
     // rows viene ordenado recorded_at desc: la primera por clave es la vigente.
+    if (!byKey.has(row.fact_key)) byKey.set(row.fact_key, row);
+  }
+  return byKey;
+}
+
+/**
+ * Hechos vigentes de UN sujeto, uno por fact_key.
+ *
+ * Libre de colisiones por construcción: la clave sólo tiene que ser única
+ * dentro del sujeto, que es justamente lo que permite que `commitment.due` sea
+ * una clave limpia en vez de llevar el id dentro (SA-4.4).
+ */
+export async function getCurrentSubjectFacts(
+  db: DbClient,
+  userId: string,
+  caseId: string,
+  subjectId: string
+): Promise<Map<string, CaseFact>> {
+  const rows = await listCaseFacts(db, userId, caseId, {
+    subjectScope: "subject",
+    subjectId,
+  });
+  const byKey = new Map<string, CaseFact>();
+  for (const row of rows) {
     if (!byKey.has(row.fact_key)) byKey.set(row.fact_key, row);
   }
   return byKey;

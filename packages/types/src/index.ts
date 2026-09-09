@@ -1140,3 +1140,5 @@ export * from "./legacy-gateway";
 export * from "./organization-policies";
 export * from "./relationship-admission";
 export * from "./source-events";
+export * from "./case-subjects";
+export * from "./relationship-supervisor";

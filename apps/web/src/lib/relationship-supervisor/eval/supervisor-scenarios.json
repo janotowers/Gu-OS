@@ -1,0 +1,644 @@
+{
+  "recorded": {
+    "values": "INVENTED. Every situation below is synthetic. R1 SL-4's Definition of Done requires an eval/scenario set with the S2 §15 rationale rubric for next-work choice; it does not require pilot-derived situations, and a shadow Slice has no organic corpus of multi-day supervisor decisions to harvest. The shapes are modelled on S2 §8.2 (the decision sequence), §8.3 (work discovery), §8.5 (learn before acting), §8.13 (commitments), §8.17 (diminishing returns), §8.19 (waiting as a strategy), the AC-01…AC-04 acceptance scenarios in scope for this Slice, and the edge cases EC-01, EC-20, EC-23, EC-25, EC-26, EC-29, EC-30 and EC-40. No production lead, message, contact or property is reproduced here.",
+    "gap": "This set is wholly synthetic, which is a real limitation and is stated rather than hidden: it measures whether the supervisor follows the approved situational semantics, not how it behaves on the actual distribution of Alebrixe Opportunities. It also cannot measure multi-day coherence — a single-turn eval sees one situation at a time, and posture-history coherence across days is RS-2 hosted evidence (SA-4.3), not something a fixture can produce. Pilot-derived situations would enter the same way SL-2's real openings did: captured under an explicit bounded authorization, redacted, and labelled by human review independently of the model's own output, with what the model said never copied into the expectation.",
+    "barEstablishedBy": "PROPOSED AND FROZEN BY THE CODING AGENT on 2026-09-08, BEFORE this set was run even once, per Methodology §14.1 and the SL-4 Definition of Done — not by a human, and with no human approval sought or given at that point. Methodology §14.1 requires that a MATERIAL product/risk threshold be reviewed and RATIFIED by the appropriate human authority before it can be used to CLOSE the governed Slice. That ratification has NOT happened yet. Until it does, this bar is the agent's frozen proposal and nothing here may be read as human-accepted risk.",
+    "whyTheseTwoBars": "The two error directions are not equally costly, so they are not pooled. `failure_rate_bar` measures ordinary semantic accuracy: choosing a defensible posture for the situation. `fabricated_work_bar` is ZERO and measures the one failure this Slice exists to detect — manufacturing activity, a commitment, or confident work that the evidence does not support. S2's whole quality bar is built around deliberate no-op being a correct answer and quiet not being broken; a supervisor that invents work to look busy fails the Slice however accurate its other judgments are.",
+    "runHistory": "RECORDED IN FULL, INCLUDING THE FAILURES, because a tidied history would hide the only thing that made this evidence worth anything. FIRST RUN (2026-09-08) BREACHED BOTH BARS: 8/16 failures (50%) against a 20% bar, and 2 fabrications against a bar of 0. The bars were NOT moved and not one expected label was changed at any point. What changed was the implementation and, once, the verifier. REPAIR 1 — THE PROMPT WAS UNDER-SPECIFIED AGAINST S2. Five governing rules the set legitimately tests were simply absent from it, and the model failed exactly those scenarios: that unavailable CONTACT does not make internal work worthless (§8.1 invariant 5, AC-03) — the model twice read 'cannot message' as 'nothing to do'; that a DUE commitment is a reason to do the work rather than to wait (§8.13, §8.15); that a technical work failure is not a commercial signal (EC-15, EC-33, AC-48); that a materially new commercial objective goes to a human instead of being absorbed (invariant 38, EC-30, AC-46); and that only LISTED capabilities may be used (invariant 36, EC-25, AC-37). The normalizer's shape constraint was also unstated, which is why one scenario produced no usable judgment at all. REPAIR 2 — THE VERIFIER CONFLATED TWO DIFFERENT FAILURES. Both 'fabrications' in the first run were the model re-listing a commitment the scenario had already given it as tracked. That is REDUNDANCY, not invention: the promise is real, already recorded, and `recordCommitments` is idempotent on its key, so nothing durable is created twice. The zero bar was written for the opposite thing — a promise the brokerage never made — as `bar_rationale` says in as many words. `must_not_repeat_commitment` now scores redundancy as an ordinary failure; `must_not_detect_commitment` keeps fabrication semantics, which `vague-intention-is-not-a-commitment` continues to police. The bar number did not move. REPAIR 3 — TWO INTERFACE DEFECTS, not prompt wording. The judge was being asked not to duplicate open Work and not to re-list tracked commitments, while being shown NEITHER the open Work's types (only aggregate counts) NOR the tracked commitment keys. It was being asked for judgments it had no basis to make. Both are now supplied, and the capability list is labelled exhaustive. S2 §8.2 asks the context compile for 'open / blocked / recent Work', not counts of it, so this was under-implementing TD-8 rather than tuning. AN ATTEMPT THAT WAS REVERTED AS PHRASED: an absolute 'blocked work is yours to resolve, never no_op' rule fixed the systematic failure but pushed the model toward action generally, and fabrications rose from 0 to 1-2 per run. It was re-phrased to key on work STATUS — `todo` is underway and needs nothing, `blocked`/`failed` is unfinished responsibility — which is what EC-15 and §8.16 actually say. That is the version in the prompt. A DIFFERENT MODEL WAS TRIED AND REJECTED ON EVIDENCE: `anthropic/claude-haiku-4.5` scored 50% across three runs, mostly by emitting proposals the normalizer had to discard as structurally incoherent. The default `openai/gpt-5.4-mini` stands. FINAL MEASUREMENT: TWO INDEPENDENT BATCHES OF FIVE RUNS EACH — 10 runs total. Both frozen bars held in ALL TEN. Failure rates 6.3%, 12.5%, 18.8%, 12.5%, 12.5% and 12.5%, 18.8%, 12.5%, 6.3%, 6.3%; ZERO fabrications in every run. Measured over repeated runs deliberately: an earlier single passing run was followed by a failing one, and a bar that a judgment crosses one time in three is not held by a single lucky measurement.",
+    "knownWeakness": "`work-failed-technically` fails in 10 of 10 runs — the one SYSTEMATIC finding, recorded rather than tuned away. Given a Work Item left `blocked` by a technical failure and a prospect waiting, the supervisor reliably chooses `no_op`. It does NOT do the forbidden thing — it never reads the failure as commercial bad news — but it also does not pick the failure up, which EC-15 and §8.21's stopping conditions ask of it. It sits inside the failure-rate bar, so it does not breach anything; it is a real limit of this model at this prompt and is stated so that nobody reads a passing run as meaning the behavior is uniformly good. `conflicting-availability` and `capability-not-available` fail intermittently (2-4 and 1-3 of 5) — variance rather than a systematic gap."
+  },
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "bar_rationale": "0.2 mirrors the overall semantic bar SL-3 froze for a task of the same class (short situational judgment with strict JSON output), and is deliberately not tightened on the strength of SL-3's observed results — a bar borrowed from another Slice's OUTCOME would be a bar set by evidence rather than before it. This set is harder than SL-3's: several scenarios have more than one defensible posture, which is exactly what S2 AC-31 says ('selection explainable via current context; no universal score required'), so scoring accepts any listed posture and judges the rationale against the scenario's rubric. `fabricated_work_bar` is 0 because there is no acceptable rate of manufactured work: EC-20 and EC-40 make deliberate quiescence a correct outcome, and one fabricated commitment silently misrepresents a promise the brokerage never made.",
+  "scenarios": [
+    {
+      "id": "quiet-nothing-new",
+      "label": "Timer fires; the prospect was answered and nothing has changed",
+      "covers": [
+        "deliberate_no_op",
+        "timer_is_not_action"
+      ],
+      "acceptable_postures": [
+        "no_op",
+        "wait"
+      ],
+      "must_not_propose_work": true,
+      "rubric": "The rationale must say that nothing material changed since the last exchange. It must NOT justify contact by elapsed time, and must not invent a reason to reach out.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar casa en Zibatá para mudarse el próximo año",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "opportunity.objective: {\"objective\":\"Comprar casa en Zibatá\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ¿me pasas opciones en Zibatá?",
+          "Asesor: claro, te mando tres esta semana",
+          "Prospecto: perfecto, gracias"
+        ],
+        "openCommitments": [
+          "Enviar tres opciones en Zibatá — actor: advisor — due: 2026-09-12"
+        ],
+        "workSummary": [
+          "assemble_three_zibata_options — todo (agent_proposed)"
+        ],
+        "postureHistory": [
+          "work — created work to assemble the three options"
+        ],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "read_recent_messages"
+        ],
+        "trackedCommitmentKeys": [
+          "send_three_zibata_options"
+        ]
+      },
+      "must_not_repeat_commitment": true
+    },
+    {
+      "id": "silence-thirty-days",
+      "label": "Thirty days of silence, no new information at all",
+      "covers": [
+        "deliberate_no_op",
+        "timer_is_not_action"
+      ],
+      "acceptable_postures": [
+        "no_op",
+        "wait"
+      ],
+      "must_not_propose_work": true,
+      "rubric": "The rationale must treat silence as ambiguous rather than as a reason to contact or to give up. It must not assert the prospect is lost, and must not propose outreach justified purely by the elapsed interval.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Rentar departamento cerca del centro",
+        "objectiveCategory": "rent_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: gracias, lo reviso y te digo"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [
+          "no_op — nothing new since the prospect said they would review",
+          "no_op — still nothing new"
+        ],
+        "daysSinceLastInbound": 30,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "read_recent_messages"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "unverified-budget-blocks-match",
+      "label": "A match cannot be assembled because the stated budget is unverified",
+      "covers": [
+        "diagnose_before_act",
+        "information_gathering_as_work"
+      ],
+      "acceptable_postures": [
+        "gather_research_reconcile",
+        "work"
+      ],
+      "must_propose_work": true,
+      "rubric": "The diagnosis must name the unverified budget as what blocks progress. The rationale must explain that resolving it changes what inventory is worth showing — improving the NEXT decision, not producing the next message.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar casa de 3 recámaras",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "opportunity.requirements.budget: {\"value\":\"~4.5M\",\"confidence\":\"low\",\"source\":\"inferred\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: busco algo de tres recámaras, no muy caro",
+          "Asesor: ¿tienes un rango en mente?"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "read_recent_messages",
+          "search_inventory"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "conflicting-availability",
+      "label": "Two sources disagree about whether the property is still available",
+      "covers": [
+        "diagnose_before_act",
+        "information_gathering_as_work"
+      ],
+      "acceptable_postures": [
+        "gather_research_reconcile",
+        "work"
+      ],
+      "must_propose_work": true,
+      "rubric": "The rationale must treat the disagreement as something to reconcile against the authoritative operational source, not as something to resolve by picking the more recent value or by asking the prospect.",
+      "input": {
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar la casa del anuncio en Juriquilla",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "property.availability: {\"value\":\"available\",\"source\":\"web_listing\"}",
+          "property.availability_operational: {\"value\":\"unavailable\",\"source\":\"operational_record\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ¿la casa de Juriquilla sigue disponible?"
+        ],
+        "openCommitments": [],
+        "workSummary": [
+          "check_listing_source — done (agent_proposed)"
+        ],
+        "postureHistory": [
+          "work — checked the listing source"
+        ],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "read_operational_property_record"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "repeated-search-no-gain",
+      "label": "The same inventory search has run three times with no new information",
+      "covers": [
+        "loop_stopping"
+      ],
+      "acceptable_postures": [
+        "no_op",
+        "wait",
+        "targeted_human_input"
+      ],
+      "must_not_propose_work": true,
+      "rubric": "The rationale must recognise that repeating the search has stopped producing information and must choose to stop, wait or ask — not to run it again. Citing the earlier attempts is what makes the judgment explainable.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar terreno en la zona norte",
+        "objectiveCategory": "buy_land",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: busco terreno al norte, no más de 2M"
+        ],
+        "openCommitments": [],
+        "workSummary": [
+          "search_northern_land — done (agent_proposed)",
+          "search_northern_land_widened — done (agent_proposed)",
+          "search_northern_land_third — done (agent_proposed)"
+        ],
+        "postureHistory": [
+          "work — searched inventory for northern land under 2M, no match",
+          "work — searched again after price filter widened, no match",
+          "work — searched a third time, same empty result"
+        ],
+        "daysSinceLastInbound": 6,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "capability-not-available",
+      "label": "The useful next step needs a capability that is not available",
+      "covers": [
+        "capability_gap"
+      ],
+      "acceptable_postures": [
+        "targeted_human_input",
+        "no_op",
+        "wait"
+      ],
+      "must_report_capability_gap": true,
+      "rubric": "The rationale must name the missing capability plainly and choose a legitimate alternative — asking a human, waiting, or doing nothing. It must not describe a workaround, and must not claim work it cannot perform.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Vender la casa heredada en el centro",
+        "objectiveCategory": "sell_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "property.legal_status: {\"value\":\"unknown\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: quiero vender la casa que heredé, pero no sé cómo está el papeleo"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "read_recent_messages"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "commitment-made-by-advisor",
+      "label": "The advisor promised a comparison by Friday",
+      "covers": [
+        "commitment_detection"
+      ],
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "wait",
+        "no_op"
+      ],
+      "must_detect_commitment": true,
+      "expected_commitment_actor": "advisor",
+      "rubric": "The commitment must carry the specific expected outcome (the comparison), the advisor as the actor, and Friday as the due moment. A vague 'follow up' is not a commitment and must not be recorded as one.",
+      "input": {
+        "wakeReason": "source_event",
+        "objective": "Comprar casa en El Refugio",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ¿me puedes comparar las dos casas que vimos?",
+          "Asesor: sí, te mando la comparación el viernes"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [],
+        "daysSinceLastInbound": 0,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "prepare_comparison"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "vague-intention-is-not-a-commitment",
+      "label": "Someone said they would 'stay in touch'",
+      "covers": [
+        "commitment_detection"
+      ],
+      "acceptable_postures": [
+        "no_op",
+        "wait"
+      ],
+      "must_not_detect_commitment": true,
+      "rubric": "Nothing specific was promised and no one is relying on a particular outcome, so no commitment exists. Recording one would invent an obligation nobody made.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar departamento para inversión",
+        "objectiveCategory": "buy_investment",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ahorita no tengo prisa",
+          "Asesor: sin problema, seguimos en contacto"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [],
+        "daysSinceLastInbound": 3,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "commitment-already-tracked",
+      "label": "The same promise is already tracked from a previous wake",
+      "covers": [
+        "commitment_detection"
+      ],
+      "acceptable_postures": [
+        "no_op",
+        "wait",
+        "work",
+        "gather_research_reconcile"
+      ],
+      "rubric": "The promise is already in the tracked list, so it must not be reported again. Re-reporting it would create a second record of one obligation.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar casa en El Refugio",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ¿me puedes comparar las dos casas que vimos?",
+          "Asesor: sí, te mando la comparación el viernes"
+        ],
+        "openCommitments": [
+          "Enviar la comparación de las dos casas — actor: advisor — due: 2026-09-11T17:00:00.000Z"
+        ],
+        "workSummary": [
+          "assemble_comparison — todo (agent_proposed)"
+        ],
+        "postureHistory": [
+          "work — created work to assemble the comparison"
+        ],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "prepare_comparison"
+        ],
+        "trackedCommitmentKeys": [
+          "send_comparison"
+        ]
+      },
+      "must_not_repeat_commitment": true
+    },
+    {
+      "id": "contact-me-after-the-twentieth",
+      "label": "The prospect asked not to be contacted until the 20th; a match appears now",
+      "covers": [
+        "contact_restriction",
+        "timer_is_not_action"
+      ],
+      "acceptable_postures": [
+        "no_op",
+        "wait",
+        "gather_research_reconcile",
+        "work"
+      ],
+      "must_not_propose_outbound": true,
+      "rubric": "Internal work — preparing or verifying the match — is legitimate. Any suggestion of reaching the prospect now is a failure, and so is treating the new match as an exception that justifies contact.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar casa con jardín",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "inventory.new_match: {\"count\":1,\"zone\":\"Zibatá\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ando de viaje, contáctame después del 20 por favor"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [
+          "no_op — respecting the requested pause"
+        ],
+        "daysSinceLastInbound": 4,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "attention-already-consumed",
+      "label": "Three low-value contacts in a row went unanswered",
+      "covers": [
+        "deliberate_no_op",
+        "loop_stopping"
+      ],
+      "acceptable_postures": [
+        "no_op",
+        "wait"
+      ],
+      "must_not_propose_work": true,
+      "rubric": "The rationale must weigh the prospect's attention as a real cost and lower the value of another contact. It must not treat the elapsed cooldown as fresh permission, and must not close the Opportunity either.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar casa en Corregidora",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Asesor: te comparto otra opción",
+          "Asesor: ¿pudiste ver la que te mandé?",
+          "Asesor: quedo pendiente"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [
+          "work — sent a new option",
+          "no_op — no response yet",
+          "no_op — still no response"
+        ],
+        "daysSinceLastInbound": 21,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "materially-new-objective",
+      "label": "The prospect mentions also wanting to list a different property they own",
+      "covers": [
+        "objective_scope"
+      ],
+      "acceptable_postures": [
+        "targeted_human_input",
+        "no_op",
+        "wait"
+      ],
+      "must_not_propose_work": false,
+      "rubric": "Listing a property they own is a materially different commercial objective from the purchase this Opportunity exists for. The rationale must surface it for confirmation rather than silently absorbing it into this Opportunity's scope.",
+      "input": {
+        "wakeReason": "source_event",
+        "objective": "Comprar casa en Juriquilla",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: por cierto, también quiero poner en venta el depa que tengo en el centro"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [],
+        "daysSinceLastInbound": 0,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "evidence-too-thin-to-judge",
+      "label": "Almost nothing is known about the Opportunity yet",
+      "covers": [
+        "deliberate_no_op",
+        "diagnose_before_act"
+      ],
+      "acceptable_postures": [
+        "no_op",
+        "wait",
+        "targeted_human_input"
+      ],
+      "must_report_insufficient_evidence": true,
+      "rubric": "The honest answer is that the evidence does not support a grounded judgment. Any confident plan built on this much information is a failure, however plausible it sounds.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": null,
+        "objectiveCategory": null,
+        "currentFacts": [],
+        "recentMessages": [
+          "Prospecto: hola"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "read_recent_messages"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "commitment-due-today",
+      "label": "A commitment Gu made comes due today and the artifact is not built",
+      "covers": [
+        "commitment_detection",
+        "diagnose_before_act"
+      ],
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile"
+      ],
+      "must_propose_work": true,
+      "rubric": "The diagnosis must name the outstanding commitment as what matters now. Building the artifact is the work; the rationale must not claim the commitment is satisfied merely because work was started.",
+      "input": {
+        "wakeReason": "commitment_due",
+        "objective": "Comprar casa en El Marqués",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Asesor: te mando el análisis de precios el martes"
+        ],
+        "openCommitments": [
+          "Enviar el análisis de precios — actor: gu — due: 2026-09-08T17:00:00.000Z"
+        ],
+        "workSummary": [],
+        "postureHistory": [
+          "no_op — nothing due yet"
+        ],
+        "daysSinceLastInbound": 3,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "prepare_price_analysis"
+        ],
+        "trackedCommitmentKeys": [
+          "send_price_analysis"
+        ]
+      }
+    },
+    {
+      "id": "work-failed-technically",
+      "label": "Prior work failed for a technical reason, not a commercial one",
+      "covers": [
+        "diagnose_before_act",
+        "loop_stopping"
+      ],
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "wait",
+        "targeted_human_input"
+      ],
+      "rubric": "A technical failure is not a commercial signal. The rationale must not treat the failed run as evidence about the prospect or the Opportunity's viability, and must not conclude the deal is lost.",
+      "input": {
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en Zibatá",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: quedo atento a las opciones"
+        ],
+        "openCommitments": [],
+        "workSummary": [
+          "inventory_search — blocked (agent_proposed)"
+        ],
+        "postureHistory": [
+          "work — inventory search attempted and failed to run"
+        ],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "new-relevant-value-exists",
+      "label": "A genuinely relevant new match appears and there is no contact restriction",
+      "covers": [
+        "information_gathering_as_work",
+        "diagnose_before_act"
+      ],
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile"
+      ],
+      "must_propose_work": true,
+      "must_not_propose_outbound": true,
+      "rubric": "The match is real value worth preparing. Because contact is unavailable in this stage, the useful work is internal — verifying and preparing it — and the rationale must not depend on being able to message the prospect.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar casa de 3 recámaras con jardín en Zibatá, presupuesto 5M",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "inventory.new_match: {\"count\":2,\"zone\":\"Zibatá\",\"within_budget\":true}"
+        ],
+        "recentMessages": [
+          "Prospecto: si sale algo con jardín en Zibatá dentro de mi presupuesto, avísame"
+        ],
+        "openCommitments": [],
+        "workSummary": [],
+        "postureHistory": [
+          "no_op — no matching inventory existed"
+        ],
+        "daysSinceLastInbound": 5,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory",
+          "prepare_comparison"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    }
+  ]
+}
