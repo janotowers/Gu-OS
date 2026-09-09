@@ -198,6 +198,38 @@ function main(): void {
     assert.ok(!allPassed(evaluateHostedSupervisorEvidence(input)));
   });
 
+  t("three calendar days four minutes apart fail the elapsed-span check", () => {
+    // The loophole a pure day count leaves open, and the reason the span is
+    // checked too: the operator is at UTC-6, so 17:59 and 18:01 local are two
+    // different UTC days.
+    const input = baseline();
+    input.reconsiderations = [
+      reconsideration("scheduled:a", "2026-09-08T23:58:00.000Z", "no_op"),
+      reconsideration("scheduled:b", "2026-09-09T00:01:00.000Z", "work"),
+      reconsideration("scheduled:c", "2026-09-10T00:01:00.000Z", "wait"),
+    ];
+    input.settlements = [
+      settlement("scheduled:a", "2026-09-08T23:58:01.000Z"),
+      settlement("scheduled:b", "2026-09-09T00:01:01.000Z"),
+      settlement("scheduled:c", "2026-09-10T00:01:01.000Z"),
+    ];
+    const checks = evaluateHostedSupervisorEvidence(input);
+    assert.equal(
+      failedAssertions(checks).filter((f) => f.includes("distinct UTC days")).length,
+      0,
+      "the day COUNT is satisfied — which is exactly the problem"
+    );
+    assert.ok(!allPassed(checks));
+    assert.ok(
+      failedAssertions(checks).some((f) => f.includes("apart")),
+      "the elapsed-span assertion must be the one that catches it"
+    );
+  });
+
+  t("a genuine three-day run satisfies both the day count and the span", () => {
+    assert.ok(allPassed(evaluateHostedSupervisorEvidence(baseline())));
+  });
+
   t("the day count is computed from the database clock, in UTC", () => {
     assert.deepEqual(
       distinctUtcDays([

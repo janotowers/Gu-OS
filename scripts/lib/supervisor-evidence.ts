@@ -135,6 +135,28 @@ export interface HostedSupervisorInputs {
   requiredDistinctDays: number;
 }
 
+/**
+ * Minimum real hours the first-to-last span must cover, per day required
+ * beyond the first.
+ *
+ * Distinct UTC days are necessary and NOT sufficient, which is worth stating
+ * plainly because it is a loophole in the obvious design. The operator running
+ * this verifier is at UTC-6, so wakes at 17:59 and 18:01 local fall on two
+ * different UTC days four minutes apart — and three such wakes would satisfy a
+ * pure day count while covering almost no elapsed time at all. SA-4.3 says
+ * "across multiple days" about the Opportunity's life, not about the calendar,
+ * so the span is checked too.
+ *
+ * 20 rather than 24 deliberately: a wake at 09:00 one day and 08:00 the next is
+ * a real day apart in every sense that matters, and demanding a full 24 would
+ * make the assertion fail for a reason that has nothing to do with what it
+ * measures. An **ordinary engineering value** under Methodology §14.1 — it
+ * encodes no product or accepted-risk tolerance; the governed requirement is
+ * that the days be real, and any value that cannot be gamed to minutes serves
+ * it equally.
+ */
+export const MIN_HOURS_PER_ADDITIONAL_DAY = 20;
+
 /** Distinct UTC calendar days covered by a set of database timestamps. */
 export function distinctUtcDays(timestamps: readonly string[]): string[] {
   const days = new Set<string>();
@@ -238,6 +260,26 @@ export function evaluateHostedSupervisorEvidence(
       // Named explicitly, because this is the assertion a synthetic run would
       // most easily fake: the days come from the database's own created_at.
       `days observed (from the database clock): ${days.join(", ") || "none"}`
+    )
+  );
+
+  const stamps = reconsiderations
+    .map((r) => new Date(r.created_at).getTime())
+    .filter((t) => !Number.isNaN(t))
+    .sort((a, b) => a - b);
+  const spanHours =
+    stamps.length >= 2 ? (stamps[stamps.length - 1] - stamps[0]) / 3_600_000 : 0;
+  const requiredSpanHours =
+    Math.max(0, requiredDistinctDays - 1) * MIN_HOURS_PER_ADDITIONAL_DAY;
+  checks.push(
+    check(
+      "SA-4.3",
+      `the first and last reconsideration are at least ${requiredSpanHours}h apart`,
+      spanHours >= requiredSpanHours,
+      // Distinct days alone are gameable across a UTC boundary — see
+      // MIN_HOURS_PER_ADDITIONAL_DAY. This is what makes "multi-day" mean
+      // elapsed time rather than three calendar labels.
+      `span ${spanHours.toFixed(1)}h across ${stamps.length} reconsideration(s)`
     )
   );
 

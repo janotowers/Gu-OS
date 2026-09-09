@@ -28,7 +28,11 @@
 //
 // The day count in the evidence comes from `operational_case_events.created_at`
 // — the database's clock, never this process's — and a run whose
-// reconsiderations share a day fails rather than passing with a caveat.
+// reconsiderations share a day fails rather than passing with a caveat. The
+// evaluator also checks the ELAPSED SPAN, because distinct UTC days are not
+// sufficient on their own: this operator is at UTC-6, so 17:59 and 18:01 local
+// are two different UTC days four minutes apart, and a pure day count would
+// call that multi-day.
 //
 // WHY THE SCENARIOS ARE CONTROLLED
 //
