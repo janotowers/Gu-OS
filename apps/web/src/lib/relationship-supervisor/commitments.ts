@@ -55,6 +55,76 @@ export interface RecordedCommitment {
 }
 
 /**
+ * A full ISO-8601 datetime with an explicit offset or `Z` — the only timing
+ * shape that names an instant without borrowing a timezone nobody stated.
+ * Date-only and zone-less datetimes are valid ISO-8601, but they are not
+ * instants: `Date.parse` reads the first as UTC midnight and the second in
+ * whatever zone the host happens to run in.
+ */
+const ISO_INSTANT =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-](\d{2}):?(\d{2}))$/i;
+
+/**
+ * True only for a real instant. `Date.parse` alone is not a validator: it
+ * silently rolls impossible dates forward (`2026-02-30` becomes March 2) and
+ * accepts bare numbers (`"5"` becomes 2001-05-01). So the shape is checked
+ * first, then the calendar, and `Date.parse` only last.
+ */
+function isInstant(expression: string): boolean {
+  const m = ISO_INSTANT.exec(expression);
+  if (!m) return false;
+  const [, y, mo, d, h, mi, s = "00", , offH = "00", offM = "00"] = m;
+  const year = Number(y);
+  const month = Number(mo);
+  const day = Number(d);
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  const isRealDate =
+    calendar.getUTCFullYear() === year &&
+    calendar.getUTCMonth() === month - 1 &&
+    calendar.getUTCDate() === day;
+  return (
+    isRealDate &&
+    Number(h) <= 23 &&
+    Number(mi) <= 59 &&
+    Number(s) <= 59 &&
+    Number(offH) <= 23 &&
+    Number(offM) <= 59 &&
+    !Number.isNaN(Date.parse(expression))
+  );
+}
+
+/**
+ * The producer boundary for `commitment.due` (Technical Plan TD-14).
+ *
+ * Detecting a commitment's timing is semantic and belongs to the judge;
+ * deciding whether that timing is an instant is not, and belongs here. The
+ * judge schema stays permissive on purpose: a schema failure discards the
+ * whole proposal, so tightening it would turn one unparseable date into a lost
+ * judgment and every commitment in that turn with it.
+ *
+ * Fails closed. Anything that is not a real instant — `"viernes"`, `"mañana"`,
+ * `"2026-09-11"`, a zone-less time — is preserved verbatim as the expression,
+ * never resolved against a reference time or a timezone the judge was not
+ * given. Returns null when there is no timing at all, which writes no fact.
+ */
+export function resolveCommitmentDue(
+  raw: string | null,
+  basis: CommitmentDueFactValue["basis"]
+): CommitmentDueFactValue | null {
+  if (raw === null) return null;
+  const expression = raw.trim();
+  if (expression === "") return null;
+  if (isInstant(expression)) {
+    return {
+      due_at: new Date(Date.parse(expression)).toISOString(),
+      basis,
+      due_expression: null,
+    };
+  }
+  return { due_at: null, basis, due_expression: expression };
+}
+
+/**
  * `attrs_jsonb` key holding the judge's stable commitment key.
  *
  * On the subject row rather than in a fact, because it is at-creation identity
@@ -147,13 +217,11 @@ export async function recordCommitments(params: {
     });
     await fact(COMMITMENT_FACT_KEYS.actor, { actor: commitment.actor });
 
-    if (commitment.due_at) {
-      const due: CommitmentDueFactValue = {
-        due_at: commitment.due_at,
-        basis: commitment.due_stated ? "stated" : "inferred_from_context",
-      };
-      await fact(COMMITMENT_FACT_KEYS.due, due);
-    }
+    const due = resolveCommitmentDue(
+      commitment.due_at,
+      commitment.due_stated ? "stated" : "inferred_from_context"
+    );
+    if (due) await fact(COMMITMENT_FACT_KEYS.due, due);
 
     // `open` with no evidence, which is the honest starting state: nothing has
     // been verified yet, and S2 §8.15 requires evidence before `fulfilled`.
@@ -216,7 +284,10 @@ export function summarizeOpenCommitments(
 
     const parts = [outcome?.expected_outcome ?? entry.subject.label ?? "(unnamed)"];
     if (actor?.actor) parts.push(`actor: ${actor.actor}`);
-    if (due?.due_at) parts.push(`due: ${due.due_at}`);
+    // An unresolved timing still reaches the judge as it was established:
+    // dropping it would make the repair lose context the judge sees today.
+    const when = due?.due_at ?? due?.due_expression ?? null;
+    if (when) parts.push(`due: ${when}`);
     lines.push(parts.join(" — "));
   }
   return lines;

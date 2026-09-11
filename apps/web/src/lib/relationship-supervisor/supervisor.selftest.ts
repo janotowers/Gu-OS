@@ -50,6 +50,7 @@ import {
   SHADOW_REACHABLE_POSTURES,
   SUPERVISOR_POSTURES,
   SUPERVISOR_RECONSIDERED_EVENT_KIND,
+  type CommitmentDueFactValue,
   type SupervisorReconsiderationRecord,
 } from "@agents/types";
 import { createFakeDb, type FakeDb } from "../relationship-testing/fake-db";
@@ -73,6 +74,7 @@ import {
   type SupervisorJudgeInput,
 } from "./next-work-judge";
 import { checkPostureHistoryCoherence, distinctDaysCovered, reconstructSituation } from "./replay";
+import { resolveCommitmentDue } from "./commitments";
 import { summarizePostureDistribution } from "./observability";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -894,6 +896,167 @@ async function main(): Promise<void> {
       .map((f) => (f.value_jsonb as { basis: string }).basis)
       .sort();
     assert.deepEqual(bases, ["inferred_from_context", "stated"]);
+  });
+
+  // ── commitment.due value contract (Technical Plan TD-14). Every fixture
+  // above supplies an ISO instant, which is exactly how hosted staging came to
+  // hold `due_at: "viernes"` with nothing noticing: the benign shape was the
+  // only one ever exercised.
+
+  await t("commitment.due: only a real instant with an explicit zone becomes due_at", async () => {
+    const resolved: Array<[string, string]> = [
+      ["2026-09-11T17:00:00.000Z", "2026-09-11T17:00:00.000Z"],
+      ["2026-09-11T11:00:00-06:00", "2026-09-11T17:00:00.000Z"],
+      ["2026-09-11T11:00-06:00", "2026-09-11T17:00:00.000Z"],
+      ["2026-09-11T11:00:00-0600", "2026-09-11T17:00:00.000Z"],
+      ["2026-09-11t17:00:00z", "2026-09-11T17:00:00.000Z"],
+    ];
+    for (const [raw, instant] of resolved) {
+      assert.deepEqual(
+        resolveCommitmentDue(raw, "stated"),
+        { due_at: instant, basis: "stated", due_expression: null },
+        raw
+      );
+    }
+  });
+
+  await t("commitment.due: anything that is not an instant is preserved, never coerced", async () => {
+    const unresolved = [
+      "viernes",
+      "mañana",
+      "la próxima semana",
+      // Date-only: `Date.parse` reads it as UTC midnight, the advisor's previous evening.
+      "2026-09-11",
+      // Zone-less: `Date.parse` reads it in whatever zone the host runs in.
+      "2026-09-11T17:00:00",
+      "09-11",
+      // `Date.parse("5")` is 2001-05-01.
+      "5",
+      // `Date.parse` rolls both of these forward into real dates in March.
+      "2026-02-30T10:00:00Z",
+      "2026-02-29T10:00:00Z",
+      "2026-09-11T24:00:00Z",
+    ];
+    for (const raw of unresolved) {
+      assert.deepEqual(
+        resolveCommitmentDue(raw, "inferred_from_context"),
+        { due_at: null, basis: "inferred_from_context", due_expression: raw },
+        raw
+      );
+    }
+  });
+
+  await t("commitment.due: no timing at all writes no fact", async () => {
+    assert.equal(resolveCommitmentDue(null, "stated"), null);
+    assert.equal(resolveCommitmentDue("   ", "stated"), null);
+  });
+
+  const WITH_UNRESOLVED_DUE: NextWorkProposal = {
+    ...QUIET,
+    commitments: [
+      {
+        expected_outcome: "Enviar la comparación de las dos casas el viernes",
+        actor: "advisor",
+        due_at: "viernes",
+        due_stated: true,
+        key: "send_comparison_friday",
+      },
+    ],
+  };
+
+  await t("the hosted shape: a stated 'viernes' keeps its provenance and never becomes an instant", async () => {
+    const fake = harness();
+    const result = await wake(fake.client, stubJudge(WITH_UNRESOLVED_DUE));
+    assert.equal(result.status, "reconsidered", "the judgment is kept, not discarded");
+    const dues = fake.tables.case_facts.filter(
+      (f) => f.fact_key === COMMITMENT_FACT_KEYS.due
+    );
+    assert.equal(dues.length, 1);
+    assert.deepEqual(dues[0].value_jsonb, {
+      due_at: null,
+      basis: "stated",
+      due_expression: "viernes",
+    });
+    assert.equal(
+      fake.tables.case_facts.filter((f) => f.subject_id !== null).length,
+      4,
+      "an unresolved timing is still a due fact: the per-commitment count does not change"
+    );
+  });
+
+  await t("every commitment.due written carries exactly one of due_at and due_expression", async () => {
+    const fake = harness();
+    await wake(
+      fake.client,
+      stubJudge({
+        ...QUIET,
+        commitments: [
+          ...WITH_COMMITMENTS.commitments,
+          ...WITH_UNRESOLVED_DUE.commitments,
+          {
+            expected_outcome: "Llamar al propietario",
+            actor: "advisor",
+            due_at: "2026-09-11",
+            due_stated: false,
+            key: "call_owner",
+          },
+        ],
+      })
+    );
+    const dues = fake.tables.case_facts.filter(
+      (f) => f.fact_key === COMMITMENT_FACT_KEYS.due
+    );
+    assert.equal(dues.length, 4);
+    for (const fact of dues) {
+      const value = fact.value_jsonb as CommitmentDueFactValue;
+      assert.ok(
+        (value.due_at === null) !== (value.due_expression === null),
+        "exactly one of due_at and due_expression is set"
+      );
+      if (value.due_at !== null) {
+        assert.equal(
+          new Date(value.due_at).toISOString(),
+          value.due_at,
+          "a due_at is always a normalized instant"
+        );
+      }
+    }
+  });
+
+  await t("an unparseable due_at never costs the judgment: the schema stays permissive", async () => {
+    // Tightening the judge schema would look like the fix and be a regression:
+    // a schema failure discards the whole proposal, commitments included.
+    const proposal = normalizeNextWorkProposal(WITH_UNRESOLVED_DUE);
+    assert.ok(proposal, "a proposal carrying 'viernes' must still parse");
+    assert.equal(proposal?.commitments[0].due_at, "viernes");
+  });
+
+  await t("an unresolved timing still reaches the judge as it was established", async () => {
+    const fake = harness();
+    await wake(fake.client, stubJudge(WITH_UNRESOLVED_DUE));
+    fake.tables.operational_cases[0].next_action_at = null;
+    const judge = stubJudge(QUIET);
+    await wake(fake.client, judge, {
+      wakeKey: buildWakeKey.scheduled("2026-09-09T12:00:00.000Z"),
+    });
+    assert.ok(
+      judge.calls[0].openCommitments.some((line) => line.includes("due: viernes"))
+    );
+  });
+
+  await t("replay recovers an unresolved timing instead of reporting no deadline", async () => {
+    const fake = harness();
+    await wake(fake.client, stubJudge(WITH_UNRESOLVED_DUE));
+    const situation = await reconstructSituation({
+      db: fake.client,
+      userId: ADVISOR,
+      caseId: CASE_ID,
+      now: NOW,
+    });
+    assert.ok(situation);
+    if (!situation) return;
+    assert.equal(situation.commitments[0].dueAt, null);
+    assert.equal(situation.commitments[0].dueExpression, "viernes");
   });
 
   await t("an already-tracked commitment is not re-created on the next wake", async () => {
