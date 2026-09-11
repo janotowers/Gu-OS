@@ -40,7 +40,10 @@ export interface ReconstructedCommitment {
   subjectId: string;
   expectedOutcome: string | null;
   actor: string | null;
+  /** The instant it is relied upon by, when the timing resolved to one. */
   dueAt: string | null;
+  /** The timing as established, when it did not resolve to an instant. */
+  dueExpression: string | null;
   status: string;
   /** Every value this commitment's status has held, oldest first. */
   statusHistory: readonly string[];
@@ -121,6 +124,7 @@ export async function reconstructSituation(params: {
       // is the honest reading, and is not the same as `open`.
       status: status?.status ?? "unresolved",
       dueAt: due?.due_at ?? null,
+      dueExpression: due?.due_expression ?? null,
       statusHistory: [],
     });
   }

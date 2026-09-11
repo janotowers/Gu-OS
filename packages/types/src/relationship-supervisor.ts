@@ -377,12 +377,41 @@ export const COMMITMENT_STATUSES: readonly CommitmentStatus[] = [
   "unresolved",
 ] as const;
 
-/** The `commitment.due` fact value. */
+/**
+ * The `commitment.due` fact value.
+ *
+ * **Exactly one of `due_at` and `due_expression` is non-null.** That is the
+ * whole contract, and it is what lets a consumer compute due-ness
+ * deterministically (Slice Plan SL-7, SA-7.4) without ever interpreting a
+ * phrase: a non-null `due_at` is always an instant, and a timing that is not
+ * one survives as `due_expression` instead of being coerced into a date.
+ *
+ * Resolution is deliberately not a field of its own — it is derivable from
+ * which of the two is set, and a third field could only disagree with them.
+ */
 export interface CommitmentDueFactValue {
-  /** ISO-8601 instant the expected outcome is relied upon by. */
-  due_at: string;
-  /** How the moment was established, for provenance. */
+  /**
+   * The instant the expected outcome is relied upon by, normalized to UTC.
+   * Written only from a full ISO-8601 datetime with an explicit offset or `Z`.
+   * **Null when the timing could not be resolved to an instant** — never a
+   * partial date, never a zone-less time, never a phrase.
+   */
+  due_at: string | null;
+  /**
+   * How the timing was established — provenance, independent of resolution.
+   * A timing can be both `stated` and unresolved: a prospect who says
+   * "el viernes" has stated it, and it still names no instant.
+   */
   basis: "stated" | "inferred_from_context";
+  /**
+   * The timing exactly as it was established, preserved when it could not be
+   * resolved to an instant: `"viernes"`, `"la próxima semana"`, `"2026-09-11"`.
+   * Null when `due_at` carries the instant.
+   *
+   * Absent on rows written before the value contract was enforced; readers
+   * treat absence as null.
+   */
+  due_expression: string | null;
 }
 
 /** The `commitment.status` fact value. */
