@@ -52,7 +52,13 @@ export interface HostedReconsiderationRow {
   };
 }
 
-/** One settlement row, matched to its claim by `wake_key`. */
+/**
+ * One settlement row, matched to its claim by `(case_id, wake_key)`.
+ *
+ * Never by `wake_key` alone: M-WAKE-IDENTITY makes a wake key unique per Case,
+ * not across Cases, and a scheduled key is `scheduled:<UTC date>` — shared by
+ * every Case woken that day.
+ */
 export interface HostedSettlementRow {
   created_at: string;
   case_id: string;
@@ -183,6 +189,11 @@ function check(
  * Grouped by the acceptance assertion each check belongs to, so a failure lands
  * somewhere a reader can act on rather than in an undifferentiated list.
  */
+/** A claim's identity. JSON keeps the pair unambiguous whatever a key contains. */
+function claimPair(caseId: string, wakeKey: string): string {
+  return JSON.stringify([caseId, wakeKey]);
+}
+
 export function evaluateHostedSupervisorEvidence(
   input: HostedSupervisorInputs
 ): HostedCheck[] {
@@ -199,11 +210,16 @@ export function evaluateHostedSupervisorEvidence(
   } = input;
 
   const caseIds = new Set(cases.map((c) => c.id));
-  const settlementByWake = new Map<string, HostedSettlementRow>();
+  // Keyed by the pair a settlement actually belongs to. A wake-only key let one
+  // Case's settlement stand in for another's on the same day, so a run with a
+  // Case left half-recorded still passed.
+  const settledPairs = new Set<string>();
   for (const row of settlements) {
     const key = row.payload.wake_key;
-    if (typeof key === "string") settlementByWake.set(key, row);
+    if (typeof key === "string") settledPairs.add(claimPair(row.case_id, key));
   }
+  const isSettled = (r: HostedReconsiderationRow) =>
+    settledPairs.has(claimPair(r.case_id, String(r.payload.wake_key)));
 
   // ── SA-4.2 — result and rationale recorded, inspectable per Case
   checks.push(
@@ -325,11 +341,9 @@ export function evaluateHostedSupervisorEvidence(
     check(
       "SA-4.3",
       "every reconsideration settled — none was left half-recorded",
-      reconsiderations.length > 0 &&
-        reconsiderations.every((r) =>
-          settlementByWake.has(String(r.payload.wake_key))
-        ),
-      `${settlementByWake.size} settlement(s) for ${reconsiderations.length} claim(s)`
+      reconsiderations.length > 0 && reconsiderations.every(isSettled),
+      `${reconsiderations.filter(isSettled).length} settled (case, wake) pair(s) ` +
+        `for ${reconsiderations.length} claim(s)`
     )
   );
 

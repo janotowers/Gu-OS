@@ -14,7 +14,9 @@
 //     explain from the evidence available at the time;
 //   * one wake producing two reconsiderations (SA-4.6);
 //   * a reconsideration that left no re-entry path (EC-39);
-//   * a claim with no settlement reported as a completed run;
+//   * a claim with no settlement reported as a completed run — including when
+//     another Case settled the SAME wake key that day, which a hosted run with
+//     more than one Case always produces;
 //   * an entity id smuggled back into a `fact_key` (SA-4.4);
 //   * a Work Item that is not `agent_proposed`, and a Case that acquired
 //     runtime authority — the two ways shadow could silently end;
@@ -292,6 +294,57 @@ function main(): void {
     const checks = evaluateHostedSupervisorEvidence(input);
     assert.ok(!allPassed(checks));
     assert.ok(failedAssertions(checks).some((f) => f.includes("settled")));
+  });
+
+  // Every fixture above uses ONE Case, so a wake key never repeats across
+  // Cases — and the settlement check once keyed by wake key alone, which only
+  // that shape could hide. A real hosted run wakes several Cases a day under the
+  // same `scheduled:<UTC date>` key.
+  const CASE_B = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+  function twoCasesSameDays(): HostedSupervisorInputs {
+    const input = baseline();
+    input.cases = [...input.cases, { ...input.cases[0], id: CASE_B }];
+    input.reconsiderations = [
+      ...input.reconsiderations,
+      ...input.reconsiderations.map((r) => ({ ...r, case_id: CASE_B })),
+    ];
+    input.settlements = [
+      ...input.settlements,
+      ...input.settlements.map((row) => ({ ...row, case_id: CASE_B })),
+    ];
+    return input;
+  }
+  const settledCheck = (checks: readonly HostedCheck[]) =>
+    checks.find((c) => c.label.includes("half-recorded"));
+
+  t("two Cases sharing each day's wake key, both settled, pass — counted per (case, wake)", () => {
+    const checks = evaluateHostedSupervisorEvidence(twoCasesSameDays());
+    assert.ok(
+      allPassed(checks),
+      `unexpected failures: ${failedAssertions(checks).join("; ")}`
+    );
+    assert.equal(
+      settledCheck(checks)?.detail,
+      "6 settled (case, wake) pair(s) for 6 claim(s)",
+      "six pairs, not three wake keys collapsed across Cases"
+    );
+  });
+
+  t("one Case's missing settlement is not covered by another Case's with the same wake key", () => {
+    const input = twoCasesSameDays();
+    input.settlements = input.settlements.filter(
+      (row) => !(row.case_id === CASE_B && row.payload.wake_key === "scheduled:d3")
+    );
+    const checks = evaluateHostedSupervisorEvidence(input);
+    assert.deepEqual(
+      failedAssertions(checks),
+      ["SA-4.3: every reconsideration settled — none was left half-recorded"],
+      "exactly the settlement assertion fails, and for no unrelated reason"
+    );
+    assert.equal(
+      settledCheck(checks)?.detail,
+      "5 settled (case, wake) pair(s) for 6 claim(s)"
+    );
   });
 
   console.log("\nSA-4.4 subject-scoped facts");
