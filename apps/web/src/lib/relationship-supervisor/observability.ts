@@ -133,3 +133,34 @@ export async function summarizePostureDistribution(params: {
     distinctDays: days.size,
   };
 }
+
+/** Which model judged a set of reconsiderations, as recorded by what actually ran. */
+export interface ModelAttribution {
+  /** Every distinct model id recorded, sorted. Empty when none was recorded. */
+  ids: string[];
+  /** Judgments with no model recorded: a stub, or no judgment available at all. */
+  unattributed: number;
+}
+
+/**
+ * Attributes judgments to the model that made them, from the record each
+ * judgment left — the judge's own `modelId`, or the `model_id` it wrote on the
+ * durable row.
+ *
+ * Never from an environment variable in the process doing the attributing: an
+ * unset override there says nothing about who judged, and a verifier that calls
+ * no model has no model of its own to report. Reading one produced
+ * `"default (configuration)"` in SL-4's first evidence artifacts.
+ */
+export function attributeModels(
+  recorded: ReadonlyArray<string | null | undefined>
+): ModelAttribution {
+  const ids = new Set<string>();
+  let unattributed = 0;
+  for (const value of recorded) {
+    const id = typeof value === "string" ? value.trim() : "";
+    if (id) ids.add(id);
+    else unattributed += 1;
+  }
+  return { ids: [...ids].sort(), unattributed };
+}

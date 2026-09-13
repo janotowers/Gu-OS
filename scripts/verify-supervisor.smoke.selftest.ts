@@ -121,8 +121,13 @@ const QUIET: NextWorkProposal = {
   reconsider_in_hours: 24,
 };
 
+// A `wait` rather than QUIET's `no_op`, so the two Cases woken on one day
+// settle with DIFFERENT yield postures — the shape of the real hosted run, and
+// the only shape in which reading another Case's settlement shows up at all.
 const WITH_COMMITMENT: NextWorkProposal = {
   ...QUIET,
+  posture: "wait",
+  rationale: "The comparison is promised; the next move is the prospect's.",
   commitments: [
     {
       expected_outcome: "Enviar la comparacion de las dos casas",
@@ -149,9 +154,12 @@ function judgeFor(scenarioId: string): NextWorkJudge {
  * The verifier drives every controlled Case in one wake pass, so a single fixed
  * proposal would leave the commitment scenario untested.
  */
+/** Recorded on every row the multi-Case judge produces; plainly not a real model. */
+const SMOKE_MODEL_ID = "smoke/fake-model";
+
 function multiJudge(fake: FakeDb): NextWorkJudge {
   return {
-    modelId: null,
+    modelId: SMOKE_MODEL_ID,
     async propose(input) {
       const scenario = SCENARIOS.find((s) =>
         input.recentMessages.length > 0
@@ -328,7 +336,16 @@ async function main(): Promise<void> {
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
     const artifactPath = join(tmpdir(), "sl4-smoke-artifact.json");
-    await phaseVerify(ctx, artifactPath);
+    // A decoy override in the verifier's own process: it judged nothing, so
+    // nothing it holds may be reported as the model that judged.
+    const saved = process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID;
+    process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID = "decoy/override-never-used";
+    try {
+      await phaseVerify(ctx, artifactPath);
+    } finally {
+      if (saved === undefined) delete process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID;
+      else process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID = saved;
+    }
     const { readFileSync, rmSync } = await import("node:fs");
     const raw = readFileSync(artifactPath, "utf8");
     rmSync(artifactPath, { force: true });
@@ -339,6 +356,32 @@ async function main(): Promise<void> {
     assert.equal(artifact.legacySourceReads, 0);
     assert.equal(artifact.legacySourceWrites, 0);
     assert.ok(String(artifact.organization).startsWith("sha256:"));
+
+    // The model is attributed from the rows the run verified.
+    assert.deepEqual(artifact.model, {
+      source: "reconsideration rows (payload.model_id)",
+      ids: [SMOKE_MODEL_ID],
+      unattributed: 0,
+    });
+    assert.ok(!raw.includes("decoy/override-never-used"), "the verifier's env never reaches the evidence");
+    assert.ok(!raw.includes("default (configuration)"));
+
+    // Each posture entry carries its own model and its OWN Case's settlement.
+    const scenarioOf = new Map(
+      (artifact.cases as Array<{ id: string; scenario: string }>).map((c) => [c.id, c.scenario])
+    );
+    const history = artifact.postureHistory as Array<{ case: string; modelId: string; yieldPosture: string }>;
+    assert.equal(history.length, SCENARIOS.length * 3);
+    for (const entry of history) {
+      assert.equal(entry.modelId, SMOKE_MODEL_ID);
+      assert.equal(
+        entry.yieldPosture,
+        scenarioOf.get(entry.case) === "commitment-bearing-opportunity"
+          ? "waiting_for_prospect"
+          : "no_useful_work_now",
+        "a Case's yield must come from its own settlement, not a same-day neighbour's"
+      );
+    }
 
     // The whole document must not contain a literal id from the run.
     for (const row of fake.tables.operational_cases) {
