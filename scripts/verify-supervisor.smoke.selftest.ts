@@ -121,8 +121,13 @@ const QUIET: NextWorkProposal = {
   reconsider_in_hours: 24,
 };
 
+// A `wait` rather than QUIET's `no_op`, so the two Cases woken on one day
+// settle with DIFFERENT yield postures — the shape of the real hosted run, and
+// the only shape in which reading another Case's settlement shows up at all.
 const WITH_COMMITMENT: NextWorkProposal = {
   ...QUIET,
+  posture: "wait",
+  rationale: "The comparison is promised; the next move is the prospect's.",
   commitments: [
     {
       expected_outcome: "Enviar la comparacion de las dos casas",
@@ -361,11 +366,21 @@ async function main(): Promise<void> {
     assert.ok(!raw.includes("decoy/override-never-used"), "the verifier's env never reaches the evidence");
     assert.ok(!raw.includes("default (configuration)"));
 
-    // Each posture entry carries the model that judged it.
-    const history = artifact.postureHistory as Array<{ modelId: string }>;
+    // Each posture entry carries its own model and its OWN Case's settlement.
+    const scenarioOf = new Map(
+      (artifact.cases as Array<{ id: string; scenario: string }>).map((c) => [c.id, c.scenario])
+    );
+    const history = artifact.postureHistory as Array<{ case: string; modelId: string; yieldPosture: string }>;
     assert.equal(history.length, SCENARIOS.length * 3);
     for (const entry of history) {
       assert.equal(entry.modelId, SMOKE_MODEL_ID);
+      assert.equal(
+        entry.yieldPosture,
+        scenarioOf.get(entry.case) === "commitment-bearing-opportunity"
+          ? "waiting_for_prospect"
+          : "no_useful_work_now",
+        "a Case's yield must come from its own settlement, not a same-day neighbour's"
+      );
     }
 
     // The whole document must not contain a literal id from the run.

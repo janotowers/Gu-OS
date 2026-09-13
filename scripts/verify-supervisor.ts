@@ -99,6 +99,7 @@ import {
 import {
   allPassed,
   evaluateHostedSupervisorEvidence,
+  settlementOf,
   type HostedCheck,
   type HostedSupervisorInputs,
 } from "./lib/supervisor-evidence";
@@ -513,9 +514,7 @@ export async function phaseVerify(
             wakeReason: r.payload.wake_reason ?? null,
             posture: r.payload.posture ?? null,
             modelId: r.payload.model_id ?? null,
-            yieldPosture:
-              settlements.find((s) => s.payload.wake_key === r.payload.wake_key)
-                ?.payload.yield_posture ?? null,
+            yieldPosture: settlementOf(settlements, r)?.payload.yield_posture ?? null,
             uncertainty: r.payload.uncertainty ?? null,
             rationale: r.payload.rationale ?? null,
             nextActionAt: r.payload.next_action_at ?? null,
