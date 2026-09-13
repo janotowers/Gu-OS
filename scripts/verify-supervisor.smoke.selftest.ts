@@ -149,9 +149,12 @@ function judgeFor(scenarioId: string): NextWorkJudge {
  * The verifier drives every controlled Case in one wake pass, so a single fixed
  * proposal would leave the commitment scenario untested.
  */
+/** Recorded on every row the multi-Case judge produces; plainly not a real model. */
+const SMOKE_MODEL_ID = "smoke/fake-model";
+
 function multiJudge(fake: FakeDb): NextWorkJudge {
   return {
-    modelId: null,
+    modelId: SMOKE_MODEL_ID,
     async propose(input) {
       const scenario = SCENARIOS.find((s) =>
         input.recentMessages.length > 0
@@ -328,7 +331,16 @@ async function main(): Promise<void> {
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
     const artifactPath = join(tmpdir(), "sl4-smoke-artifact.json");
-    await phaseVerify(ctx, artifactPath);
+    // A decoy override in the verifier's own process: it judged nothing, so
+    // nothing it holds may be reported as the model that judged.
+    const saved = process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID;
+    process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID = "decoy/override-never-used";
+    try {
+      await phaseVerify(ctx, artifactPath);
+    } finally {
+      if (saved === undefined) delete process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID;
+      else process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID = saved;
+    }
     const { readFileSync, rmSync } = await import("node:fs");
     const raw = readFileSync(artifactPath, "utf8");
     rmSync(artifactPath, { force: true });
@@ -339,6 +351,22 @@ async function main(): Promise<void> {
     assert.equal(artifact.legacySourceReads, 0);
     assert.equal(artifact.legacySourceWrites, 0);
     assert.ok(String(artifact.organization).startsWith("sha256:"));
+
+    // The model is attributed from the rows the run verified.
+    assert.deepEqual(artifact.model, {
+      source: "reconsideration rows (payload.model_id)",
+      ids: [SMOKE_MODEL_ID],
+      unattributed: 0,
+    });
+    assert.ok(!raw.includes("decoy/override-never-used"), "the verifier's env never reaches the evidence");
+    assert.ok(!raw.includes("default (configuration)"));
+
+    // Each posture entry carries the model that judged it.
+    const history = artifact.postureHistory as Array<{ modelId: string }>;
+    assert.equal(history.length, SCENARIOS.length * 3);
+    for (const entry of history) {
+      assert.equal(entry.modelId, SMOKE_MODEL_ID);
+    }
 
     // The whole document must not contain a literal id from the run.
     for (const row of fake.tables.operational_cases) {

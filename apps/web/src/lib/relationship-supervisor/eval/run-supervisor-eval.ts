@@ -31,12 +31,13 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createOpenRouterNextWorkJudge,
   type NextWorkProposal,
   type SupervisorJudgeInput,
 } from "../next-work-judge";
+import { attributeModels } from "../observability";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -230,6 +231,24 @@ interface RunOutcome {
   fabrications: number;
   noJudgment: number;
   held: boolean;
+  /** The model the judge that ran this pass requested — from the judge itself. */
+  modelId: string | null;
+}
+
+/**
+ * The artifact's model attribution: the models that actually judged, taken
+ * from each run's judge rather than from an override variable in this process.
+ *
+ * The override is resolved when the judge's module is imported, before
+ * `.env.local` is loaded, so reading it at write time could report a model the
+ * judge never used — or, unset, the uninformative `"default (configuration)"`
+ * SL-4's first eval artifacts carry.
+ */
+export function evalArtifactModel(runs: ReadonlyArray<Pick<RunOutcome, "modelId">>) {
+  return {
+    source: "the judge that ran each pass (NextWorkJudge.modelId)",
+    ...attributeModels(runs.map((run) => run.modelId)),
+  };
 }
 
 async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
@@ -277,6 +296,7 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
     held:
       failureRate <= evalSet.failure_rate_bar &&
       fabrications <= evalSet.fabricated_work_bar,
+    modelId: judge.modelId,
   };
 }
 
@@ -358,9 +378,7 @@ async function main(): Promise<void> {
       JSON.stringify(
         {
           ranAt: new Date().toISOString(),
-          model:
-            process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID?.trim() ??
-            "default (configuration)",
+          model: evalArtifactModel(runs),
           failure_rate_bar: evalSet.failure_rate_bar,
           fabricated_work_bar: evalSet.fabricated_work_bar,
           scenarios: total,
@@ -407,7 +425,15 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+// Only run the eval when this file IS the entry point, so a test can import
+// `evalArtifactModel` without spending model calls or loading `.env.local`.
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

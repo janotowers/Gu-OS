@@ -88,6 +88,7 @@ import {
   type DbClient,
 } from "@agents/db";
 import {
+  attributeModels,
   buildWakeKey,
   createOpenRouterNextWorkJudge,
   reconstructSituation,
@@ -489,9 +490,12 @@ export async function phaseVerify(
           run: ctx.runLabel,
           organization: redact(ctx.organizationId),
           requiredDistinctDays: REQUIRED_DISTINCT_DAYS,
-          model:
-            process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID?.trim() ??
-            "default (configuration)",
+          // From the rows this run verified, never from this process: verify
+          // calls no model, so its own environment says nothing about who judged.
+          model: {
+            source: "reconsideration rows (payload.model_id)",
+            ...attributeModels(reconsiderations.map((r) => r.payload.model_id)),
+          },
           legacySourceReads: 0,
           legacySourceWrites: 0,
           preflight,
@@ -508,6 +512,7 @@ export async function phaseVerify(
             recordedAt: r.created_at,
             wakeReason: r.payload.wake_reason ?? null,
             posture: r.payload.posture ?? null,
+            modelId: r.payload.model_id ?? null,
             yieldPosture:
               settlements.find((s) => s.payload.wake_key === r.payload.wake_key)
                 ?.payload.yield_posture ?? null,

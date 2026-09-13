@@ -60,6 +60,8 @@ export {
   type ReconstructedCommitment,
 } from "./replay";
 export {
+  attributeModels,
   summarizePostureDistribution,
+  type ModelAttribution,
   type PostureDistribution,
 } from "./observability";
