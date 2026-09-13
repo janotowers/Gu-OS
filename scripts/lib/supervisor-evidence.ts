@@ -194,6 +194,24 @@ function claimPair(caseId: string, wakeKey: string): string {
   return JSON.stringify([caseId, wakeKey]);
 }
 
+/**
+ * The settlement that belongs to one reconsideration: the same Case AND the
+ * same wake. Every Case woken on a day shares its `scheduled:<UTC date>` key,
+ * so matching on the key alone reads another Case's settlement — the defect
+ * the SA-4.3 check was repaired for, which the artifact's posture history
+ * still carried.
+ */
+export function settlementOf(
+  settlements: readonly HostedSettlementRow[],
+  reconsideration: HostedReconsiderationRow
+): HostedSettlementRow | undefined {
+  return settlements.find(
+    (s) =>
+      s.case_id === reconsideration.case_id &&
+      s.payload.wake_key === reconsideration.payload.wake_key
+  );
+}
+
 export function evaluateHostedSupervisorEvidence(
   input: HostedSupervisorInputs
 ): HostedCheck[] {

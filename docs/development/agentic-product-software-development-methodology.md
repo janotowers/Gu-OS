@@ -1,6 +1,6 @@
 # Gu OS Agentic Product & Software Development Methodology
 
-> **Version:** v0.4.4  
+> **Version:** v0.4.5  
 > **Status:** Canonical development methodology  
 > **Scope:** Tool-agnostic, product-portable operating method for humans + coding agents  
 > **Intended repo path:** `docs/development/agentic-product-software-development-methodology.md`
@@ -833,17 +833,40 @@ Rules that keep the boundary honest:
 A Slice is **Done** when:
 
 - its Slice Acceptance Contract is satisfied;
-- its applicable Definition of Done is satisfied;
+- its applicable Definition of Done is satisfied, save any requirement closed under the rule below as an **accepted deviation**, which stays recorded as not met;
 - the required verification evidence exists;
 - the evidence required by its declared Release Scope is satisfied;
 - no unresolved consequential blocker remains.
 
-The Done record makes explicit: the **environment reached**, the **Release Scope achieved**, the **material assertions verified**, and the **material things intentionally not exercised**.
+The Done record makes explicit: the **environment reached**, the **Release Scope achieved**, the **material assertions verified**, the **material things intentionally not exercised**, and any **accepted deviation** (below).
 
 | **Merged is not Done. CI green is not Done. Deployed to staging is not Done.** Each is evidence at one layer. Done is the satisfaction of the Slice's own acceptance contract, Definition of Done and declared Release Scope. |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 **Done is a Slice boundary, not a roadmap boundary.** A Done Slice says its own acceptance contract, Definition of Done and declared Release Scope are satisfied. It says nothing about whether the Roadmap Increment it belongs to has demonstrated its intended result — that is a separate evaluation against separately declared evidence (Sections 4.1, 17.2).
+
+### A Definition-of-Done requirement found unmet after the fact
+
+Occasionally a Definition-of-Done requirement is found, after the fact, not to have been met — and it can no longer be met, because what it asked for concerned a moment that has passed: a bar stated, or a review held, *before* implementation began. Later work cannot change when something happened. Without a rule, such a Slice could only be misrecorded as Done or held open indefinitely. This rule closes that gap and nothing wider. **It is not a waiver:** the requirement stays on the record as not met.
+
+**It applies only when all of the following hold:**
+
+- the requirement belongs to the Slice's applicable **Definition of Done**. A Slice Acceptance Contract assertion, and the evidence the declared Release Scope requires, are never closed this way;
+- it was found not met **after the fact**;
+- meeting it now is **historically impossible** — not merely costly, slow or inconvenient. A requirement that can still be met must be met, or the Slice is not Done;
+- the risk the requirement exists to control can still be **evaluated with compensating evidence**. If it cannot, the Slice is not Done.
+
+**What is recorded, in the artifact that owns the Slice's Done record** (normally its Slice Plan), **before the Slice is recorded Done** — at the latest in the same change:
+
+- the original requirement, in its original wording, **recorded as not met**;
+- why it was not met, and why remediation is no longer possible;
+- the residual risk, and the compensating evidence that evaluates it;
+- its effect on downstream work — dependent Slices, carried-forward findings, later evidence — or that it has none;
+- the **explicit acceptance** of the Slice's human Accountable / DRI, and its date; where the requirement protects a boundary that Section 16 places under another authority, that authority's acceptance as well.
+
+**Its status is `DEVIATION ACCEPTED`** — never PASS, and never *satisfied*. With it recorded, a Slice whose other Done conditions are all met may be recorded Done, and its Done record names the deviation; wherever this Methodology describes a Done Slice's Definition of Done as satisfied (this section, Section 17.2), that excludes the deviations its Done record names and never asserts they were met. Dropping the requirement, re-reading it until it was met, or recording it as PASS is not permitted; nor is using this rule to skip or defer a requirement that is still ahead.
+
+**An accepted deviation belongs to one Slice and sets no precedent.** Later Slices must still meet the original requirement; only a prospective change to the requirement itself, made through the process of the artifact that owns it — this Methodology, or the Slice Plan that declared it — can alter that. The development system may find, record and surface a deviation; accepting one is a human decision (Section 12).
 
 # 15. Failure classification and owning-artifact repair
 
@@ -1143,7 +1166,7 @@ Adoption is itself brownfield. Do not stop engineering to rewrite all historical
 
 | **Order** | **Action**                                                                                                                                                                                                                                                                                                                                                                   |
 |-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Next 1    | Maintain this Methodology (current v0.4.4) as the canonical development method, including the four-layer agent instruction architecture, proportional test/eval-first guidance, the Slice / Execution Cycle planning model, and the Development Continuity Loop with its READY Horizon and Roadmap Increment graduation.                                                       |
+| Next 1    | Maintain this Methodology (current v0.4.5) as the canonical development method, including the four-layer agent instruction architecture, proportional test/eval-first guidance, the Slice / Execution Cycle planning model, and the Development Continuity Loop with its READY Horizon and Roadmap Increment graduation.                                                       |
 | Next 2    | ~~Align the existing root `AGENTS.md` with the current canonical Methodology.~~ **Done in v0.4.3** (Section 23.8): the stale pre-v0.4.0 artifact-chain wording is corrected, and the root contract now activates the Development Continuity Loop, its stopping condition and the autonomy-is-not-authority rule by reference to Sections 4.1, 10.1, 10.5, 12.3, 12.4 and 14.1 — without copying them into always-on context. Keeping that contract concise and current remains ongoing maintenance rather than a completed programme.                                                                                              |
 | Next 3    | ~~Reconcile document organization with the clarified taxonomy.~~ **Done in v0.4.1** (Section 23.6): durable Relationship Operations Specs moved to `product/operating-domains/relationship-operations/specs/`, R1 delivery/discovery/provenance artifacts to `product/roadmap-increments/r1-relationship-operations-v1/`, and the unused `product/initiatives/` tree removed. |
 | Next 4    | Continue empirical calibration with subsequent Slices and Cycles (Section 17.1), including the READY Horizon and Execution Cycle defaults, which are operating starting points rather than invariants.                                                                                                                                                                       |
@@ -1264,6 +1287,18 @@ v0.4.4 is a **coherence-only patch**. It corrects two statements in this documen
 
 **Historical version notes preserved.** Sections 23.1–23.8 are unchanged. Statements elsewhere that describe what v0.4.3 introduced or resolved remain written as v0.4.3; only pointers naming the **active** version move to v0.4.4.
 
+# 23.10 v0.4.5 update note
+
+v0.4.5 adds **one narrow rule to the Done boundary** (Section 14.2). It was found by the first closure that needed it — R1 SL-4's closure review, 2026-09-13 — but nothing in it is specific to that Slice.
+
+**The gap.** Section 14.2 made Done require the applicable Definition of Done to be satisfied, and nothing said what happens when a requirement is found, after the fact, not to have been met *and can no longer be met*, because it concerned a moment that has passed. Such a Slice could only be misrecorded as Done, or held open with nothing left that could close it. Neither is honest.
+
+**The rule.** Such a requirement may be closed as an **accepted deviation** — status `DEVIATION ACCEPTED` — only when meeting it is historically impossible and compensating evidence can still evaluate the risk it controls. The record keeps the requirement **as not met** and states why it was not met, why remediation is no longer possible, the residual risk, the compensating evidence and the effect on downstream work. The Slice's human Accountable / DRI accepts it explicitly — with any authority Section 16 assigns to the boundary the requirement protects — in the artifact that owns the Done record, before the Slice is recorded Done. The deviation belongs to one Slice, sets no precedent and never becomes PASS. The Done conditions and the Done record's contents are amended to match, and the glossary gains *Accepted deviation*.
+
+**What it explicitly does not change.** It adds no waiver: a requirement that can still be met, a Slice Acceptance Contract assertion and the evidence a Release Scope requires cannot be closed this way. Release Scope and the rule against lowering it, eval-threshold authority and non-retroactivity (Section 14.1), the Definition of Ready and every human-authority boundary are unchanged. The development system gains no authority: it may find and record a deviation, never accept one. No template or repository contract is modified.
+
+**Historical version notes preserved.** Sections 23.1–23.9 are unchanged; only pointers naming the **active** version move to v0.4.5.
+
 # 24. Working glossary
 
 | **Term**                             | **Working definition**                                                                                                                                                                                   |
@@ -1294,6 +1329,7 @@ v0.4.4 is a **coherence-only patch**. It corrects two statements in this documen
 | Accountable / DRI                    | The human responsible for a Slice's outcome, escalation response, external coordination and its reaching the governed Done boundary — confirmed when the Slice becomes `Planned`, required before it can execute, and distinct from the AI actor that executes it. |
 | Release Scope                        | Slice-level Done boundary: RS-1 deterministic, RS-2 hosted, RS-3 production. Declared at Ready; composes with the four verification layers rather than replacing them.                                     |
 | Definition of Done                   | Explicit conditions/evidence that make a task/slice complete.                                                                                                                                            |
+| Accepted deviation                   | A Definition-of-Done requirement found not met after the fact, which can no longer be met and whose risk compensating evidence can still evaluate, closed by the explicit acceptance of the Slice's human Accountable / DRI. Recorded `DEVIATION ACCEPTED` — never PASS — for that Slice only, with no precedent (Section 14.2). |
 | Verification Evidence                | Tests/evals/replay/simulation/readiness/E2E evidence that supports a completion or release claim.                                                                                                        |
 | Owning artifact                      | The document/system that has authority over the type of truth implicated by a failure or change.                                                                                                         |
 | Silent drift                         | Behavior/design changes introduced through implementation without reconciling the governing artifact.                                                                                                    |

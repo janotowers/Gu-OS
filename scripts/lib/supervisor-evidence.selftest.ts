@@ -26,6 +26,7 @@ import {
   allPassed,
   distinctUtcDays,
   evaluateHostedSupervisorEvidence,
+  settlementOf,
   type HostedCheck,
   type HostedSupervisorInputs,
 } from "./supervisor-evidence";
@@ -345,6 +346,19 @@ function main(): void {
       settledCheck(checks)?.detail,
       "5 settled (case, wake) pair(s) for 6 claim(s)"
     );
+  });
+
+  t("the posture history reads each Case's own settlement, not another Case's on the same day", () => {
+    // Both Cases woken on d1 share its key, and the other Case settled first.
+    // Matching on the key alone reported that Case's yield for this one: what
+    // SL-4's artifacts did to the commitment-bearing Case on all three days.
+    const mine = reconsideration("scheduled:d1", "2026-09-08T12:00:05.000Z", "wait");
+    const theirs = { ...settlement("scheduled:d1", "2026-09-08T12:00:01.000Z"), case_id: CASE_B };
+    const own = settlement("scheduled:d1", "2026-09-08T12:00:06.000Z");
+    own.payload.yield_posture = "waiting_for_prospect";
+    assert.equal(settlementOf([theirs, own], mine)?.case_id, CASE);
+    assert.equal(settlementOf([theirs, own], mine)?.payload.yield_posture, "waiting_for_prospect");
+    assert.equal(settlementOf([theirs], mine), undefined, "another Case's settlement is never borrowed");
   });
 
   console.log("\nSA-4.4 subject-scoped facts");
