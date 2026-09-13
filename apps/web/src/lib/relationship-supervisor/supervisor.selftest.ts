@@ -215,8 +215,9 @@ function harness(overrides: FixtureOverrides = {}): FakeDb {
     },
     uniqueIndexes: [
       // uq_operational_case_events_supervisor_wake — M-WAKE-IDENTITY. Declared
-      // so the executor's conflict path is exercised; the PostgreSQL race
-      // itself is proven in the DB-backed suite, not here.
+      // so the executor's conflict path is exercised. PostgreSQL's own
+      // enforcement of the index is proven in the DB-backed suite
+      // (packages/db/test-rls/run.ts, SA-4.6), not here.
       {
         table: "operational_case_events",
         columns: ["case_id", "payload_jsonb->>wake_key"],
