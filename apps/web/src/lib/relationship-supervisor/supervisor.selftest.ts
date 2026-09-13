@@ -75,7 +75,8 @@ import {
 } from "./next-work-judge";
 import { checkPostureHistoryCoherence, distinctDaysCovered, reconstructSituation } from "./replay";
 import { resolveCommitmentDue } from "./commitments";
-import { summarizePostureDistribution } from "./observability";
+import { attributeModels, summarizePostureDistribution } from "./observability";
+import { evalArtifactModel } from "./eval/run-supervisor-eval";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1193,6 +1194,37 @@ async function main(): Promise<void> {
     assert.equal(result.status, "reconsidered");
     if (result.status !== "reconsidered") return;
     assert.equal(result.record.model_id, null);
+  });
+
+  await t("evidence attributes judgments to the models recorded, and counts the unrecorded", () => {
+    // What the durable rows or the judge recorded — never a guess. A missing or
+    // blank model is counted as unattributed rather than filled in.
+    assert.deepEqual(
+      attributeModels(["openai/gpt-5.4-mini", " openai/gpt-5.4-mini ", null, undefined, ""]),
+      { ids: ["openai/gpt-5.4-mini"], unattributed: 3 }
+    );
+    assert.deepEqual(attributeModels([]), { ids: [], unattributed: 0 });
+  });
+
+  await t("the eval artifact names the judge's model, never the override variable", () => {
+    // SL-4's first eval artifacts read an unset override at write time and said
+    // "default (configuration)". A decoy override must not leak into the record:
+    // the model is whatever the judge that ran each pass requested.
+    const saved = process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID;
+    process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID = "decoy/override-never-used";
+    try {
+      const model = evalArtifactModel([
+        { modelId: "openai/gpt-5.4-mini" },
+        { modelId: "openai/gpt-5.4-mini" },
+      ]);
+      assert.deepEqual(model.ids, ["openai/gpt-5.4-mini"]);
+      assert.equal(model.unattributed, 0);
+      assert.ok(!JSON.stringify(model).includes("decoy"), "the override must not reach the artifact");
+      assert.ok(!JSON.stringify(model).includes("default (configuration)"));
+    } finally {
+      if (saved === undefined) delete process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID;
+      else process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID = saved;
+    }
   });
 
   console.log("\nS2 §8.21 safe yield");
