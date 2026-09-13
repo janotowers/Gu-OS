@@ -1537,6 +1537,70 @@ async function main(): Promise<void> {
     });
 
     // ---------------------------------------------------------------
+    console.log("\nSL-4 wake identity — M-WAKE-IDENTITY (SA-4.6)");
+
+    // SA-4.6: a redelivered wake must not become a second reconsideration. The
+    // executor claims a wake by inserting its reconsideration first, and the
+    // partial unique index on (case_id, payload_jsonb ->> 'wake_key') WHERE
+    // kind = 'supervisor_reconsidered' is what turns a duplicate into a conflict
+    // it converges on. The module selftest drives that conflict path against a
+    // test double that EMULATES the index; whether PostgreSQL enforces it — the
+    // expression, the predicate, the error code — can only be shown here. Same
+    // shape as SA-3.5's narration identity above.
+
+    const claimWake = (caseId: string, wakeKey: string, kind = "supervisor_reconsidered") =>
+      client.query(
+        `insert into public.operational_case_events
+           (case_id, event_type, actor, payload_jsonb)
+         values ($1, 'state_changed', 'agent',
+                 jsonb_build_object('kind', $3::text, 'wake_key', $2::text))`,
+        [caseId, wakeKey, kind]
+      );
+
+    const claimsOf = async (caseId: string, wakeKey: string, kind = "supervisor_reconsidered") =>
+      (
+        await client.query(
+          `select id from public.operational_case_events
+            where case_id = $1
+              and payload_jsonb ->> 'wake_key' = $2
+              and payload_jsonb ->> 'kind' = $3`,
+          [caseId, wakeKey, kind]
+        )
+      ).rowCount;
+
+    await t("SA-4.6 two claims of one wake on one Case: exactly one survives, as a unique violation", async () => {
+      const results = await Promise.allSettled([
+        claimWake(f.orgCaseA, "scheduled:2026-09-09"),
+        claimWake(f.orgCaseA, "scheduled:2026-09-09"),
+      ]);
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === "rejected"
+      );
+      assert.equal(rejected.length, 1, "the index is the wake's identity — without it both would land");
+      assert.equal((rejected[0].reason as { code?: string }).code, UNIQUE_VIOLATION);
+      assert.equal(await claimsOf(f.orgCaseA, "scheduled:2026-09-09"), 1);
+    });
+
+    await t("SA-4.6 the same wake key on ANOTHER Case, and another day on this Case, are new claims", async () => {
+      // Per (Case, wake) is the identity: every Case woken on a day shares its key.
+      await claimWake(f.orgCaseA2, "scheduled:2026-09-09");
+      await claimWake(f.orgCaseA, "scheduled:2026-09-10");
+      assert.equal(await claimsOf(f.orgCaseA2, "scheduled:2026-09-09"), 1);
+      assert.equal(await claimsOf(f.orgCaseA, "scheduled:2026-09-10"), 1);
+    });
+
+    await t("the wake index is scoped to supervisor claims, not to other writers on the timeline", async () => {
+      // Scoped by kind, as SA-3.5's is. A settlement carries the same key but is
+      // written only after its claim succeeded, so its uniqueness is procedural.
+      await claimWake(f.orgCaseA, "scheduled:2026-09-09", "supervisor_reconsideration_settled");
+      await claimWake(f.orgCaseA, "scheduled:2026-09-09", "supervisor_reconsideration_settled");
+      assert.equal(
+        await claimsOf(f.orgCaseA, "scheduled:2026-09-09", "supervisor_reconsideration_settled"),
+        2
+      );
+    });
+
+    // ---------------------------------------------------------------
     console.log("\nscope — the Work Plane must be untouched by SL-0");
 
     await t("work_items / work_item_attempts / artifact_inputs keep exactly their CURRENT policies", async () => {
