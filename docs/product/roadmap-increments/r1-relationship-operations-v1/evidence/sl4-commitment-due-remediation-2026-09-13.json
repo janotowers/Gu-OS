@@ -1,0 +1,105 @@
+{
+  "kind": "hosted-data-remediation",
+  "slice": "SL-4",
+  "writtenAt": "2026-09-13T15:08:07Z",
+  "derivedFrom": "a raw correction record kept outside the repository because it carries raw staging identifiers. Every identifier below is digested with the verifier's convention; values, times and provenance are copied, not re-typed.",
+  "environment": {
+    "target": "staging",
+    "supabaseProject": "wdtjqlbsxwiijasicint",
+    "organization": "sha256:eab41f21d4c319b6"
+  },
+  "mainSha": "378bb9cb50849de1e8ef49ecf05a4231d2b19834",
+  "performedAt": "2026-09-13T02:16:37.996Z",
+  "recordedAt": "2026-09-13T02:16:38.649503+00:00",
+  "writePath": {
+    "function": "insertCaseFact (@agents/db, packages/db/src/queries/case-facts.ts)",
+    "statements": "one INSERT of the new row, then one UPDATE setting superseded_by on the prior current row for (case, fact_key, subject)",
+    "databaseGuard": "case_facts_enforce_append_only: DELETE is refused, and UPDATE is accepted only for superseded_by null -> value with every other column unchanged — an in-place value rewrite is structurally impossible"
+  },
+  "resolver": {
+    "call": "resolveCommitmentDue(\"viernes\", \"stated\")",
+    "module": "apps/web/src/lib/relationship-supervisor/commitments.ts @ 378bb9c",
+    "result": {
+      "due_at": null,
+      "basis": "stated",
+      "due_expression": "viernes"
+    },
+    "contract": "exactly one of due_at and due_expression is non-null; due_at only a full ISO-8601 instant with an explicit zone; basis keeps meaning how the timing was established"
+  },
+  "target": {
+    "case": "sha256:24cdeb4968f09052",
+    "subject": "sha256:660d6005beff2397",
+    "factKey": "commitment.due",
+    "user": "sha256:16489b62fa9cdf77"
+  },
+  "oldFact": {
+    "row": "sha256:c6f0183b60e85843",
+    "value": {
+      "basis": "stated",
+      "due_at": "viernes"
+    },
+    "sourceKind": "derived",
+    "sourceRef": "supervisor_wake:scheduled:2026-09-09",
+    "recordedAt": "2026-09-09T04:34:16.939102+00:00",
+    "afterRemediation": {
+      "current": false,
+      "supersededBy": "sha256:80d1eb0e44dbe8ea",
+      "valueUnchanged": true
+    }
+  },
+  "newFact": {
+    "row": "sha256:80d1eb0e44dbe8ea",
+    "value": {
+      "basis": "stated",
+      "due_at": null,
+      "due_expression": "viernes"
+    },
+    "sourceKind": "derived",
+    "sourceRef": "remediation:commitment_due_value_contract:378bb9cb5084",
+    "recordedAt": "2026-09-13T02:16:38.649503+00:00",
+    "current": true,
+    "equalsResolverOutput": true
+  },
+  "preconditionsVerifiedImmediatelyBeforeTheWrite": [
+    "HEAD = 378bb9cb50849de1e8ef49ecf05a4231d2b19834 on main, with no tracked changes",
+    "the resolver output deep-equals {due_at: null, basis: stated, due_expression: viernes}",
+    "exactly one current commitment.due for (case, subject, user), and it was the known malformed row",
+    "the Case still at version 6 with 6 events — no wake since the evidence"
+  ],
+  "containment": {
+    "method": "read-only fingerprints of every row the SL-4 run rests on, and of every Case, event, fact, Subject and Work Item in the Organization, taken immediately before and after the write",
+    "unchanged": [
+      "run Cases (version, next_action_at, updated_at, status)",
+      "run events (12: 6 reconsiderations, 6 settlements)",
+      "Organization Cases (14)",
+      "Organization events (25, 8 reconsiderations)",
+      "Organization Subjects (2)",
+      "Organization Work Items (2)"
+    ],
+    "changed": [
+      "Organization facts 32 -> 33: exactly the new row, plus superseded_by set on the old row"
+    ],
+    "proofNothingElseMoved": "removing the new row and un-superseding the old one in memory reproduces the pre-write facts fingerprint exactly (398a993782410481)",
+    "noWake": true,
+    "noReconsideration": true,
+    "noWorkItem": true,
+    "noCaseExecution": true,
+    "noSchedulingChange": true,
+    "auditEventCreated": false
+  },
+  "verificationAfterTheWrite": {
+    "exactlyOneCurrentCommitmentDueForTheSubject": true,
+    "duplicateCurrentRowsInTheOrganization": 0,
+    "currentCommitmentDueViolatingTheContract": 0,
+    "replay": {
+      "reader": "reconstructSituation (fresh, read-only)",
+      "dueAt": null,
+      "dueExpression": "viernes"
+    },
+    "sl4Verifier": "22/22 hosted checks and 9/9 preflight over the remediated state — read-only, no artifact written"
+  },
+  "notDone": [
+    "no multi-day evidence artifact was regenerated or edited; they record the run as it was",
+    "no wake, no new Subject, no Work Item, no scheduling change, no other fact"
+  ]
+}

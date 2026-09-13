@@ -1,0 +1,295 @@
+{
+  "ranAt": "2026-09-11T05:35:25.181Z",
+  "slice": "SL-4",
+  "run": "sl4-2026-09-09b",
+  "organization": "sha256:eab41f21d4c319b6",
+  "requiredDistinctDays": 3,
+  "model": "default (configuration)",
+  "legacySourceReads": 0,
+  "legacySourceWrites": 0,
+  "preflight": [
+    {
+      "assertion": "preflight",
+      "label": "the Organization resolves in the declared Gu OS environment",
+      "ok": true,
+      "detail": "Alebrixe (active)"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the declared Case owner is an active member",
+      "ok": true,
+      "detail": "role=advisor"
+    },
+    {
+      "assertion": "preflight",
+      "label": "relationship_ops is enabled for this Organization",
+      "ok": true,
+      "detail": "enabled=true"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the Organization is in the shadow stage",
+      "ok": true,
+      "detail": "value=shadow"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the global lead_opportunity Case type is registered",
+      "ok": true,
+      "detail": "skill=lead-opportunity-supervisor"
+    },
+    {
+      "assertion": "preflight",
+      "label": "the case type binds the supervisor root skill",
+      "ok": true,
+      "detail": "lead-opportunity-supervisor"
+    },
+    {
+      "assertion": "preflight",
+      "label": "a published lead_opportunity definition resolves for this owner",
+      "ok": true,
+      "detail": "v1 status=published scope=global"
+    },
+    {
+      "assertion": "preflight",
+      "label": "case_subjects is present with the TD-14 columns",
+      "ok": true,
+      "detail": "6 columns readable"
+    },
+    {
+      "assertion": "preflight",
+      "label": "case_facts carries subject_id",
+      "ok": true,
+      "detail": "column readable"
+    }
+  ],
+  "checks": [
+    {
+      "assertion": "SA-4.2",
+      "label": "every reconsideration carries a posture and a rationale",
+      "ok": true,
+      "detail": "6 reconsideration(s)"
+    },
+    {
+      "assertion": "SA-4.2",
+      "label": "every reconsideration is attributable to a named wake",
+      "ok": true
+    },
+    {
+      "assertion": "SA-4.2",
+      "label": "every reconsideration belongs to a controlled Case of the pilot Organization",
+      "ok": true
+    },
+    {
+      "assertion": "SA-4.3",
+      "label": "the posture history spans at least 3 distinct UTC days",
+      "ok": true,
+      "detail": "days observed (from the database clock): 2026-09-09, 2026-09-10, 2026-09-11"
+    },
+    {
+      "assertion": "SA-4.3",
+      "label": "the first and last reconsideration are at least 40h apart",
+      "ok": true,
+      "detail": "span 48.1h across 6 reconsideration(s)"
+    },
+    {
+      "assertion": "SA-4.3",
+      "label": "each Case's reconsiderations are strictly ordered in time",
+      "ok": true
+    },
+    {
+      "assertion": "SA-4.3 / SA-4.6",
+      "label": "no wake produced two reconsiderations on the same Case",
+      "ok": true
+    },
+    {
+      "assertion": "SA-4.3",
+      "label": "every reconsideration left a re-entry path — none stranded responsibility",
+      "ok": true
+    },
+    {
+      "assertion": "SA-4.3",
+      "label": "every reconsideration settled — none was left half-recorded",
+      "ok": true,
+      "detail": "6 settled (case, wake) pair(s) for 6 claim(s)"
+    },
+    {
+      "assertion": "SA-4.4",
+      "label": "every subject-scoped fact points at a subject of its own Case",
+      "ok": true,
+      "detail": "4 subject-scoped fact(s)"
+    },
+    {
+      "assertion": "SA-4.4",
+      "label": "no subject-scoped fact key carries an entity id",
+      "ok": true,
+      "detail": "commitment.expected_outcome, commitment.actor, commitment.due, commitment.status"
+    },
+    {
+      "assertion": "SA-4.4",
+      "label": "two commitments never share a current fact row for the same key",
+      "ok": true,
+      "detail": "1 commitment subject(s)"
+    },
+    {
+      "assertion": "SA-4.8",
+      "label": "every Work Item this Slice created is agent_proposed",
+      "ok": true,
+      "detail": "1 Work Item(s)"
+    },
+    {
+      "assertion": "SA-4.8",
+      "label": "no controlled Case acquired runtime authority",
+      "ok": true,
+      "detail": "ADR-107: shadow acquires no runtime or conversation authority"
+    },
+    {
+      "assertion": "SA-4.8",
+      "label": "every reconsideration recorded itself as stage=shadow",
+      "ok": true
+    },
+    {
+      "assertion": "SA-4.5",
+      "label": "a fresh reader reconstructs the same number of reconsiderations",
+      "ok": true,
+      "detail": "replay 3 vs rows 3"
+    },
+    {
+      "assertion": "SA-4.5",
+      "label": "the reconstruction recovers the objective and the next wake condition",
+      "ok": true
+    },
+    {
+      "assertion": "SA-4.5",
+      "label": "the reconstruction recovers every commitment recorded on that Case",
+      "ok": true
+    },
+    {
+      "assertion": "SA-4.5",
+      "label": "the reconstruction names what is being waited on",
+      "ok": true
+    },
+    {
+      "assertion": "SA-4.9",
+      "label": "posture distribution and no-op rate are observable per Organization",
+      "ok": true,
+      "detail": "total 8, no-action 6, ratio 0.75 — reported, not judged"
+    },
+    {
+      "assertion": "SA-4.9",
+      "label": "observability agrees with the raw rows on the day span",
+      "ok": true,
+      "detail": "observability 3 vs rows 3"
+    },
+    {
+      "assertion": "SA-4.12",
+      "label": "every row this run produced belongs to the pilot Organization's Cases",
+      "ok": true,
+      "detail": "containment observed; hosted RLS enforcement is NOT proven by this run"
+    }
+  ],
+  "passed": true,
+  "cases": [
+    {
+      "id": "sha256:61b9be2e990aabd9",
+      "scenario": "quiescent-opportunity",
+      "status": "active",
+      "runtimeAuthority": null
+    },
+    {
+      "id": "sha256:24cdeb4968f09052",
+      "scenario": "commitment-bearing-opportunity",
+      "status": "active",
+      "runtimeAuthority": null
+    }
+  ],
+  "postureHistory": [
+    {
+      "case": "sha256:61b9be2e990aabd9",
+      "recordedAt": "2026-09-09T04:34:13.290898+00:00",
+      "wakeReason": "scheduled_reconsideration",
+      "posture": "no_op",
+      "yieldPosture": "no_useful_work_now",
+      "uncertainty": "insufficient_evidence",
+      "rationale": "The case is viable, but the only evidence is an open-ended interest and no tracked commitments or new facts to reconcile.",
+      "nextActionAt": "2026-09-10T04:34:11.349Z"
+    },
+    {
+      "case": "sha256:24cdeb4968f09052",
+      "recordedAt": "2026-09-09T04:34:16.09745+00:00",
+      "wakeReason": "scheduled_reconsideration",
+      "posture": "work",
+      "yieldPosture": "no_useful_work_now",
+      "uncertainty": null,
+      "rationale": "El prospecto pidio comparar las dos casas y el asesor prometio enviar la comparacion el viernes.",
+      "nextActionAt": "2026-09-10T04:34:14.224Z"
+    },
+    {
+      "case": "sha256:61b9be2e990aabd9",
+      "recordedAt": "2026-09-10T04:38:35.0414+00:00",
+      "wakeReason": "scheduled_reconsideration",
+      "posture": "no_op",
+      "yieldPosture": "no_useful_work_now",
+      "uncertainty": "insufficient_evidence",
+      "rationale": "The only evidence is a viable buying interest with no due promise, deadline, or contradictory information to reconcile.",
+      "nextActionAt": "2026-09-11T04:38:29.501Z"
+    },
+    {
+      "case": "sha256:24cdeb4968f09052",
+      "recordedAt": "2026-09-10T04:38:39.057296+00:00",
+      "wakeReason": "scheduled_reconsideration",
+      "posture": "wait",
+      "yieldPosture": "no_useful_work_now",
+      "uncertainty": null,
+      "rationale": "El asesor ya comprometió enviar la comparación de las dos casas el viernes y el trabajo prepare_comparison está todo.",
+      "nextActionAt": "2026-09-11T04:38:33.454Z"
+    },
+    {
+      "case": "sha256:61b9be2e990aabd9",
+      "recordedAt": "2026-09-11T04:40:15.934125+00:00",
+      "wakeReason": "scheduled_reconsideration",
+      "posture": "no_op",
+      "yieldPosture": "no_useful_work_now",
+      "uncertainty": "insufficient_evidence",
+      "rationale": "The record only shows open-ended interest and no tracked commitments or new information.",
+      "nextActionAt": "2026-09-12T04:40:13.344Z"
+    },
+    {
+      "case": "sha256:24cdeb4968f09052",
+      "recordedAt": "2026-09-11T04:40:18.450234+00:00",
+      "wakeReason": "scheduled_reconsideration",
+      "posture": "wait",
+      "yieldPosture": "no_useful_work_now",
+      "uncertainty": null,
+      "rationale": "La comparación prometida sigue pendiente y el trabajo prepare_comparison ya figura como todo.",
+      "nextActionAt": "2026-09-12T04:40:16.183Z"
+    }
+  ],
+  "commitments": [
+    {
+      "id": "sha256:660d6005beff2397",
+      "case": "sha256:24cdeb4968f09052",
+      "kind": "commitment",
+      "key": "comparacion_casas"
+    }
+  ],
+  "work": [
+    {
+      "id": "sha256:ec50ec0fde04ebf5",
+      "workType": "prepare_comparison",
+      "origin": "agent_proposed",
+      "status": "todo"
+    }
+  ],
+  "observability": {
+    "total": 8,
+    "noAction": 6,
+    "noActionRatio": 0.75,
+    "byPosture": {
+      "wait": 2,
+      "no_op": 4,
+      "work": 2
+    },
+    "distinctDays": 3
+  }
+}
