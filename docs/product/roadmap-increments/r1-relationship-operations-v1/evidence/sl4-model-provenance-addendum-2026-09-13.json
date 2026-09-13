@@ -1,0 +1,195 @@
+{
+  "kind": "evidence-provenance-addendum",
+  "slice": "SL-4",
+  "writtenAt": "2026-09-13T15:08:07Z",
+  "scope": "Which model judged each SL-4 evidence artifact, and one misattributed descriptive field in the hosted artifacts. The artifacts named here are historical and remain byte-identical: this addendum records what they literally say and what is established instead from the owning sources, and claims no more certainty than those sources support.",
+  "conventions": {
+    "fileHash": "sha256 of the committed file content (git show <commit>:<path>), byte-identical to what each run wrote. A Windows checkout with core.autocrlf=true rewrites line endings in the working copy, so hash the committed blob, not a checked-out file.",
+    "rowIdentity": "Hosted rows are cited as sha256:<first 16 hex of sha256(row id)>, the verifier's own redaction convention. No raw identifier appears.",
+    "organization": "sha256:eab41f21d4c319b6"
+  },
+  "artifacts": [
+    {
+      "file": "sl4-hosted-evidence-2026-09-11-post-merge-f4afa91.json",
+      "sha256": "023d6d2364fcdafc9ca13a516c594c738d23f56a3efe886c00d8eab10a5c57ea",
+      "role": "canonical hosted verification — read-only, merged main @ f4afa91, corrected settlement check",
+      "recordedModel": "default (configuration)",
+      "ranAt": "2026-09-11T05:35:25.181Z"
+    },
+    {
+      "file": "sl4-hosted-evidence-2026-09-11-corrected-verifier-ca4100e.json",
+      "sha256": "840bbb7a60da6ac84966ab589037bad721fa93940703e3a5c88dab9ebc0372a7",
+      "role": "the same rows re-verified from the verifier-fix branch before it merged",
+      "recordedModel": "default (configuration)",
+      "ranAt": "2026-09-11T05:22:57.917Z"
+    },
+    {
+      "file": "sl4-hosted-evidence-2026-09-11.json",
+      "sha256": "cc3c2c0f80bdfed36e0e75b069691a3c2607e1ab9063584bf2e9cb62c4409b07",
+      "role": "the first hosted verification, by the pre-fix settlement check — provenance only",
+      "recordedModel": "default (configuration)",
+      "ranAt": "2026-09-11T04:42:49.738Z"
+    },
+    {
+      "file": "sl4-supervisor-eval-2026-09-08-batch1.json",
+      "sha256": "d51e250b17bd88cccffb048c504080524f98df19b818f5d83b78fe1809b2ef02",
+      "role": "eval batch 1 — 16 scenarios × 5 runs",
+      "recordedModel": "default (configuration)",
+      "ranAt": "2026-09-09T00:57:04.276Z"
+    },
+    {
+      "file": "sl4-supervisor-eval-2026-09-08-batch2.json",
+      "sha256": "b02023af4e279e293855ea81cb359fc120bb2e9cf07ec2303ba52be6cd838619",
+      "role": "eval batch 2 — 16 scenarios × 5 runs",
+      "recordedModel": "default (configuration)",
+      "ranAt": "2026-09-09T00:59:49.009Z"
+    }
+  ],
+  "modelField": {
+    "whatTheArtifactsRecord": "every artifact above records model = \"default (configuration)\"",
+    "hostedWriter": {
+      "file": "scripts/verify-supervisor.ts (verify phase)",
+      "expression": "process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID?.trim() ?? \"default (configuration)\"",
+      "whyIncomplete": "The verify phase calls no model. The expression describes an override variable in the verifier's own process, which was unset; it does not identify the model that produced the reconsiderations being verified."
+    },
+    "evalWriter": {
+      "file": "apps/web/src/lib/relationship-supervisor/eval/run-supervisor-eval.ts",
+      "expression": "process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID?.trim() ?? \"default (configuration)\"",
+      "whyIncomplete": "The judge's model is resolved when the judge module is imported (RELATIONSHIP_SUPERVISOR_MODEL_ID = override, else the default), before the runner loads apps/web/.env.local; the label was read from the environment afterwards, at write time. It records the override variable's state, not the judge's model."
+    }
+  },
+  "effectiveModel": {
+    "hostedReconsiderations": {
+      "model": "openai/gpt-5.4-mini",
+      "basis": "recorded on every row",
+      "source": "payload_jsonb.model_id on each canonical supervisor_reconsidered event of run sl4-2026-09-09b in hosted staging (project wdtjqlbsxwiijasicint), read-only, 2026-09-13",
+      "rows": [
+        {
+          "reconsideration": "sha256:6ac287c966404b8a",
+          "scenario": "quiescent-opportunity",
+          "wakeKey": "scheduled:2026-09-09",
+          "posture": "no_op",
+          "modelId": "openai/gpt-5.4-mini",
+          "stage": "shadow"
+        },
+        {
+          "reconsideration": "sha256:36aa24d2ff560309",
+          "scenario": "commitment-bearing-opportunity",
+          "wakeKey": "scheduled:2026-09-09",
+          "posture": "work",
+          "modelId": "openai/gpt-5.4-mini",
+          "stage": "shadow"
+        },
+        {
+          "reconsideration": "sha256:3f5fe5199dcb6ecb",
+          "scenario": "quiescent-opportunity",
+          "wakeKey": "scheduled:2026-09-10",
+          "posture": "no_op",
+          "modelId": "openai/gpt-5.4-mini",
+          "stage": "shadow"
+        },
+        {
+          "reconsideration": "sha256:4b010c7d89439c69",
+          "scenario": "commitment-bearing-opportunity",
+          "wakeKey": "scheduled:2026-09-10",
+          "posture": "wait",
+          "modelId": "openai/gpt-5.4-mini",
+          "stage": "shadow"
+        },
+        {
+          "reconsideration": "sha256:bfe1777790f6c450",
+          "scenario": "quiescent-opportunity",
+          "wakeKey": "scheduled:2026-09-11",
+          "posture": "no_op",
+          "modelId": "openai/gpt-5.4-mini",
+          "stage": "shadow"
+        },
+        {
+          "reconsideration": "sha256:206a653e7cf8f8f3",
+          "scenario": "commitment-bearing-opportunity",
+          "wakeKey": "scheduled:2026-09-11",
+          "posture": "wait",
+          "modelId": "openai/gpt-5.4-mini",
+          "stage": "shadow"
+        }
+      ],
+      "writtenBy": "the judge's own modelId (NextWorkJudge.modelId = RELATIONSHIP_SUPERVISOR_MODEL_ID, resolved at import) — the attribution added by commit 7036b45 (PR #40)",
+      "establishes": "the model the judge requested from OpenRouter for each reconsideration; the request names a single model and no fallback list",
+      "doesNotEstablish": "a provider-side confirmation of the model served — the response's model field was not recorded",
+      "limits": [
+        "The Day-1 rows were written 6 m 21 s before commit 7036b45 was created, by the working tree it was committed from. They carry model_id, which only that change writes, so the attribution change was present; byte-identity of that working tree to 7036b45 is not provable from Git. Days 2 and 3 ran supervisor, types, db and verifier code byte-identical to 7036b45.",
+        "The discarded run sl4-2026-09-09 recorded model_id = null on both its reconsiderations (sha256:831719f4b8caaef5, sha256:822b0efd5e4bfb4d). That is why it was discarded; it is not evidence."
+      ]
+    },
+    "evalBatches": {
+      "model": "openai/gpt-5.4-mini",
+      "basis": "inferred from committed configuration and the artifacts' own label — not recorded by the runs",
+      "reasoning": [
+        "The label \"default (configuration)\" is written only when process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID is undefined at write time; an empty value would have been written as \"\".",
+        "Between import and write the runner only adds environment keys — loadWebEnvLocal never overwrites or removes one — so the override was also undefined when the judge resolved its model at import.",
+        "With the override undefined, RELATIONSHIP_SUPERVISOR_MODEL_ID resolves to DEFAULT_RELATIONSHIP_SUPERVISOR_MODEL_ID (packages/agent/src/model.ts).",
+        "DEFAULT_RELATIONSHIP_SUPERVISOR_MODEL_ID = \"openai/gpt-5.4-mini\" was introduced in commit 8298df8, and no commit on any ref has changed it since; it holds that value in both commits that bracket the runs."
+      ],
+      "timing": {
+        "batch1RanAt": "2026-09-09T00:57:04.276Z",
+        "batch2RanAt": "2026-09-09T00:59:49.009Z",
+        "precedingCommit": {
+          "sha": "8298df8",
+          "committedAt": "2026-09-09T00:33:50Z"
+        },
+        "followingCommit": {
+          "sha": "6e8bfdd",
+          "committedAt": "2026-09-09T01:07:08Z"
+        }
+      },
+      "limits": [
+        "Both batches ran from an uncommitted working tree 7–10 minutes before 6e8bfdd was committed; the constant's value there is inferred from the commits on either side, not recorded.",
+        "No ai_usage_events rows exist for the runs (metering was off) and the provider's served-model field was not recorded, so no runtime record independently confirms the model.",
+        "The judge the eval exercised differs from the judge that ran hosted only by the modelId attribution property added in 7036b45; its prompt, schema and behaviour are unchanged, and the eval calls the judge alone, not the executor."
+      ]
+    }
+  },
+  "misattributedYieldPosture": {
+    "field": "postureHistory[].yieldPosture",
+    "affects": [
+      "sl4-hosted-evidence-2026-09-11-post-merge-f4afa91.json",
+      "sl4-hosted-evidence-2026-09-11-corrected-verifier-ca4100e.json",
+      "sl4-hosted-evidence-2026-09-11.json"
+    ],
+    "cause": "settlements.find((s) => s.payload.wake_key === r.payload.wake_key) keyed on the wake key alone. Both Cases woken on a day share it, and find() returned the quiescent Case's settlement first.",
+    "entries": [
+      {
+        "reconsideration": "sha256:36aa24d2ff560309",
+        "scenario": "commitment-bearing-opportunity",
+        "wakeKey": "scheduled:2026-09-09",
+        "artifactSays": "no_useful_work_now",
+        "ownSettlementSays": "work_underway"
+      },
+      {
+        "reconsideration": "sha256:4b010c7d89439c69",
+        "scenario": "commitment-bearing-opportunity",
+        "wakeKey": "scheduled:2026-09-10",
+        "artifactSays": "no_useful_work_now",
+        "ownSettlementSays": "waiting_for_prospect"
+      },
+      {
+        "reconsideration": "sha256:206a653e7cf8f8f3",
+        "scenario": "commitment-bearing-opportunity",
+        "wakeKey": "scheduled:2026-09-11",
+        "artifactSays": "no_useful_work_now",
+        "ownSettlementSays": "waiting_for_prospect"
+      }
+    ],
+    "impact": "Descriptive only. None of the 22 hosted checks reads this field, so every check result stands; each hosted artifact misdescribes 3 of its 6 entries.",
+    "authoritativeValues": "the per-row settlements above (supervisor_reconsideration_settled.payload.yield_posture)"
+  },
+  "prevention": {
+    "pr": "#47",
+    "branch": "fix/sl4-evidence-attribution",
+    "commits": {
+      "79fc901": "evidence attributes the model that actually judged",
+      "356f753": "the evidence posture history reads each Case's own settlement"
+    },
+    "statusWhenWritten": "open — to merge before the SL-4 closure record"
+  }
+}
