@@ -70,6 +70,7 @@ import {
   presentationPatchFor,
 } from "./presentation";
 import { buildWorkPortfolio, canDecideApprovals } from "./projection";
+import { PREDICATE_COPY, renderClause } from "./copy";
 import { loadWorkPortfolio } from "./load";
 import {
   completePortfolioWork,
@@ -732,6 +733,29 @@ async function testNeverInvented(): Promise<void> {
       }
       assert.ok(item.interaction.evidence_refs.length > 0);
       assert.equal(item.case_id, snap.case.id);
+    }
+  });
+
+  await t("every clause the rules emit has Spanish copy — a missing template fails here, not as a blank", () => {
+    const { snap } = blockedOnHumanSnapshot();
+    snap.commitments = [commitment()];
+    snap.approval_requests = [approvalRequest()];
+    snap.authority_conflict = { resolution_id: id("authority"), state: "conflicting", detected_at: iso(-HOUR) };
+    snap.effect_operations = [{ id: id("effect"), capability: "send_prospect_message", status: "unknown_outcome", updated_at: iso(-HOUR) }];
+    snap.work.push(work({ status: "review", origin: "definition_template" }));
+    const stall = snapshot({ caseOverrides: { runtime_authority: "gu_os", next_action_at: null } });
+    const items = [...evaluateMustSurface(snap, NOW), ...evaluateMustSurface(stall, NOW)];
+    assert.deepEqual(
+      [...new Set(items.map((i) => i.predicate))].sort(),
+      [...MUST_SURFACE_PREDICATES].sort(),
+      "the fixture exercises all six predicates"
+    );
+    for (const item of items) {
+      assert.ok(PREDICATE_COPY[item.predicate]);
+      for (const clause of [item.why, item.what_gu_needs, item.why_now]) {
+        const text = renderClause(clause, (instant) => instant ?? "—");
+        assert.ok(text.length > 0 && !text.includes("undefined"), `${clause.code}: ${text}`);
+      }
     }
   });
 

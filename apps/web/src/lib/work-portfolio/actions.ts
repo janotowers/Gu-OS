@@ -51,7 +51,7 @@ export const PORTFOLIO_APPROVAL_DECIDED_EVENT_KIND = "portfolio_approval_decided
 const HUMAN_CLAIM_LEASE_MS = 5 * 60_000;
 
 export type PortfolioRefusal =
-  | OrgAuthorizationReason
+  | Exclude<OrgAuthorizationReason, "active_member">
   | "case_not_in_organization"
   | "work_not_awaiting_human"
   | "work_not_claimable"
@@ -68,6 +68,11 @@ export type PortfolioActionResult =
   | { status: "refused"; reason: PortfolioRefusal };
 
 const refused = (reason: PortfolioRefusal): PortfolioActionResult => ({ status: "refused", reason });
+
+/** A denied gate's reason. `active_member` only ever accompanies an allowed gate. */
+const denial = (reason: OrgAuthorizationReason): PortfolioRefusal =>
+  reason === "active_member" ? "no_active_membership" : reason;
+
 const INERT: PortfolioActionResult = { status: "inert", reason: "relationship_ops_disabled" };
 
 /**
@@ -121,7 +126,7 @@ export async function decidePortfolioApproval(params: {
 
   // D3, first: role in THIS Organization, now. Assignment is never consulted.
   const gate = await authorizeOrgAction(serviceDb, actorUserId, organizationId, "case_approval.decide");
-  if (!gate.allowed || !gate.membership) return refused(gate.reason);
+  if (!gate.allowed || !gate.membership) return refused(denial(gate.reason));
   if (!(await isRelationshipOpsEnabled(serviceDb, organizationId))) return INERT;
 
   const opCase = await organizationCase(serviceDb, organizationId, caseId);
@@ -209,7 +214,7 @@ export async function completePortfolioWork(params: {
   // The existing Organization action vocabulary: any active member may write
   // an Organization Case. No new authority is minted for the Portfolio.
   const gate = await authorizeOrgAction(serviceDb, actorUserId, organizationId, "case.write");
-  if (!gate.allowed || !gate.membership) return refused(gate.reason);
+  if (!gate.allowed || !gate.membership) return refused(denial(gate.reason));
   if (!(await isRelationshipOpsEnabled(serviceDb, organizationId))) return INERT;
 
   const opCase = await organizationCase(serviceDb, organizationId, caseId);
