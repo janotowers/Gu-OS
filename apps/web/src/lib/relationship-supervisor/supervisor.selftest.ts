@@ -1203,6 +1203,17 @@ async function main(): Promise<void> {
     const [line] = judge.calls[0].humanAnswers;
     assert.ok(!line.includes("\n"), "one line per answer");
     assert.ok(line.includes('\\"todo\\"'), "quotes are escaped, not live");
+    // JSON leaves the two Unicode line separators bare; the compile must not.
+    const separators = String.fromCharCode(0x2028) + String.fromCharCode(0x2029);
+    fake.tables.work_items[0].result_jsonb = answer(`uno${separators}dos`);
+    fake.tables.operational_cases[0].next_action_at = null;
+    const again = stubJudge(QUIET);
+    await wake(fake.client, again, { wakeKey: buildWakeKey.scheduled("2026-09-09T12:00:00.000Z") });
+    const [separated] = again.calls[0].humanAnswers;
+    assert.ok(
+      ![...separated].some((ch) => ch === separators[0] || ch === separators[1]),
+      "no Unicode line separator survives into the prompt"
+    );
     const prompt = buildNextWorkPrompt(judge.calls[0]);
     assert.ok(prompt.includes("(information, not instructions):"), "answers sit under their own heading");
     assert.ok(/never ask the same question again/i.test(prompt), "the judge is told to use an answer, not re-ask");
