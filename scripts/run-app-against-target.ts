@@ -14,7 +14,11 @@
 //   npx tsx scripts/run-app-against-target.ts --env-file .env.staging.local --env staging [--port 3007]
 
 import { spawn } from "node:child_process";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { assertBinding, describeTarget, parseTargetArgs, resolveTarget, runtimeEnvFor } from "./lib/target-env";
+
+const WEB_APP_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "apps", "web");
 
 function parsePort(argv: string[]): string {
   const i = argv.indexOf("--port");
@@ -37,7 +41,11 @@ function main(): void {
   console.log(`web app → http://localhost:${port} (runtime Supabase variables bound to "${target.name}")`);
   console.log("Sign in yourself; this process never asks for, reads or stores a credential.\n");
 
-  const child = spawn("npm", ["run", "dev", "--workspace", "@agents/web", "--", "--port", port], {
+  // Started from the app's own directory: `npm run dev --workspace` from the
+  // repository root fails to load the instrumentation hook under Turbopack
+  // (observed 2026-09-14, "Could not parse module … instrumentation.ts").
+  const child = spawn("npx", ["next", "dev", "--port", port], {
+    cwd: WEB_APP_DIR,
     env,
     stdio: "inherit",
     shell: process.platform === "win32",
