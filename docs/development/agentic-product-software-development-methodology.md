@@ -1,6 +1,6 @@
 # Gu OS Agentic Product & Software Development Methodology
 
-> **Version:** v0.4.5  
+> **Version:** v0.4.6  
 > **Status:** Canonical development methodology  
 > **Scope:** Tool-agnostic, product-portable operating method for humans + coding agents  
 > **Intended repo path:** `docs/development/agentic-product-software-development-methodology.md`
@@ -632,9 +632,11 @@ The term `commit` / `committed` is deliberately **not** used for Slice planning 
 | **Role**                 | **Responsible for**                                                                                                                                                                                                                     |
 |--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Human Accountable / DRI  | Outcome; escalation response; coordination of external dependencies; participation in consequential decisions; ensuring the Slice reaches its governed Done boundary.                                                                     |
-| AI / coding agent        | Inspecting; planning Tasks; implementing; refactoring; creating required tests; running tests; diagnosing; repairing; branching; committing; pushing; creating and updating PRs; responding to CI failures; gathering verification evidence — inside approved scope and repository policy. |
+| AI / coding agent        | Inspecting; planning Tasks; implementing; refactoring; creating required tests; running tests; diagnosing; repairing; branching; committing; pushing; creating and updating PRs; responding to CI failures; merging PRs under the rule below; gathering verification evidence — inside approved scope and repository policy. |
 
 The Accountable is **not** redefined as a line-by-line code approver.
+
+**Merge authority follows decision authority.** A pull request and its merge are how a change lands, not a decision of their own: the PR/merge boundary neither creates a human gate nor removes one. The coding agent may merge a PR when the verification required before merge is green and every consequential decision the change embodies is either already within approved agent authority or has already received the human authorization it requires. It must stop before merge when merging would enact an unresolved human-authority decision, or an operation whose governing contract explicitly requires human authorization. Those boundaries are defined where they already live — in this Methodology (Section 12, including the conditions below, and Sections 12.4, 14.1, 14.2 and 16–18), in the repository operating contract and in the governing contract itself — and this rule adds none.
 
 **When execution must return to human planning.** These are the existing agent-autonomy and escalation principles, consolidated rather than replaced. Human re-planning or decision is required when execution discovers:
 
@@ -921,6 +923,8 @@ Human review should be concentrated at consequential boundaries rather than spra
 | Workflow/case authority change                   | Transitions, approvals, evidence, durable state, external commitments.    | Business/architecture approval + simulation/replay/readiness.              |
 | Production code/policy self-improvement proposal | Generated from incidents/evals/outcomes.                                  | PR + tests/evals + human release authority; never silent runtime mutation. |
 
+**Review and human approval are not synonyms.** A required code, security or architecture review may be performed by an appropriate coding or verification agent (Section 11.4) unless this Methodology or the governing contract explicitly requires a human reviewer or human approval. Human approval remains required wherever this Methodology or the governing contract assigns the consequential authority decision to a human.
+
 **Relationship to Release Scope.** A Slice's declared Release Scope (Section 14.2) says how far it must reach; this table says who must authorize it. RS-1 and RS-2 are ordinarily satisfied inside the governance a Slice already carries. **RS-3 always engages release authority**, and raising a Slice from RS-1 or RS-2 to RS-3 mid-flight is a human decision at the boundary its change class implies.
 
 Release safely means retaining a credible rollback path: additive migrations where practical, feature flags, versioned behavior, canary/staged rollout and preserved prior artifacts. “Generated quickly” is not a reason to make consequential change irreversible.
@@ -1166,7 +1170,7 @@ Adoption is itself brownfield. Do not stop engineering to rewrite all historical
 
 | **Order** | **Action**                                                                                                                                                                                                                                                                                                                                                                   |
 |-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Next 1    | Maintain this Methodology (current v0.4.5) as the canonical development method, including the four-layer agent instruction architecture, proportional test/eval-first guidance, the Slice / Execution Cycle planning model, and the Development Continuity Loop with its READY Horizon and Roadmap Increment graduation.                                                       |
+| Next 1    | Maintain this Methodology (current v0.4.6) as the canonical development method, including the four-layer agent instruction architecture, proportional test/eval-first guidance, the Slice / Execution Cycle planning model, and the Development Continuity Loop with its READY Horizon and Roadmap Increment graduation.                                                       |
 | Next 2    | ~~Align the existing root `AGENTS.md` with the current canonical Methodology.~~ **Done in v0.4.3** (Section 23.8): the stale pre-v0.4.0 artifact-chain wording is corrected, and the root contract now activates the Development Continuity Loop, its stopping condition and the autonomy-is-not-authority rule by reference to Sections 4.1, 10.1, 10.5, 12.3, 12.4 and 14.1 — without copying them into always-on context. Keeping that contract concise and current remains ongoing maintenance rather than a completed programme.                                                                                              |
 | Next 3    | ~~Reconcile document organization with the clarified taxonomy.~~ **Done in v0.4.1** (Section 23.6): durable Relationship Operations Specs moved to `product/operating-domains/relationship-operations/specs/`, R1 delivery/discovery/provenance artifacts to `product/roadmap-increments/r1-relationship-operations-v1/`, and the unused `product/initiatives/` tree removed. |
 | Next 4    | Continue empirical calibration with subsequent Slices and Cycles (Section 17.1), including the READY Horizon and Execution Cycle defaults, which are operating starting points rather than invariants.                                                                                                                                                                       |
@@ -1298,6 +1302,20 @@ v0.4.5 adds **one narrow rule to the Done boundary** (Section 14.2). It was foun
 **What it explicitly does not change.** It adds no waiver: a requirement that can still be met, a Slice Acceptance Contract assertion and the evidence a Release Scope requires cannot be closed this way. Release Scope and the rule against lowering it, eval-threshold authority and non-retroactivity (Section 14.1), the Definition of Ready and every human-authority boundary are unchanged. The development system gains no authority: it may find and record a deviation, never accept one. No template or repository contract is modified.
 
 **Historical version notes preserved.** Sections 23.1–23.9 are unchanged; only pointers naming the **active** version move to v0.4.5.
+
+# 23.11 v0.4.6 update note
+
+v0.4.6 makes **one authority rule explicit** — who may merge a pull request — and **clarifies the one term that rule depends on**: review. It surfaced on 2026-09-13, when a review asked whether a generic *continue development* instruction is enough for a coding agent to reconstruct development state and stop only at a genuine human gate. The continuity contract held. Merge authority did not: Section 12.1 listed the agent's work up to creating and updating PRs and assigned merging to no one, while repository enforcement requires green checks but no approval — so two agents reading the same repository could stop, or not, at the same green PR.
+
+**The rule (Section 12.1).** Merge authority follows decision authority: the PR/merge boundary neither creates a human gate nor removes one. The coding agent may merge when the verification required before merge is green and every consequential decision the change embodies is already within approved agent authority or has already received the human authorization it requires. It stops before merge when merging would enact an unresolved human-authority decision, or an operation whose governing contract explicitly requires human authorization. The rule points at those boundaries where they already live rather than listing them, and adds none. The agent's row in the Section 12.1 responsibility table now includes merging under it.
+
+**The clarification (Section 16).** Review and human approval are not synonyms. A required code, security or architecture review may be performed by an appropriate coding or verification agent unless this Methodology or the governing contract explicitly requires a human reviewer or human approval; human approval remains required wherever either assigns the consequential authority decision to a human. Section 16 named reviews without naming who performs them, so the merge rule could otherwise be read back into a human gate on every PR. This resolves that ambiguity rather than removing a gate: no approval that this Methodology or a governing contract assigns to a human moves.
+
+**What changes in practice.** A green PR whose consequential decisions are all already authorized no longer waits for a human merge by default, and a required review no longer implies a human reviewer unless one is explicitly required. A PR that would enact a decision still owed to a human always waits.
+
+**What it explicitly does not change.** No human-authority boundary is added, removed or relaxed, and a merge cannot be used to enact one. Merged is still not Done (Section 14.2). Release Scope and release authority, eval-threshold authority (Section 14.1), accepted deviations, the Definition of Ready, Execution Cycle semantics, the Accountable / DRI rule — the Accountable is still not a line-by-line code approver — and every Development Continuity Loop behavior and stopping condition are unchanged. No repository contract, playbook or template is modified: the root `AGENTS.md` stopping condition already defers to these boundaries, and the release-path playbook already escalates on decisions rather than on the merge.
+
+**Historical version notes preserved.** Sections 23.1–23.10 are unchanged; only pointers naming the **active** version move to v0.4.6.
 
 # 24. Working glossary
 
