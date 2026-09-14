@@ -30,7 +30,7 @@ type OrBranch =
   | { op: "gte"; column: string; value: string }
   | { op: "is"; column: string };
 
-type Filter =
+export type Filter =
   | { kind: "eq"; column: string; value: unknown }
   | { kind: "neq"; column: string; value: unknown }
   | { kind: "lte"; column: string; value: unknown }
@@ -97,11 +97,24 @@ export interface FakeDbOptions {
   onWrite?: (table: string) => Promise<void> | void;
 }
 
+/** One executed read and the filters it carried. */
+export interface FakeQuery {
+  table: string;
+  filters: readonly Filter[];
+}
+
 export interface FakeDb {
   client: DbClient;
   tables: Record<string, Row[]>;
   /** Every table a query touched, in order. Used to assert "zero reads". */
   reads: string[];
+  /**
+   * Every read with its filters, in order. Added for R1 SL-7, whose SA-7.2
+   * claim is about what a read was KEYED BY — an unauthorized Case must never
+   * reach a service-role query, which an assertion on the result alone cannot
+   * show, because a projection could fetch a row and then drop it.
+   */
+  queries: FakeQuery[];
   writes: string[];
   /** Arms a one-shot write failure after construction. */
   failNextWrite(table: string): void;
@@ -142,6 +155,7 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
   const tables: Record<string, Row[]> = options.tables ?? {};
   const uniqueIndexes = options.uniqueIndexes ?? [];
   const reads: string[] = [];
+  const queries: FakeQuery[] = [];
   const writes: string[] = [];
   const defaults = options.defaults ?? {};
   const writeCounts = new Map<string, number>();
@@ -268,6 +282,7 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
       }
 
       reads.push(name);
+      queries.push({ table: name, filters: [...filters] });
       let rows = table(name).filter((row) => matches(row, filters));
       if (orderColumn) {
         const column = orderColumn;
@@ -389,6 +404,7 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
     client: { from: (name: string) => builder(name) } as unknown as DbClient,
     tables,
     reads,
+    queries,
     writes,
     failNextWrite(table: string) {
       armedFaults.push({
