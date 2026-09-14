@@ -78,6 +78,7 @@ import {
   resolveDeliveryEligibility,
   type DeliveryEligibility,
 } from "./delivery";
+import { summarizeHumanAnswers } from "./human-answers";
 import type { NextWorkJudge, NextWorkProposal } from "./next-work-judge";
 
 /** Postgres unique-violation: this wake was already reconsidered. */
@@ -512,6 +513,11 @@ export async function runSupervisorWake(
         workSummary: work.map(
           (item) => `${item.work_type} — ${item.status} (${item.origin})`
         ),
+        // …and what a person ANSWERED, which the line above cannot carry. S2
+        // §8.5 replans "after a Tool/human response" and HP-08 resumes work
+        // "when the answer arrives"; before the Cycle 3 repair the answer the
+        // Work Portfolio records never reached the judge (R1 Slice Plan §6).
+        humanAnswers: summarizeHumanAnswers(work),
         postureHistory: history.map(
           (r) => `${r.posture} — ${r.rationale}${r.uncertainty ? ` (${r.uncertainty})` : ""}`
         ),

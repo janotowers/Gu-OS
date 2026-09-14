@@ -16,6 +16,13 @@
  *     answer, so a supervisor that invents activity to look busy fails this
  *     Slice however accurate the rest of its judgments are.
  *
+ * A THIRD BAR, FOR THE CYCLE 3 REPAIR (Slice Plan §5 order 2).
+ *
+ *   * `reask_bar` — ZERO. The supervisor now reads what a person answered to an
+ *     earlier ask. In a scenario whose one human-answerable question has been
+ *     answered, a targeted ask re-asks it — the defect the repair removes — so it
+ *     is counted apart from ordinary failures, the way fabrication is.
+ *
  * SCORING ACCEPTS MORE THAN ONE ANSWER, ON PURPOSE. S2 AC-31 says selection
  * must be "explainable via current context; no universal score required", so
  * several scenarios list more than one defensible posture and any of them
@@ -100,6 +107,12 @@ interface Scenario {
   must_not_repeat_commitment?: boolean;
   must_report_capability_gap?: boolean;
   must_report_insufficient_evidence?: boolean;
+  /**
+   * The one question a person could answer here HAS been answered (see
+   * `input.humanAnswers`). A targeted ask now re-asks it, or asks a person for
+   * what a listed capability can find. Scored against `reask_bar`.
+   */
+  must_not_reask?: boolean;
   /** The judge must never suggest reaching the prospect. */
   must_not_propose_outbound?: boolean;
   expected_commitment_actor?: string;
@@ -108,6 +121,7 @@ interface Scenario {
 interface EvalSet {
   failure_rate_bar: number;
   fabricated_work_bar: number;
+  reask_bar: number;
   scenarios: Scenario[];
 }
 
@@ -132,22 +146,32 @@ interface ScenarioResult {
   proposal: NextWorkProposal | null;
   violations: string[];
   fabrication: string[];
+  reask: string[];
   passed: boolean;
 }
 
-function scoreScenario(
+export function scoreScenario(
   scenario: Scenario,
   proposal: NextWorkProposal | null
-): { violations: string[]; fabrication: string[] } {
+): { violations: string[]; fabrication: string[]; reask: string[] } {
   const violations: string[] = [];
   const fabrication: string[] = [];
+  const reask: string[] = [];
 
   if (!proposal) {
     // A missing judgment is a failure of this eval — the executor handles it
     // safely at runtime under SA-4.11, but a run that cannot judge measures
     // nothing about judgment.
     violations.push("no judgment was produced");
-    return { violations, fabrication };
+    return { violations, fabrication, reask };
+  }
+
+  if (scenario.must_not_reask && proposal.posture === "targeted_human_input") {
+    reask.push(
+      `asked a person again although their answer is in the context: ${proposal.proposed_work
+        .map((w) => w.purpose)
+        .join(" | ")}`
+    );
   }
 
   if (!scenario.acceptable_postures.includes(proposal.posture)) {
@@ -220,7 +244,7 @@ function scoreScenario(
     violations.push("no usable rationale — the judgment is not explainable");
   }
 
-  return { violations, fabrication };
+  return { violations, fabrication, reask };
 }
 
 interface RunOutcome {
@@ -229,6 +253,7 @@ interface RunOutcome {
   failures: number;
   failureRate: number;
   fabrications: number;
+  reasks: number;
   noJudgment: number;
   held: boolean;
   /** The model the judge that ran this pass requested — from the judge itself. */
@@ -257,14 +282,15 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
 
   for (const scenario of evalSet.scenarios) {
     const proposal = await judge.propose(scenario.input);
-    const { violations, fabrication } = scoreScenario(scenario, proposal);
-    const passed = violations.length === 0 && fabrication.length === 0;
+    const { violations, fabrication, reask } = scoreScenario(scenario, proposal);
+    const passed = violations.length === 0 && fabrication.length === 0 && reask.length === 0;
     results.push({
       id: scenario.id,
       label: scenario.label,
       proposal,
       violations,
       fabrication,
+      reask,
       passed,
     });
 
@@ -272,9 +298,10 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
       const mark = passed ? "ok  " : "FAIL";
       console.log(
         `  ${mark} ${scenario.id} — ${proposal ? proposal.posture : "null"}` +
-          (fabrication.length > 0 ? "  << FABRICATION" : "")
+          (fabrication.length > 0 ? "  << FABRICATION" : "") +
+          (reask.length > 0 ? "  << RE-ASK" : "")
       );
-      for (const line of [...violations, ...fabrication]) {
+      for (const line of [...violations, ...fabrication, ...reask]) {
         console.log(`       ${line}`);
       }
       if (!passed && proposal) {
@@ -285,6 +312,7 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
 
   const failures = results.filter((r) => !r.passed).length;
   const fabrications = results.filter((r) => r.fabrication.length > 0).length;
+  const reasks = results.filter((r) => r.reask.length > 0).length;
   const failureRate = failures / results.length;
   return {
     index,
@@ -292,10 +320,12 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
     failures,
     failureRate,
     fabrications,
+    reasks,
     noJudgment: results.filter((r) => r.proposal === null).length,
     held:
       failureRate <= evalSet.failure_rate_bar &&
-      fabrications <= evalSet.fabricated_work_bar,
+      fabrications <= evalSet.fabricated_work_bar &&
+      reasks <= evalSet.reask_bar,
     modelId: judge.modelId,
   };
 }
@@ -337,6 +367,9 @@ async function main(): Promise<void> {
     `fabrications:     ${runs.map((r) => r.fabrications).join(", ")} — bar ${
       evalSet.fabricated_work_bar
     }`
+  );
+  console.log(
+    `re-asks:          ${runs.map((r) => r.reasks).join(", ")} — bar ${evalSet.reask_bar}`
   );
   const noJudgment = runs.reduce((sum, r) => sum + r.noJudgment, 0);
   if (noJudgment > 0) {
@@ -381,14 +414,16 @@ async function main(): Promise<void> {
           model: evalArtifactModel(runs),
           failure_rate_bar: evalSet.failure_rate_bar,
           fabricated_work_bar: evalSet.fabricated_work_bar,
+          reask_bar: evalSet.reask_bar,
           scenarios: total,
           runCount,
-          runsHoldingBothBars: heldRuns,
+          runsHoldingAllBars: heldRuns,
           runs: runs.map((run) => ({
             run: run.index,
             failures: run.failures,
             failureRate: run.failureRate,
             fabrications: run.fabrications,
+            reasks: run.reasks,
             held: run.held,
             results: run.results.map((r) => ({
               id: r.id,
@@ -396,6 +431,7 @@ async function main(): Promise<void> {
               passed: r.passed,
               violations: r.violations,
               fabrication: r.fabrication,
+              reask: r.reask,
               rationale: r.proposal?.rationale ?? null,
             })),
           })),
@@ -421,7 +457,7 @@ async function main(): Promise<void> {
 
   console.log("");
   console.log(
-    `supervisor eval: both frozen bars held in all ${runCount} run(s).`
+    `supervisor eval: every frozen bar held in all ${runCount} run(s).`
   );
 }
 

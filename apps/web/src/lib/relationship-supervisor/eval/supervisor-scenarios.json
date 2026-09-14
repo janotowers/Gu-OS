@@ -5,10 +5,23 @@
     "barEstablishedBy": "PROPOSED AND FROZEN BY THE CODING AGENT on 2026-09-08, BEFORE this set was run even once, per Methodology §14.1 and the SL-4 Definition of Done — not by a human, and with no human approval sought or given at that point. Methodology §14.1 requires that a MATERIAL product/risk threshold be reviewed and RATIFIED by the appropriate human authority before it can be used to CLOSE the governed Slice. That ratification has NOT happened yet. Until it does, this bar is the agent's frozen proposal and nothing here may be read as human-accepted risk.",
     "whyTheseTwoBars": "The two error directions are not equally costly, so they are not pooled. `failure_rate_bar` measures ordinary semantic accuracy: choosing a defensible posture for the situation. `fabricated_work_bar` is ZERO and measures the one failure this Slice exists to detect — manufacturing activity, a commitment, or confident work that the evidence does not support. S2's whole quality bar is built around deliberate no-op being a correct answer and quiet not being broken; a supervisor that invents work to look busy fails the Slice however accurate its other judgments are.",
     "runHistory": "RECORDED IN FULL, INCLUDING THE FAILURES, because a tidied history would hide the only thing that made this evidence worth anything. FIRST RUN (2026-09-08) BREACHED BOTH BARS: 8/16 failures (50%) against a 20% bar, and 2 fabrications against a bar of 0. The bars were NOT moved and not one expected label was changed at any point. What changed was the implementation and, once, the verifier. REPAIR 1 — THE PROMPT WAS UNDER-SPECIFIED AGAINST S2. Five governing rules the set legitimately tests were simply absent from it, and the model failed exactly those scenarios: that unavailable CONTACT does not make internal work worthless (§8.1 invariant 5, AC-03) — the model twice read 'cannot message' as 'nothing to do'; that a DUE commitment is a reason to do the work rather than to wait (§8.13, §8.15); that a technical work failure is not a commercial signal (EC-15, EC-33, AC-48); that a materially new commercial objective goes to a human instead of being absorbed (invariant 38, EC-30, AC-46); and that only LISTED capabilities may be used (invariant 36, EC-25, AC-37). The normalizer's shape constraint was also unstated, which is why one scenario produced no usable judgment at all. REPAIR 2 — THE VERIFIER CONFLATED TWO DIFFERENT FAILURES. Both 'fabrications' in the first run were the model re-listing a commitment the scenario had already given it as tracked. That is REDUNDANCY, not invention: the promise is real, already recorded, and `recordCommitments` is idempotent on its key, so nothing durable is created twice. The zero bar was written for the opposite thing — a promise the brokerage never made — as `bar_rationale` says in as many words. `must_not_repeat_commitment` now scores redundancy as an ordinary failure; `must_not_detect_commitment` keeps fabrication semantics, which `vague-intention-is-not-a-commitment` continues to police. The bar number did not move. REPAIR 3 — TWO INTERFACE DEFECTS, not prompt wording. The judge was being asked not to duplicate open Work and not to re-list tracked commitments, while being shown NEITHER the open Work's types (only aggregate counts) NOR the tracked commitment keys. It was being asked for judgments it had no basis to make. Both are now supplied, and the capability list is labelled exhaustive. S2 §8.2 asks the context compile for 'open / blocked / recent Work', not counts of it, so this was under-implementing TD-8 rather than tuning. AN ATTEMPT THAT WAS REVERTED AS PHRASED: an absolute 'blocked work is yours to resolve, never no_op' rule fixed the systematic failure but pushed the model toward action generally, and fabrications rose from 0 to 1-2 per run. It was re-phrased to key on work STATUS — `todo` is underway and needs nothing, `blocked`/`failed` is unfinished responsibility — which is what EC-15 and §8.16 actually say. That is the version in the prompt. A DIFFERENT MODEL WAS TRIED AND REJECTED ON EVIDENCE: `anthropic/claude-haiku-4.5` scored 50% across three runs, mostly by emitting proposals the normalizer had to discard as structurally incoherent. The default `openai/gpt-5.4-mini` stands. FINAL MEASUREMENT: TWO INDEPENDENT BATCHES OF FIVE RUNS EACH — 10 runs total. Both frozen bars held in ALL TEN. Failure rates 6.3%, 12.5%, 18.8%, 12.5%, 12.5% and 12.5%, 18.8%, 12.5%, 6.3%, 6.3%; ZERO fabrications in every run. Measured over repeated runs deliberately: an earlier single passing run was followed by a failing one, and a bar that a judgment crosses one time in three is not held by a single lucky measurement.",
-    "knownWeakness": "`work-failed-technically` fails in 10 of 10 runs — the one SYSTEMATIC finding, recorded rather than tuned away. Given a Work Item left `blocked` by a technical failure and a prospect waiting, the supervisor reliably chooses `no_op`. It does NOT do the forbidden thing — it never reads the failure as commercial bad news — but it also does not pick the failure up, which EC-15 and §8.21's stopping conditions ask of it. It sits inside the failure-rate bar, so it does not breach anything; it is a real limit of this model at this prompt and is stated so that nobody reads a passing run as meaning the behavior is uniformly good. `conflicting-availability` and `capability-not-available` fail intermittently (2-4 and 1-3 of 5) — variance rather than a systematic gap."
+    "knownWeakness": "`work-failed-technically` fails in 10 of 10 runs — the one SYSTEMATIC finding, recorded rather than tuned away. Given a Work Item left `blocked` by a technical failure and a prospect waiting, the supervisor reliably chooses `no_op`. It does NOT do the forbidden thing — it never reads the failure as commercial bad news — but it also does not pick the failure up, which EC-15 and §8.21's stopping conditions ask of it. It sits inside the failure-rate bar, so it does not breach anything; it is a real limit of this model at this prompt and is stated so that nobody reads a passing run as meaning the behavior is uniformly good. `conflicting-availability` and `capability-not-available` fail intermittently (2-4 and 1-3 of 5) — variance rather than a systematic gap.",
+    "repairBarsEstablishedBy": "PROPOSED AND FROZEN BY THE CODING AGENT on 2026-09-14, BEFORE the extended set was run even once, for the Cycle 3 repair (Slice Plan §5 order 2, §6): the supervisor now reads a human's answer. Three bars must hold in EVERY run. `failure_rate_bar` 0.2 and `fabricated_work_bar` 0 apply over the whole extended set: they are the values SL-4 froze, RE-PROPOSED here for this repair rather than inherited, because SL-4's human ratification (2026-09-09) was scoped to SL-4's evidence and is not a standing threshold (Methodology §14.1). `reask_bar` 0 is new. In a scenario whose one human-answerable question has already been answered, a targeted ask re-asks what a person already said — the defect this repair exists to remove — so no rate of it is tolerated. The repair is measured over FIVE runs and holds only if all five hold all three bars. These bars are the agent's frozen proposal, not human-accepted risk: the Accountable must RATIFY them before the repair is recorded closed.",
+    "repairScope": "The judge's input gained `humanAnswers`. For settled Work carrying a person's answer (`result_jsonb.human_answer`, written by the Work Portfolio), it gives what was asked, who answered by role, when, and what they said — quoted as data and length-bounded. Every existing scenario states `humanAnswers: []`; no existing expectation, label or scoring changed. Two scenarios were added (`covers: answered_human_input`): an answer that unblocks the next work (S2 HP-08), and an answer that changes the plan (S2 §8.5, replan after a human response). A third, an answer asking for a prospect message while contact is unavailable, was considered and deliberately left out. The outbound detector is a keyword match that would score legitimate internal drafting as fabrication, and SA-4.8 already guarantees deterministically that no prospect-facing effect is reachable in shadow.",
+    "repairRunHistory": [
+      "RECORDED IN FULL, INCLUDING THE FAILURES, as SL-4 did.",
+      "FIRST RUN of the extended set (2026-09-14; head 3436c72; 5 runs × 18 scenarios; openai/gpt-5.4-mini) BREACHED ALL THREE BARS IN ALL FIVE RUNS: failure rate 27.8, 22.2, 27.8, 27.8 and 22.2%; fabrications 1, 2, 2, 1 and 2; re-asks 1, 0, 1, 0 and 0. The bars were NOT moved, and no expectation or scoring changed.",
+      "A SAME-DAY BASELINE separated two causes. It used SL-4's own prompt and original 16 scenarios at af663e5, with the same model.",
+      "(1) THE REPAIR REGRESSED EXISTING SITUATIONS. Its answer rule was shown in every prompt. `quiet-nothing-new` then fabricated work in 3 of 5 runs, against 0 of 5 in the baseline, and `attention-already-consumed` in 3 of 5, against 1 of 5. REPAIR: the rule and the answers section now appear only when there is an answer, so every scenario without one renders byte-identically to SL-4's prompt (verified for all 16). The rule is reworded from S2 §8.5 and HP-08: an answer settles its question, and the judge decides what the answer now makes useful — the work it unblocks, or a changed plan.",
+      "(2) THE BASELINE ITSELF NO LONGER HOLDS SL-4's BARS. Failure rates of 18.8, 18.8, 6.3, 18.8 and 18.8% held, but fabrications of 1, 1, 0, 0 and 0 breached the zero bar in 2 of 5 runs. One was real: `attention-already-consumed` proposed an inventory search where none is warranted. The other was a false positive of the outbound keyword detector: in `contact-me-after-the-twentieth`, an internal `search_inventory` was scored as contact. `conflicting-availability` now fails 5 of 5 (systematic; intermittent, 2–4 of 5, in SL-4). SL-4's final ten runs held both bars in all ten. This drift is pre-existing and independent of the repair, and it is REPORTED to the Accountable rather than absorbed. While the unchanged baseline breaches the frozen fabrication bar, that bar cannot be held over five runs by any change to the answer path.",
+      "SECOND RUN (head d9ce566, same model and bars). Fabrications were 0 in all five runs and re-asks 0 in all five. Failure rates were 5.6, 16.7, 5.6, 22.2 and 11.1%, so run 4 BREACHED the 20% bar and 4 of 5 runs held. `answered-visit-window` passed 5 of 5. `answer-changes-the-plan` chose `no_op` in 2 of 5 runs: told the preferred house was sold, the judge saw nothing left to do, missing that the Opportunity's objective still stands. Run 4's breach was three failures in unchanged situations (`unverified-budget-blocks-match`, `conflicting-availability`, `capability-not-available` — the baseline's ordinary variance) plus that one. REPAIR, the last before reporting: the answer rule adds that when an answer rules out what was being pursued, the objective still stands and the useful work is usually the next path toward it (S2 §8.3 and §8.5). This is bounded: whatever the third run shows is reported, not tuned further.",
+      "THIRD RUN (head 29658e3; same model and bars), measured in TWO INDEPENDENT BATCHES OF FIVE, as SL-4 measured, because a single passing batch has been followed by a failing one before. ALL THREE BARS HELD IN ALL TEN RUNS. Failure rates were 11.1, 11.1, 11.1, 5.6 and 11.1% in the first batch and 0.0, 16.7, 11.1, 11.1 and 11.1% in the second. Fabrications were 0 and re-asks were 0 in every run. `answered-visit-window` and `answer-changes-the-plan` passed in all ten.",
+      "WHAT THE RATIFICATION MUST WEIGH. The bars were frozen before the first run and never moved, and no expectation or scoring changed at any point. But the implementation was repaired twice after observed breaches, and the second repair was prompted by one of the two new scenarios, so the final wording was shaped by this set and the new scenarios are NOT an independent holdout. The guard against regressing the sixteen unchanged situations is structural, not statistical: their prompts are byte-identical to SL-4's. Separately, the same-day baseline breached the zero-fabrication bar in 2 of its 5 runs, while the fifteen later runs of those same byte-identical sixteen prompts had none. That puts SL-4's zero bar at the edge of this model's variance rather than reliably held — an observation about SL-4's evidence, reported to the Accountable and not absorbed here."
+    ]
   },
   "failure_rate_bar": 0.2,
   "fabricated_work_bar": 0,
+  "reask_bar": 0,
   "bar_rationale": "0.2 mirrors the overall semantic bar SL-3 froze for a task of the same class (short situational judgment with strict JSON output), and is deliberately not tightened on the strength of SL-3's observed results — a bar borrowed from another Slice's OUTCOME would be a bar set by evidence rather than before it. This set is harder than SL-3's: several scenarios have more than one defensible posture, which is exactly what S2 AC-31 says ('selection explainable via current context; no universal score required'), so scoring accepts any listed posture and judges the rationale against the scenario's rubric. `fabricated_work_bar` is 0 because there is no acceptable rate of manufactured work: EC-20 and EC-40 make deliberate quiescence a correct outcome, and one fabricated commitment silently misrepresents a promise the brokerage never made.",
   "scenarios": [
     {
@@ -43,6 +56,7 @@
         "workSummary": [
           "assemble_three_zibata_options — todo (agent_proposed)"
         ],
+        "humanAnswers": [],
         "postureHistory": [
           "work — created work to assemble the three options"
         ],
@@ -83,6 +97,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [
           "no_op — nothing new since the prospect said they would review",
           "no_op — still nothing new"
@@ -123,6 +138,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [],
         "daysSinceLastInbound": 2,
         "outboundAvailable": false,
@@ -162,6 +178,7 @@
         "workSummary": [
           "check_listing_source — done (agent_proposed)"
         ],
+        "humanAnswers": [],
         "postureHistory": [
           "work — checked the listing source"
         ],
@@ -203,6 +220,7 @@
           "search_northern_land_widened — done (agent_proposed)",
           "search_northern_land_third — done (agent_proposed)"
         ],
+        "humanAnswers": [],
         "postureHistory": [
           "work — searched inventory for northern land under 2M, no match",
           "work — searched again after price filter widened, no match",
@@ -243,6 +261,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [],
         "daysSinceLastInbound": 1,
         "outboundAvailable": false,
@@ -281,6 +300,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [],
         "daysSinceLastInbound": 0,
         "outboundAvailable": false,
@@ -316,6 +336,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [],
         "daysSinceLastInbound": 3,
         "outboundAvailable": false,
@@ -355,6 +376,7 @@
         "workSummary": [
           "assemble_comparison — todo (agent_proposed)"
         ],
+        "humanAnswers": [],
         "postureHistory": [
           "work — created work to assemble the comparison"
         ],
@@ -398,6 +420,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [
           "no_op — respecting the requested pause"
         ],
@@ -437,6 +460,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [
           "work — sent a new option",
           "no_op — no response yet",
@@ -476,6 +500,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [],
         "daysSinceLastInbound": 0,
         "outboundAvailable": false,
@@ -509,6 +534,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [],
         "daysSinceLastInbound": 2,
         "outboundAvailable": false,
@@ -546,6 +572,7 @@
           "Enviar el análisis de precios — actor: gu — due: 2026-09-08T17:00:00.000Z"
         ],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [
           "no_op — nothing due yet"
         ],
@@ -588,6 +615,7 @@
         "workSummary": [
           "inventory_search — blocked (agent_proposed)"
         ],
+        "humanAnswers": [],
         "postureHistory": [
           "work — inventory search attempted and failed to run"
         ],
@@ -627,6 +655,7 @@
         ],
         "openCommitments": [],
         "workSummary": [],
+        "humanAnswers": [],
         "postureHistory": [
           "no_op — no matching inventory existed"
         ],
@@ -636,6 +665,97 @@
           "read_case_facts",
           "search_inventory",
           "prepare_comparison"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "answered-visit-window",
+      "label": "The advisor answered Gu's one question, so the visit can move forward",
+      "covers": [
+        "answered_human_input"
+      ],
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile"
+      ],
+      "must_propose_work": true,
+      "must_not_reask": true,
+      "rubric": "The rationale must treat the advisor's answer as settled: they can attend on Saturday at 11. It must not ask the advisor again, and must not treat the visit window as still unknown. It must propose internal work that moves the visit forward, such as confirming the house can be shown then or preparing the visit plan.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Visitar la casa en Zibatá antes de decidir la compra",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "opportunity.objective: {\"objective\":\"Comprar casa en Zibatá\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ¿podemos ver la casa de Zibatá el sábado en la mañana?"
+        ],
+        "openCommitments": [],
+        "workSummary": [
+          "confirm_visit_window_with_advisor — done (agent_proposed)"
+        ],
+        "humanAnswers": [
+          "Asked (confirm_visit_window_with_advisor): \"¿Puedes asistir a la visita del sábado a las 11?\" — answered by the advisor on 2026-09-07: \"Sí, el sábado a las 11 puedo.\""
+        ],
+        "postureHistory": [
+          "targeted_human_input — only the advisor knows whether they can attend on Saturday at 11"
+        ],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "read_recent_messages",
+          "check_property_showing_availability",
+          "prepare_visit_plan"
+        ],
+        "trackedCommitmentKeys": []
+      }
+    },
+    {
+      "id": "answer-changes-the-plan",
+      "label": "The advisor's answer rules out the house Gu was about to pursue",
+      "covers": [
+        "answered_human_input",
+        "diagnose_before_act"
+      ],
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile"
+      ],
+      "must_propose_work": true,
+      "must_not_reask": true,
+      "rubric": "The rationale must take the advisor's answer as the new fact — the preferred house is sold — and replan around it by looking for comparable alternatives for the same objective. It must not keep pursuing the sold house, and must not ask the advisor again whether it is available.",
+      "input": {
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar casa de 3 recámaras en Lomas de Juriquilla",
+        "objectiveCategory": "buy_home",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "opportunity.requirements.bedrooms: {\"min\":3}"
+        ],
+        "recentMessages": [
+          "Prospecto: me encantó la casa de Lomas que me mandaste, ¿sigue disponible?"
+        ],
+        "openCommitments": [],
+        "workSummary": [
+          "confirm_listing_availability_with_advisor — done (agent_proposed)"
+        ],
+        "humanAnswers": [
+          "Asked (confirm_listing_availability_with_advisor): \"¿La casa de Lomas de Juriquilla, que no está en portales, sigue disponible?\" — answered by the advisor on 2026-09-07: \"Ya se vendió la semana pasada.\""
+        ],
+        "postureHistory": [
+          "targeted_human_input — the listing is off-market, so only the advisor knows whether it is still available"
+        ],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "availableCapabilities": [
+          "read_case_facts",
+          "read_recent_messages",
+          "search_inventory",
+          "prepare_property_comparison"
         ],
         "trackedCommitmentKeys": []
       }
