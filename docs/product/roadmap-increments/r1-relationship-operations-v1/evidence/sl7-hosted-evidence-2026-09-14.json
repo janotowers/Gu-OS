@@ -1,0 +1,475 @@
+{
+  "ranAt": "2026-09-14T21:01:35.542Z",
+  "slice": "SL-7",
+  "releaseScope": "RS-2",
+  "run": "sl7-2026-09-14",
+  "organization": "sha256:eab41f21d4c319b6",
+  "seededCase": "sha256:3d616171b0f29a9c",
+  "advisor": "sha256:16489b62fa9cdf77",
+  "askWorkItem": "sha256:8b8f683bfdc68560",
+  "topology": "application code executed by the operator process against hosted staging persistence; no deployed Gu OS runtime",
+  "legacySourceReads": 0,
+  "legacySourceWrites": 0,
+  "checkpoints": [
+    {
+      "label": "t0",
+      "takenAt": "2026-09-14T16:42:02.536Z",
+      "seeded": {
+        "operational_cases": {
+          "rows": 1,
+          "digest": "sha256:b81aab506c1d6bf0c4afa72f0088f16126ada367b3f6c680efe0cb2200ad0845"
+        },
+        "case_facts": {
+          "rows": 5,
+          "digest": "sha256:e002bc55034886b36a5162ac25c8caa750608398ddaa1acb16c465253424fdd7"
+        },
+        "case_subjects": {
+          "rows": 1,
+          "digest": "sha256:c189da5041eb89d40e88e0f25efafb23029c5f759a1f5d7eba15069d074d7733"
+        },
+        "operational_case_events": {
+          "rows": 2,
+          "digest": "sha256:08480b89f7988870a7393c2ed67cf7ebb4f7534fe37b8372b040366cdc7a16f9"
+        },
+        "case_approvals": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_items": {
+          "rows": 1,
+          "digest": "sha256:fab0dd990a5363720ec8e0276dbc04db095a90d92d15842e4fb03b689c5966c4"
+        },
+        "work_item_attempts": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_item_events": {
+          "rows": 1,
+          "digest": "sha256:648f1d63fdb34253c865e44e847ad47ef6b0ac35708be045fc9d5c7f4188ffa8"
+        },
+        "internal_user_notifications": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "outside": {
+        "operational_cases": {
+          "rows": 15,
+          "digest": "sha256:0752b58cbbcfc51997905e3c465a8c23afc7adbfa9c2af7c3ab168f02b060f7d"
+        },
+        "case_facts": {
+          "rows": 33,
+          "digest": "sha256:23128bb738031ebfe27ef2088639d4e400a983b3e2db0dfa51ab633be152ec3a"
+        },
+        "case_subjects": {
+          "rows": 2,
+          "digest": "sha256:ab9cf4e0aac178173d88bbff4469d9b2eea20a5022d16f64ff02d2840229b2e7"
+        },
+        "operational_case_events": {
+          "rows": 25,
+          "digest": "sha256:127fd3d447a06ca9ab874a747dc13e58e8698e7a631b41e75cecc947e73da0a9"
+        },
+        "case_approvals": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_items": {
+          "rows": 2,
+          "digest": "sha256:0e75aafb8eb9cd642dc27b7af2c77328a0f1f7cbf9975fadc9e97ed9d35023af"
+        },
+        "work_item_attempts": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_item_events": {
+          "rows": 2,
+          "digest": "sha256:ac55f47c0cb00b3a12edd075f015a7c4f7f00e8d93b663f3b08a0be728ef1005"
+        },
+        "internal_user_notifications": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "case_subject_external_refs": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "case_relationships": {
+          "rows": 4,
+          "digest": "sha256:0bf55d5f7dc7c856802582ec2dde988aa22b9df63a8dd4b3a30fdbb09bf786ca"
+        },
+        "portfolio_presentation_state": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "organizations": {
+          "rows": 2,
+          "digest": "sha256:0edde9148d861fcc58106ea27913b6f5ee690fd838a8bf0c87ab66c111d7301f"
+        },
+        "organization_memberships": {
+          "rows": 3,
+          "digest": "sha256:e5ad4196cfe4e74409ecf0074fde4b790c138d88cfdaf2b71a89f0e9a99fa0ef"
+        },
+        "organization_feature_flags": {
+          "rows": 2,
+          "digest": "sha256:440bf2b8dc854457587dd59135a129210b87d01ed2e6157e1580f60d480db3b1"
+        },
+        "ai_usage_events": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "presentation": {
+        "rows": 0,
+        "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "t1",
+      "takenAt": "2026-09-14T20:59:54.119Z",
+      "seeded": {
+        "operational_cases": {
+          "rows": 1,
+          "digest": "sha256:b81aab506c1d6bf0c4afa72f0088f16126ada367b3f6c680efe0cb2200ad0845"
+        },
+        "case_facts": {
+          "rows": 5,
+          "digest": "sha256:e002bc55034886b36a5162ac25c8caa750608398ddaa1acb16c465253424fdd7"
+        },
+        "case_subjects": {
+          "rows": 1,
+          "digest": "sha256:c189da5041eb89d40e88e0f25efafb23029c5f759a1f5d7eba15069d074d7733"
+        },
+        "operational_case_events": {
+          "rows": 2,
+          "digest": "sha256:08480b89f7988870a7393c2ed67cf7ebb4f7534fe37b8372b040366cdc7a16f9"
+        },
+        "case_approvals": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_items": {
+          "rows": 1,
+          "digest": "sha256:fab0dd990a5363720ec8e0276dbc04db095a90d92d15842e4fb03b689c5966c4"
+        },
+        "work_item_attempts": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_item_events": {
+          "rows": 1,
+          "digest": "sha256:648f1d63fdb34253c865e44e847ad47ef6b0ac35708be045fc9d5c7f4188ffa8"
+        },
+        "internal_user_notifications": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "outside": {
+        "operational_cases": {
+          "rows": 15,
+          "digest": "sha256:0752b58cbbcfc51997905e3c465a8c23afc7adbfa9c2af7c3ab168f02b060f7d"
+        },
+        "case_facts": {
+          "rows": 33,
+          "digest": "sha256:23128bb738031ebfe27ef2088639d4e400a983b3e2db0dfa51ab633be152ec3a"
+        },
+        "case_subjects": {
+          "rows": 2,
+          "digest": "sha256:ab9cf4e0aac178173d88bbff4469d9b2eea20a5022d16f64ff02d2840229b2e7"
+        },
+        "operational_case_events": {
+          "rows": 25,
+          "digest": "sha256:127fd3d447a06ca9ab874a747dc13e58e8698e7a631b41e75cecc947e73da0a9"
+        },
+        "case_approvals": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_items": {
+          "rows": 2,
+          "digest": "sha256:0e75aafb8eb9cd642dc27b7af2c77328a0f1f7cbf9975fadc9e97ed9d35023af"
+        },
+        "work_item_attempts": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_item_events": {
+          "rows": 2,
+          "digest": "sha256:ac55f47c0cb00b3a12edd075f015a7c4f7f00e8d93b663f3b08a0be728ef1005"
+        },
+        "internal_user_notifications": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "case_subject_external_refs": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "case_relationships": {
+          "rows": 4,
+          "digest": "sha256:0bf55d5f7dc7c856802582ec2dde988aa22b9df63a8dd4b3a30fdbb09bf786ca"
+        },
+        "portfolio_presentation_state": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "organizations": {
+          "rows": 2,
+          "digest": "sha256:0edde9148d861fcc58106ea27913b6f5ee690fd838a8bf0c87ab66c111d7301f"
+        },
+        "organization_memberships": {
+          "rows": 3,
+          "digest": "sha256:e5ad4196cfe4e74409ecf0074fde4b790c138d88cfdaf2b71a89f0e9a99fa0ef"
+        },
+        "organization_feature_flags": {
+          "rows": 2,
+          "digest": "sha256:440bf2b8dc854457587dd59135a129210b87d01ed2e6157e1580f60d480db3b1"
+        },
+        "ai_usage_events": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "presentation": {
+        "rows": 1,
+        "digest": "sha256:96bc30a3aa773bc7e8105980a9c00f0a5b1f662a985436d4321a9f07c04712ae"
+      }
+    },
+    {
+      "label": "t2",
+      "takenAt": "2026-09-14T21:00:49.195Z",
+      "seeded": {
+        "operational_cases": {
+          "rows": 1,
+          "digest": "sha256:b81aab506c1d6bf0c4afa72f0088f16126ada367b3f6c680efe0cb2200ad0845"
+        },
+        "case_facts": {
+          "rows": 5,
+          "digest": "sha256:e002bc55034886b36a5162ac25c8caa750608398ddaa1acb16c465253424fdd7"
+        },
+        "case_subjects": {
+          "rows": 1,
+          "digest": "sha256:c189da5041eb89d40e88e0f25efafb23029c5f759a1f5d7eba15069d074d7733"
+        },
+        "operational_case_events": {
+          "rows": 2,
+          "digest": "sha256:08480b89f7988870a7393c2ed67cf7ebb4f7534fe37b8372b040366cdc7a16f9"
+        },
+        "case_approvals": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_items": {
+          "rows": 1,
+          "digest": "sha256:43b3f7be6a8f12f9a5940cab91bab062917c2b8406cfa2b644368717e222ca50"
+        },
+        "work_item_attempts": {
+          "rows": 1,
+          "digest": "sha256:3f20c9d5020a2f67644ee059903230380ba384def3ac4f1073b7487449850214"
+        },
+        "work_item_events": {
+          "rows": 4,
+          "digest": "sha256:12713f0e30fcccaf36d0138f84aa915acb60461531ca680d092d796c4acb9505"
+        },
+        "internal_user_notifications": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "outside": {
+        "operational_cases": {
+          "rows": 15,
+          "digest": "sha256:0752b58cbbcfc51997905e3c465a8c23afc7adbfa9c2af7c3ab168f02b060f7d"
+        },
+        "case_facts": {
+          "rows": 33,
+          "digest": "sha256:23128bb738031ebfe27ef2088639d4e400a983b3e2db0dfa51ab633be152ec3a"
+        },
+        "case_subjects": {
+          "rows": 2,
+          "digest": "sha256:ab9cf4e0aac178173d88bbff4469d9b2eea20a5022d16f64ff02d2840229b2e7"
+        },
+        "operational_case_events": {
+          "rows": 25,
+          "digest": "sha256:127fd3d447a06ca9ab874a747dc13e58e8698e7a631b41e75cecc947e73da0a9"
+        },
+        "case_approvals": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_items": {
+          "rows": 2,
+          "digest": "sha256:0e75aafb8eb9cd642dc27b7af2c77328a0f1f7cbf9975fadc9e97ed9d35023af"
+        },
+        "work_item_attempts": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "work_item_events": {
+          "rows": 2,
+          "digest": "sha256:ac55f47c0cb00b3a12edd075f015a7c4f7f00e8d93b663f3b08a0be728ef1005"
+        },
+        "internal_user_notifications": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "case_subject_external_refs": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "case_relationships": {
+          "rows": 4,
+          "digest": "sha256:0bf55d5f7dc7c856802582ec2dde988aa22b9df63a8dd4b3a30fdbb09bf786ca"
+        },
+        "portfolio_presentation_state": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "organizations": {
+          "rows": 2,
+          "digest": "sha256:0edde9148d861fcc58106ea27913b6f5ee690fd838a8bf0c87ab66c111d7301f"
+        },
+        "organization_memberships": {
+          "rows": 3,
+          "digest": "sha256:e5ad4196cfe4e74409ecf0074fde4b790c138d88cfdaf2b71a89f0e9a99fa0ef"
+        },
+        "organization_feature_flags": {
+          "rows": 2,
+          "digest": "sha256:440bf2b8dc854457587dd59135a129210b87d01ed2e6157e1580f60d480db3b1"
+        },
+        "ai_usage_events": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "presentation": {
+        "rows": 1,
+        "digest": "sha256:96bc30a3aa773bc7e8105980a9c00f0a5b1f662a985436d4321a9f07c04712ae"
+      }
+    }
+  ],
+  "captures": {
+    "myWork": "sha256:c6dfcfd859316746ed0aa2f8e4f9e695bce0c74266e118fd3b2e44bf7b7acb9b",
+    "organizationWork": "sha256:5e9d20630ab848229d543b8ba0989edd84391cc3f1f8840b975ae3e184f2b8ee",
+    "afterSuppress": "sha256:f11801ec8407f4d48e05238882fe935a2d1fe49e8ae80c085c6e3b2d9f964511",
+    "afterComplete": "sha256:c89b9626c0d134e0b1b24d6374e5fdfd9958a85509fd0f1f66667448d1b81417"
+  },
+  "otherOrganizationCases": 1,
+  "probe": {
+    "attempted": true,
+    "refused": true,
+    "code": "42501",
+    "httpStatus": 403,
+    "how": "run inside the advisor's own signed-in page in the in-app browser: a PostgREST insert into portfolio_presentation_state naming ANOTHER user (the pilot owner) on the seeded Case, with the advisor's session; the session token was read and used in the page and never returned to the operator"
+  },
+  "checks": [
+    {
+      "assertion": "setup",
+      "label": "the seeded Case is an Organization Case of the pilot, assigned to the advisor, under legacy authority",
+      "ok": true,
+      "detail": "runtime_authority=legacy"
+    },
+    {
+      "assertion": "setup",
+      "label": "the seeded human ask is open Work proposed by a waiting_for_human_input settlement",
+      "ok": true
+    },
+    {
+      "assertion": "RS2-1",
+      "label": "the seeded Case appears in the advisor's My Work",
+      "ok": true
+    },
+    {
+      "assertion": "RS2-1",
+      "label": "the seeded Case appears in the advisor's Organization Work",
+      "ok": true
+    },
+    {
+      "assertion": "RS2-1",
+      "label": "a Case of another Organization appears in neither",
+      "ok": true,
+      "detail": "1 other-Organization Case(s) checked, 0 visible"
+    },
+    {
+      "assertion": "RS2-1",
+      "label": "an attempt to write another user's presentation state is refused",
+      "ok": true,
+      "detail": "code=42501"
+    },
+    {
+      "assertion": "RS2-2",
+      "label": "the advisor's presentation-state row exists, snoozed and hidden",
+      "ok": true
+    },
+    {
+      "assertion": "RS2-2",
+      "label": "the seeded must-surface items stay in the projection with that presentation applied",
+      "ok": true,
+      "detail": "predicates=blocked_on_human,due_commitment"
+    },
+    {
+      "assertion": "RS2-2",
+      "label": "the advisor's page still lists the seeded Case after snoozing and hiding it",
+      "ok": true
+    },
+    {
+      "assertion": "RS2-2",
+      "label": "no business row of the seeded Case changed between T0 and T1",
+      "ok": true,
+      "detail": "all seeded tables identical"
+    },
+    {
+      "assertion": "RS2-2",
+      "label": "nothing outside the seeded Case changed between T0 and T1",
+      "ok": true,
+      "detail": "16 tables identical"
+    },
+    {
+      "assertion": "RS2-3",
+      "label": "work_items: only the ask changed, to done, answered by the advisor",
+      "ok": true,
+      "detail": "changed=1 added=0 status=done"
+    },
+    {
+      "assertion": "RS2-3",
+      "label": "work_item_attempts: exactly one new attempt, by a human executor, succeeded",
+      "ok": true
+    },
+    {
+      "assertion": "RS2-3",
+      "label": "work_item_events: exactly ready, claimed and done were appended for the ask",
+      "ok": true,
+      "detail": "appended=claimed,done,ready"
+    },
+    {
+      "assertion": "RS2-3",
+      "label": "no other row of the seeded Case changed: Case, facts, subjects, timeline, approvals, notifications",
+      "ok": true,
+      "detail": "identical"
+    },
+    {
+      "assertion": "RS2-3",
+      "label": "no Portfolio-only business state: nothing outside the seeded Case and no presentation row changed",
+      "ok": true,
+      "detail": "identical"
+    },
+    {
+      "assertion": "RS2-3",
+      "label": "the need exits: the ask is no longer a must-surface item; the due commitment still is",
+      "ok": true,
+      "detail": "predicates=due_commitment"
+    },
+    {
+      "assertion": "boundary",
+      "label": "no authority change and no write outside the seeded Case across the whole session (T0 → T2)",
+      "ok": true,
+      "detail": "containment held"
+    }
+  ],
+  "passed": true,
+  "notExercised": [
+    "stalled positive case (no Organization Case holds gu_os authority before SL-11)",
+    "pending approval, authority conflict and unknown-outcome predicates (no producer before SL-9 / SL-6)",
+    "deployment infrastructure, a hosted URL, production build or deployment, domain/CDN, scaling, production operation"
+  ]
+}
