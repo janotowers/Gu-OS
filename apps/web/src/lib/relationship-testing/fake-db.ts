@@ -213,6 +213,7 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
     let orderColumn: string | null = null;
     let orderAscending = true;
     let limitValue: number | null = null;
+    let offsetValue = 0;
 
     /** Awaited before any durable write, so a test can hold a worker there. */
     async function beforeWrite(): Promise<void> {
@@ -294,6 +295,7 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
             : right.localeCompare(left);
         });
       }
+      if (offsetValue > 0) rows = rows.slice(offsetValue);
       if (limitValue !== null) rows = rows.slice(0, limitValue);
       return { rows, error: null };
     }
@@ -371,6 +373,12 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
       },
       limit: (count: number) => {
         limitValue = count;
+        return self;
+      },
+      /** PostgREST `.range(from, to)`, inclusive — the SL-7 verifier pages with it. */
+      range: (from: number, to: number) => {
+        offsetValue = from;
+        limitValue = to - from + 1;
         return self;
       },
       maybeSingle: async () => {
