@@ -169,7 +169,7 @@ En Supabase:
 
 - `profiles.id` referencia `auth.users(id)`.
 - Las tablas del **plano personal** del agente se aislan por `user_id` y RLS.
-- Las tablas del **plano de Organizacion** (`00080`+) se aislan por **membresia activa**, no por propiedad de fila: el predicado `is_active_org_member` (SECURITY DEFINER) alimenta las policies de `organizations`, `organization_memberships`, `contacts`, `organization_feature_flags`, `organization_policies` y `case_relationships`. La escritura es de `service_role`; `organization_tool_secrets` ademas no tiene policy de lectura para `authenticated`.
+- Las tablas del **plano de Organizacion** (`00080`+) se aislan por **membresia activa**, no por propiedad de fila: el predicado `is_active_org_member` (SECURITY DEFINER) alimenta las policies de `organizations`, `organization_memberships`, `contacts`, `organization_feature_flags`, `organization_policies` y `case_relationships`. La escritura es de `service_role`; `organization_tool_secrets` ademas no tiene policy de lectura para `authenticated`. La unica excepcion es `portfolio_presentation_state` (R1 SL-7): presentacion personal del Work Portfolio, que un `authenticated` escribe **solo sobre sus propias filas y solo mientras es miembro activo** de la Organizacion de la fila.
 - `profiles.business_brain` guarda contexto por cuenta, incluyendo datos de warehouse.
 - `profiles.is_ungga_admin` permite modo staff/cross-tenant en BigQuery.
 
@@ -1030,6 +1030,16 @@ a mano contra staging. El `lead_opportunity` declara su habilidad raíz por
 `default_skill_slug` —el binding que el case-runner usaría— pero ese runner no lo invoca
 hoy. Ver [`docs/architecture.md`](../architecture.md).
 
+**La primera ruta sobre estos Casos es de lectura supervisora, no de ejecución.** El
+**Work Portfolio** (`/portfolio`, R1 SL-7; `apps/web/src/lib/work-portfolio/`) proyecta
+los Casos de una Organización —Needs Attention con sus seis predicados *must-surface*,
+postura derivada de la última reconsideración asentada— y lee con el **JWT del propio
+actor**, de modo que las policies de membresía de arriba deciden qué Casos existen para
+él. Solo escribe por mecanismos canónicos, tras `authorizeOrgAction`: completar un Work
+Item que espera a una persona y decidir una aprobación (`case_approval.decide`, solo
+`owner` / `org_admin`); más la presentación personal en `portfolio_presentation_state`.
+No invoca admisión, resolución ni el supervisor.
+
 ---
 
 ## 14. Brain Layer futura
@@ -1219,7 +1229,7 @@ El agente no debe mezclar usuarios, organizaciones ni permisos. Hay tres mecanis
 | Area | Regla |
 |---|---|
 | Supabase — plano personal | RLS por `auth.uid()` / `user_id` |
-| Supabase — plano de Organizacion (`00080`+) | RLS por **membresia activa** (`is_active_org_member`), no por propiedad de fila; escritura solo `service_role`; `organization_tool_secrets` sin lectura para `authenticated` |
+| Supabase — plano de Organizacion (`00080`+) | RLS por **membresia activa** (`is_active_org_member`), no por propiedad de fila; escritura solo `service_role`, salvo `portfolio_presentation_state` (presentacion personal: filas propias y solo con membresia activa); `organization_tool_secrets` sin lectura para `authenticated` |
 | `operational_cases` | Hibrida: `organization_id` NULL conserva la semantica user-scoped; las filas con Organizacion suman policies **RESTRICTIVE** de guardia de tenencia y FK compuestos contra cruce de tenant |
 | Autorizacion de negocio | RLS es el piso, no la autorizacion completa, y hay **tres caminos** (ver §3): (1) mutacion de negocio desde ruta de servidor → `authorizeOrgAction`, recibe actor, revalida membresia + rol en el momento, vocabulario cerrado y fail-closed; (2) bootstrap/aprovisionamiento/backfill → caminos `service_role` acotados a su proposito; (3) mutacion explicita del ciclo de vida (`setMembershipStatus`) → primitiva privilegiada **sin actor que no autoriza**: `service_role` da el camino de ejecucion, no la autoridad de negocio, que debe traer ya el llamador. Una membresia `inactive` no otorga nada |
 | Autoridad de runtime | `operational_cases.runtime_authority` es *nullable* y sin default: solo se mueve por una operacion gobernada autorizada |
@@ -1357,7 +1367,7 @@ El agente no debe mezclar usuarios, organizaciones ni permisos. Hay tres mecanis
 
 Estas preguntas no bloquean el entendimiento del sistema actual, pero conviene resolverlas antes de escalar multi-organizacion:
 
-1. **Absorcion de lo user-scoped en el modelo de Organizacion:** el substrato nativo **ya existe** (`organizations`, `organization_memberships`, `contacts`, `organization_feature_flags`, `organization_tool_secrets`, con RLS por membresia — migraciones `00080`-`00084`), y `operational_cases` es hibrida con `organization_id` nullable. La pregunta abierta ya no es *si* migrar, sino **cuando y como se absorben las rutas todavia user-scoped** (sesion, memoria personal, skills y ajustes por usuario, y las filas legacy con `organization_id` NULL), en que orden y con que ruta de compatibilidad. La adopcion en runtime sigue siendo **parcial**: ninguna route HTTP ni cron ejerce hoy autorizacion por Organizacion (ver [`../architecture.md`](../architecture.md), *Tenencia por Organizacion*).
+1. **Absorcion de lo user-scoped en el modelo de Organizacion:** el substrato nativo **ya existe** (`organizations`, `organization_memberships`, `contacts`, `organization_feature_flags`, `organization_tool_secrets`, con RLS por membresia — migraciones `00080`-`00084`), y `operational_cases` es hibrida con `organization_id` nullable. La pregunta abierta ya no es *si* migrar, sino **cuando y como se absorben las rutas todavia user-scoped** (sesion, memoria personal, skills y ajustes por usuario, y las filas legacy con `organization_id` NULL), en que orden y con que ruta de compatibilidad. La adopcion en runtime sigue siendo **parcial**: la unica route HTTP que ejerce hoy autorizacion por Organizacion es el Work Portfolio (`/portfolio`, R1 SL-7), y ningun cron lo hace (ver [`../architecture.md`](../architecture.md), *Tenencia por Organizacion*).
 2. **Multi-org por usuario:** si un usuario podra operar varias inmobiliarias desde una sola cuenta.
 3. **Fuente directa vs warehouse:** cuando leer directo Firebase/Mongo vs BigQuery.
 4. **Ingestion Layer:** primer connector real y politica de consent/dry-run.

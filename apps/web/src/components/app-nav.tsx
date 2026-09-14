@@ -208,6 +208,7 @@ export function AppNav({ compact = false }: { compact?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isUnggaAdmin, setIsUnggaAdmin] = useState(false);
+  const [isOrganizationMember, setIsOrganizationMember] = useState(false);
 
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -231,6 +232,17 @@ export function AppNav({ compact = false }: { compact?: boolean }) {
           if (!cancelled) {
             setIsUnggaAdmin(data?.is_ungga_admin === true);
           }
+          // Visible only to active members (RLS returns just the viewer's
+          // Organizations). Navigation only: /portfolio re-checks everything.
+          const { data: memberships } = await supabase
+            .from("organization_memberships")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("status", "active")
+            .limit(1);
+          if (!cancelled) {
+            setIsOrganizationMember((memberships ?? []).length > 0);
+          }
         } catch {
           // Keep non-admin nav tree if profile lookup fails.
         }
@@ -246,7 +258,7 @@ export function AppNav({ compact = false }: { compact?: boolean }) {
 
   // Always resolve from the full tree so Configuración children (including
   // "Cuenta y sesión") stay visible; only admin-only items are gated.
-  const tree = resolveAppNavTree(isUnggaAdmin);
+  const tree = resolveAppNavTree(isUnggaAdmin, isOrganizationMember);
 
   return (
     <nav aria-label="Navegación principal">

@@ -3,7 +3,8 @@
  *
  * Landed at SL-0 and extended by every Slice that adds a multi-seat surface:
  * SL-2 added `organization_policies` and `source_events`; SL-3 added the
- * M-RESOLUTION-IDENTITY indexes.
+ * M-RESOLUTION-IDENTITY indexes; SL-4 the Case Subjects and wake identity;
+ * SL-7 `portfolio_presentation_state` and the Work Portfolio read paths.
  *
  * Technical Plan §8: "Cross-tenant negative suite (two-orgs fixture, read and
  * write paths) required from SL-0 and gating every multi-seat surface."
@@ -1598,6 +1599,272 @@ async function main(): Promise<void> {
         await claimsOf(f.orgCaseA, "scheduled:2026-09-09", "supervisor_reconsideration_settled"),
         2
       );
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-7 Work Portfolio — M-PRESENTATION (SA-7.6, SA-7.11, SA-7.12)");
+
+    // SL-7 is the first multi-seat surface the Technical Plan §8 gate actually
+    // binds, and `portfolio_presentation_state` is the only table in R1 an
+    // authenticated user writes directly. So its write policy IS the security
+    // boundary, not a backstop behind a server route — and only a real
+    // PostgreSQL can say whether it holds.
+
+    const presentationRow = (
+      claims: Claims,
+      userId: string,
+      organizationId: string,
+      caseId: string,
+      extra: { snoozeUntil?: string; updatedAt?: string } = {}
+    ) =>
+      asRole(client, claims, () =>
+        client.query<{ id: string; snooze_until: string | null; updated_at: string }>(
+          `insert into public.portfolio_presentation_state
+             (user_id, organization_id, subject_kind, subject_id, snooze_until, updated_at)
+           values ($1, $2, 'case', $3, $4::timestamptz, coalesce($5::timestamptz, now()))
+           returning id, snooze_until, updated_at`,
+          [userId, organizationId, caseId, extra.snoozeUntil ?? null, extra.updatedAt ?? null]
+        )
+      );
+
+    await t("SA-7.12 an active member writes their own presentation state for an Organization Case", async () => {
+      const { rowCount } = await presentationRow(authed(f.memberA2), f.memberA2, f.orgA, f.orgCaseA);
+      assert.equal(rowCount, 1);
+    });
+
+    await t("SA-7.12 a member cannot write another user's presentation state", async () => {
+      const code = await errorCode(() =>
+        presentationRow(authed(f.memberA2), f.creatorA, f.orgA, f.orgCaseA)
+      );
+      assert.equal(code, RLS_VIOLATION, "user_id = auth.uid() is enforced on the write");
+    });
+
+    await t("SA-7.11 a revoked member, a non-member and another Organization's member cannot write", async () => {
+      assert.equal(
+        await errorCode(() => presentationRow(authed(f.revokedA), f.revokedA, f.orgA, f.orgCaseA2)),
+        RLS_VIOLATION,
+        "revoked: user_id = auth.uid() alone is insufficient (TD-1)"
+      );
+      assert.equal(
+        await errorCode(() => presentationRow(authed(f.legacyUser), f.legacyUser, f.orgA, f.orgCaseA)),
+        RLS_VIOLATION,
+        "non-member"
+      );
+      assert.equal(
+        await errorCode(() => presentationRow(authed(f.memberB), f.memberB, f.orgA, f.orgCaseA)),
+        RLS_VIOLATION,
+        "member of another Organization, naming Org A"
+      );
+    });
+
+    await t("a row cannot pair an Organization with another Organization's Case (composite FK)", async () => {
+      // The Org B member passes the RLS check for their own Organization, so what
+      // refuses this is structural: (Org A's Case, Org B) does not exist.
+      const code = await errorCode(() =>
+        presentationRow(authed(f.memberB), f.memberB, f.orgB, f.orgCaseA)
+      );
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    await t("a legacy NULL-Organization Case can never be a presentation subject, even for the service role", async () => {
+      const code = await errorCode(() =>
+        presentationRow(service, f.legacyUser, f.orgA, f.legacyCase)
+      );
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    // Rows the read and update checks below observe. Written by the superuser
+    // outside any request role, so they persist across the rolled-back cases.
+    const seedPresentation = async (userId: string, organizationId: string, caseId: string) =>
+      (
+        await client.query<{ id: string }>(
+          `insert into public.portfolio_presentation_state
+             (user_id, organization_id, subject_kind, subject_id, hidden_at)
+           values ($1, $2, 'case', $3, now())
+           returning id`,
+          [userId, organizationId, caseId]
+        )
+      ).rows[0].id;
+    const rowCreatorA = await seedPresentation(f.creatorA, f.orgA, f.orgCaseA);
+    await seedPresentation(f.memberA2, f.orgA, f.orgCaseA2);
+    // A row the member wrote while they were still active: SA-7.11 requires
+    // that, once revoked, they read nothing through it.
+    await seedPresentation(f.revokedA, f.orgA, f.orgCaseA);
+
+    const visiblePresentation = (userId: string) =>
+      asRole(client, authed(userId), async () =>
+        (
+          await client.query<{ user_id: string }>(
+            "select user_id from public.portfolio_presentation_state"
+          )
+        ).rows
+      );
+
+    await t("SA-7.12 presentation state is personal: a member reads only their own rows", async () => {
+      const rows = await visiblePresentation(f.memberA2);
+      assert.equal(rows.length, 1);
+      assert.ok(rows.every((r) => r.user_id === f.memberA2));
+    });
+
+    await t("SA-7.11 a revoked member reads nothing, not even the rows they wrote while active", async () => {
+      assert.equal((await visiblePresentation(f.revokedA)).length, 0);
+      assert.equal((await visiblePresentation(f.legacyUser)).length, 0, "non-member");
+      assert.equal((await visiblePresentation(f.memberB)).length, 0, "another Organization's member");
+    });
+
+    await t("SA-7.12 a member cannot update another user's row, nor re-point their own", async () => {
+      const affected = await asRole(client, authed(f.memberA2), async () =>
+        (
+          await client.query(
+            "update public.portfolio_presentation_state set pinned = true where id = $1",
+            [rowCreatorA]
+          )
+        ).rowCount
+      );
+      assert.equal(affected, 0, "another user's row is invisible to the update");
+
+      const repoint = await asRole(client, authed(f.creatorA), () =>
+        errorCode(() =>
+          client.query(
+            "update public.portfolio_presentation_state set user_id = $2 where id = $1",
+            [rowCreatorA, f.memberA2]
+          )
+        )
+      );
+      // The stamp trigger runs BEFORE the policy's WITH CHECK, so it is what
+      // answers; the policy would refuse the same write if the trigger did not.
+      assert.equal(repoint, RAISE_EXCEPTION, "a row keeps the person it was written for");
+
+      const moveSubject = await asRole(client, authed(f.creatorA), () =>
+        errorCode(() =>
+          client.query(
+            "update public.portfolio_presentation_state set subject_id = $2 where id = $1",
+            [rowCreatorA, f.orgCaseA2]
+          )
+        )
+      );
+      assert.equal(moveSubject, RAISE_EXCEPTION, "a row keeps the subject it was written for");
+    });
+
+    await t("an authenticated user cannot delete presentation state (clearing is an update)", async () => {
+      const affected = await asRole(client, authed(f.creatorA), async () =>
+        (
+          await client.query("delete from public.portfolio_presentation_state where id = $1", [
+            rowCreatorA,
+          ])
+        ).rowCount
+      );
+      assert.equal(affected, 0);
+    });
+
+    await t("SA-7.6 D6 cap: a snooze longer than 14 days is clamped to 14 days from the write", async () => {
+      const {
+        rows: [row],
+      } = await presentationRow(authed(f.memberA2), f.memberA2, f.orgA, f.orgCaseA, {
+        snoozeUntil: new Date(Date.now() + 365 * 86_400_000).toISOString(),
+      });
+      const capMs = new Date(row.updated_at).getTime() + 14 * 86_400_000;
+      assert.equal(new Date(row.snooze_until as string).getTime(), capMs);
+    });
+
+    await t("SA-7.6 the write time is the database's: a caller-supplied updated_at cannot move the cap", async () => {
+      const farFuture = new Date(Date.now() + 365 * 86_400_000).toISOString();
+      const {
+        rows: [row],
+      } = await presentationRow(authed(f.memberA2), f.memberA2, f.orgA, f.orgCaseA, {
+        updatedAt: farFuture,
+        snoozeUntil: farFuture,
+      });
+      assert.ok(
+        new Date(row.updated_at).getTime() < Date.now() + 60_000,
+        "updated_at is stamped from now(), not taken from the caller"
+      );
+      assert.ok(new Date(row.snooze_until as string).getTime() <= Date.now() + 14 * 86_400_000 + 60_000);
+    });
+
+    await t("SA-7.6 a presentation write has no path to business truth: its only trigger stamps its own row", async () => {
+      const { rows } = await client.query<{ tgname: string }>(
+        `select tgname from pg_trigger
+          where tgrelid = 'public.portfolio_presentation_state'::regclass
+            and not tgisinternal
+          order by tgname`
+      );
+      assert.deepEqual(
+        rows.map((r) => r.tgname),
+        ["trg_portfolio_presentation_state_stamp"]
+      );
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-7 Work Portfolio — read paths (SA-7.2, SA-7.11)");
+
+    // The Portfolio reads case-level truth under the actor's own JWT, so the
+    // candidate set is whatever these policies return — an unauthorized Case
+    // never reaches application code to be filtered afterwards (AC-9 §14.2).
+    // These are the exact shapes the projection issues (packages/db
+    // `work-portfolio.ts`). Work Items are read with the service role, keyed
+    // only by the Case ids these reads returned; that half is proven by the
+    // module selftest, because RLS cannot see it.
+    const portfolioReads = (userId: string, organizationId: string) =>
+      asRole(client, authed(userId), async () => {
+        const cases = await client.query<{ id: string }>(
+          `select id from public.operational_cases where organization_id = $1`,
+          [organizationId]
+        );
+        const ids = cases.rows.map((r) => r.id);
+        // Reading children for EVERY Case of the Organization — not only the
+        // ids returned above — is the adversarial form: a projection bug that
+        // leaked an id into the child reads must still get nothing back.
+        const allIds = (
+          await client.query<{ id: string }>("select id from public.operational_cases")
+        ).rows.map((r) => r.id);
+        const every = [...new Set([...ids, ...allIds, f.orgCaseA, f.orgCaseA2])];
+        const count = async (sql: string) =>
+          (await client.query(sql, [every])).rowCount ?? 0;
+        return {
+          cases: ids.length,
+          caseIds: ids,
+          facts: await count(
+            "select id from public.case_facts where case_id = any($1) and superseded_by is null"
+          ),
+          subjects: await count("select id from public.case_subjects where case_id = any($1)"),
+          events: await count("select id from public.operational_case_events where case_id = any($1)"),
+          approvals: await count("select id from public.case_approvals where case_id = any($1)"),
+        };
+      });
+
+    await t("SA-7.11 the Portfolio read paths return Organization truth to an active member", async () => {
+      const reads = await portfolioReads(f.memberA2, f.orgA);
+      assert.ok(reads.caseIds.includes(f.orgCaseA), "a Case the member did not create");
+      assert.ok(reads.caseIds.includes(f.orgCaseA2), "a Case whose creator was revoked");
+      assert.ok(!reads.caseIds.includes(f.orgCaseB) && !reads.caseIds.includes(f.legacyCase));
+      assert.ok(reads.facts > 0 && reads.subjects > 0 && reads.events > 0);
+    });
+
+    await t("SA-7.11 the Portfolio read paths return NOTHING of Org A to a revoked member, a non-member or an Org B member", async () => {
+      for (const [who, userId] of [
+        ["revoked member", f.revokedA],
+        ["non-member", f.legacyUser],
+        ["Org B member", f.memberB],
+      ] as const) {
+        const reads = await portfolioReads(userId, f.orgA);
+        assert.equal(reads.cases, 0, `${who}: candidate Cases`);
+        // Each of them may legitimately see child rows of their OWN Cases (the
+        // non-member's legacy Cases, the Org B member's Organization), so the
+        // assertion that matters is scoped to Org A's Cases explicitly.
+        const orgAChildren = await asRole(client, authed(userId), async () =>
+          (
+            await client.query(
+              `select 1 from public.case_facts where case_id = any($1)
+               union all select 1 from public.case_subjects where case_id = any($1)
+               union all select 1 from public.operational_case_events where case_id = any($1)
+               union all select 1 from public.case_approvals where case_id = any($1)`,
+              [[f.orgCaseA, f.orgCaseA2]]
+            )
+          ).rowCount
+        );
+        assert.equal(orgAChildren, 0, `${who}: no child row of an Org A Case`);
+      }
     });
 
     // ---------------------------------------------------------------

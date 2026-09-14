@@ -31,6 +31,12 @@ export type AppNavNode = {
   matcher?: AppNavMatcher;
   /** Only shown when `profiles.is_ungga_admin` is true. */
   adminOnly?: boolean;
+  /**
+   * Only shown to someone with an ACTIVE Organization membership (R1 SL-7).
+   * Navigation only — the page re-checks membership and the
+   * `relationship_ops` flag itself, so hiding the link is never the gate.
+   */
+  organizationMemberOnly?: boolean;
   children?: AppNavNode[];
 };
 
@@ -63,6 +69,17 @@ export const APP_NAV_TREE: AppNavNode[] = [
     label: "Operaciones",
     icon: "flow",
     children: [
+      {
+        // Work Portfolio (R1 SL-7): la proyección supervisora de los Casos de
+        // una Organización. Solo para miembros activos de alguna Organización.
+        key: "work-portfolio",
+        label: "Portafolio de trabajo",
+        shortLabel: "Portaf",
+        icon: "bell",
+        href: "/portfolio",
+        matcher: { kind: "path-prefix", prefixes: ["/portfolio"] },
+        organizationMemberOnly: true,
+      },
       {
         key: "running-flows",
         label: "Casos en curso",
@@ -179,10 +196,17 @@ export const APP_NAV_TREE: AppNavNode[] = [
   },
 ];
 
-/** Filters admin-only nodes when the viewer is not an Ungga admin. */
-export function resolveAppNavTree(isUnggaAdmin: boolean): AppNavNode[] {
+/**
+ * Filters admin-only nodes when the viewer is not an Ungga admin, and
+ * Organization-member nodes when the viewer holds no active membership.
+ */
+export function resolveAppNavTree(
+  isUnggaAdmin: boolean,
+  isOrganizationMember = false
+): AppNavNode[] {
   const keep = (node: AppNavNode): AppNavNode | null => {
     if (node.adminOnly && !isUnggaAdmin) return null;
+    if (node.organizationMemberOnly && !isOrganizationMember) return null;
     if (!node.children?.length) return node;
     const children = node.children
       .map(keep)

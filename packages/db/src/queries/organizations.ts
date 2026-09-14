@@ -208,6 +208,7 @@ export async function setMembershipStatus(
 export type OrgAction =
   | "case.write"
   | "case_relationship.write"
+  | "case_approval.decide"
   | "organization.manage_members"
   | "organization.manage_flags"
   | "organization.manage_secrets";
@@ -215,6 +216,11 @@ export type OrgAction =
 const ACTION_ROLES: Record<OrgAction, readonly OrganizationRole[]> = {
   "case.write": ["owner", "org_admin", "advisor"],
   "case_relationship.write": ["owner", "org_admin", "advisor"],
+  // Deciding an approval on an Organization Case (human decision D3,
+  // 2026-09-13; Technical Plan TD-1). Role only: assignment never contributes
+  // to approval authority, so an advisor is refused on a Case assigned to
+  // them exactly as on any other. No grant or policy model in R1.
+  "case_approval.decide": ["owner", "org_admin"],
   "organization.manage_members": ["owner", "org_admin"],
   "organization.manage_flags": ["owner", "org_admin"],
   "organization.manage_secrets": ["owner", "org_admin"],

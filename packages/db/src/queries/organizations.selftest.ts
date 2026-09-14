@@ -241,7 +241,30 @@ async function testAuthorization(): Promise<void> {
     assert.equal(admin.reason, "role_not_permitted");
   }
 
+  {
+    // D3 (2026-09-13): deciding an approval on an Organization Case is owner /
+    // org_admin only. The advisor is refused by ROLE — the gate never looks at
+    // assignment, so being assigned to the Case changes nothing.
+    for (const role of ["owner", "org_admin"] as const) {
+      const { db } = fakeDb({ organization_memberships: [membershipRow({ role })] });
+      const result = await authorizeOrgAction(db, USER, ORG, "case_approval.decide");
+      assert.equal(result.allowed, true, role);
+    }
+    const { db } = fakeDb({ organization_memberships: [membershipRow({ role: "advisor" })] });
+    const advisor = await authorizeOrgAction(db, USER, ORG, "case_approval.decide");
+    assert.equal(advisor.allowed, false);
+    assert.equal(advisor.reason, "role_not_permitted");
+    const inactive = fakeDb({
+      organization_memberships: [membershipRow({ role: "owner", status: "inactive" })],
+    }).db;
+    assert.equal(
+      (await authorizeOrgAction(inactive, USER, ORG, "case_approval.decide")).reason,
+      "no_active_membership"
+    );
+  }
+
   console.log("  ok  authorizeOrgAction: membership + role, fail-closed");
+  console.log("  ok  case_approval.decide: owner / org_admin only, never by assignment (D3)");
   console.log("  ok  platform authority is never an Organization role");
 }
 
