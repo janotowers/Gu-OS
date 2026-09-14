@@ -363,6 +363,61 @@ export function buildHitlActionsForKind(
     ];
   }
 
+  // TD-15 semantic Human Interactions (R1 SL-7). The Work Portfolio renders its
+  // typed interactions through this contract rather than through a new
+  // renderer (TD-15 point 3). Web-only for now: no Telegram flow emits these
+  // kinds, so they carry no callback prefix — a button nothing handles must
+  // not exist. `exception_review`, `decision_request` and `evidence_request`
+  // have no SL-7 action and fall through to [].
+  if (kind === "information_request") {
+    return [
+      {
+        id: "answer_and_complete",
+        label: "Responder y completar",
+        variant: "primary",
+        acceptsNotes: true,
+        // The answer IS the information Gu asked for.
+        requiresNotes: true,
+        notesPlaceholder: "Tu respuesta para Gu",
+      },
+    ];
+  }
+
+  if (kind === "human_work_request") {
+    // A due commitment is a human-work need with no Work Item to complete:
+    // fulfilling it is recorded against the commitment, not from here.
+    if (typeof data?.work_item_id !== "string") return [];
+    return [
+      {
+        id: "complete_work",
+        label: "Marcar como hecho",
+        variant: "primary",
+        acceptsNotes: true,
+        notesPlaceholder: "Opcional: qué se hizo",
+      },
+    ];
+  }
+
+  if (kind === "approval_request") {
+    return [
+      {
+        id: "approve",
+        label: "Aprobar",
+        variant: "primary",
+        acceptsNotes: true,
+        notesPlaceholder: "Opcional: comentario",
+      },
+      {
+        id: "reject",
+        label: "Rechazar",
+        variant: "danger",
+        acceptsNotes: true,
+        requiresNotes: true,
+        notesPlaceholder: "Motivo del rechazo",
+      },
+    ];
+  }
+
   return [];
 }
 

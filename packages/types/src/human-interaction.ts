@@ -81,8 +81,11 @@ interface HumanInteractionBase {
   case_id: string;
   organization_id: string;
   requested_by: InteractionRequester;
-  /** When the need began, from durable truth. */
-  requested_at: string;
+  /**
+   * When the need began, from durable truth; null when no row records it
+   * (a stall has no starting instant, and one is never invented).
+   */
+  requested_at: string | null;
   /** What the need rests on. Never empty for an emitted interaction. */
   evidence_refs: readonly DurableRef[];
 }

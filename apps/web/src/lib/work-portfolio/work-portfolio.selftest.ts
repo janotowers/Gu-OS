@@ -69,7 +69,7 @@ import {
   effectiveSnoozeUntil,
   presentationPatchFor,
 } from "./presentation";
-import { buildWorkPortfolio } from "./projection";
+import { buildWorkPortfolio, canDecideApprovals } from "./projection";
 import { loadWorkPortfolio } from "./load";
 import {
   completePortfolioWork,
@@ -1035,7 +1035,9 @@ async function testLoader(): Promise<void> {
 // Actions — SA-7.8 canonical mechanisms only, SA-7.9 the approval gate
 // ============================================================
 
-function actionTables(extra: Record<string, Array<Record<string, unknown>>> = {}) {
+type Tables = Record<string, Array<Record<string, unknown>>>;
+
+function actionTables(extra: Tables = {}): Tables {
   const ask = {
     id: "work-ask",
     case_id: CASE_ID,
@@ -1131,6 +1133,14 @@ async function testActions(): Promise<void> {
     assert.equal(advisor.reason, "role_not_permitted", "the Case IS assigned to this advisor — and it does not matter");
     assert.equal((await authorizeOrgAction(db, REVOKED, ORG, "case_approval.decide")).reason, "no_active_membership");
     assert.equal((await authorizeOrgAction(db, OUTSIDER, ORG, "case_approval.decide")).reason, "no_active_membership");
+  });
+
+  await t("the projection's rendering of D3 agrees with the gate for every role", async () => {
+    for (const role of ["owner", "org_admin", "advisor"] as const) {
+      const db = createFakeDb({ tables: { organization_memberships: [membership(ADVISOR, role)] } }).client;
+      const gate = await authorizeOrgAction(db, ADVISOR, ORG, "case_approval.decide");
+      assert.equal(canDecideApprovals(role), gate.allowed, role);
+    }
   });
 
   const request = approvalRequest({ request_id: "request-1" });

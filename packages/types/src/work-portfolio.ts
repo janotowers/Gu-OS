@@ -124,8 +124,12 @@ export interface AttentionProjection {
   /** WHY NOW the contribution is material. */
   why_now: AttentionClause;
   interaction: HumanInteractionPayload;
-  /** When the need began, from durable truth. */
-  since: string;
+  /**
+   * When the need began, from durable truth. Null when no row records it — a
+   * stall has no instant at which it started, and inventing one would be
+   * exactly the invented urgency SA-7.4 forbids.
+   */
+  since: string | null;
 }
 
 // ============================================================

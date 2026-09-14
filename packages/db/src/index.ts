@@ -44,6 +44,7 @@ export * from "./queries/case-facts";
 export * from "./queries/case-subjects";
 export * from "./queries/case-artifacts";
 export * from "./queries/case-approvals";
+export * from "./queries/work-portfolio";
 export * from "./queries/worker-profiles";
 export * from "./queries/durable-tasks";
 export * from "./queries/studio-authoring-sessions";

@@ -829,6 +829,67 @@ async function testReviewedItemStoresResolutionEvidence(): Promise<void> {
   console.log("✓ review→done conserva evidencia de resolución");
 }
 
+/**
+ * R1 SL-7: un humano completa desde el Work Portfolio el item concreto que se
+ * le pidió. Tres extensiones aditivas, cada una con su default intacto:
+ * readiness acotada a un item, claim de un item concreto, y atribución de la
+ * revisión a quien la resolvió.
+ */
+async function testTargetedReadinessClaimAndAttributedReview(): Promise<void> {
+  const fake = makeFakeDb();
+  const { a } = await seedChain(fake);
+  const { created } = await createWorkItemsFromTemplates(fake.client, {
+    userId: USER,
+    caseId: CASE,
+    workflowDefinitionVersion: 1,
+    origin: "agent_proposed",
+    templates: [{ work_type: "confirm_with_advisor", required_capability: "confirm_with_advisor" }],
+  });
+  const ask = created[0];
+
+  // Readiness de UN item: el resto del caso no se mueve.
+  const targeted = await propagateReadiness(fake.client, { userId: USER, caseId: CASE, workItemId: ask.id });
+  assert.deepEqual(targeted.readyIds, [ask.id]);
+  assert.equal(fake.store.work_items.find((i) => i.id === a.id)!.status, "todo");
+
+  // Con `a` también ready y primero en el orden, el claim dirigido toma `ask`.
+  await propagateReadiness(fake.client, { userId: USER });
+  const claimed = await claimNextReady(fake.client, {
+    userId: USER,
+    caseId: CASE,
+    workItemId: ask.id,
+    runnerRef: "work_portfolio:actor-9",
+    executorKind: "human",
+    leaseMs: 60_000,
+  });
+  assert.equal(claimed?.item.id, ask.id);
+  assert.equal(claimed?.attempt.executor_kind, "human");
+  assert.equal(fake.store.work_items.find((i) => i.id === a.id)!.status, "ready", "a sigue esperando su ejecutor");
+
+  // Sin workItemId el comportamiento previo no cambia: el siguiente por orden.
+  const next = await claimNextReady(fake.client, {
+    userId: USER,
+    runnerRef: "runner-default",
+    executorKind: "deterministic_service",
+    leaseMs: 60_000,
+  });
+  assert.equal(next?.item.id, a.id);
+
+  // La revisión se atribuye a quien la resolvió; default = userId (sin cambio).
+  const row = fake.store.work_items.find((i) => i.id === ask.id)!;
+  row.status = "review";
+  row.current_attempt_id = null;
+  const resolved = await approveReviewedItem(fake.client, {
+    userId: USER,
+    itemId: ask.id,
+    resolvedBy: "actor-9",
+    resolution: { source: "work_portfolio", decision: "completed" },
+  });
+  const resolution = (resolved?.result_jsonb as Record<string, Record<string, unknown>>).review_resolution;
+  assert.equal(resolution.resolved_by, "actor-9");
+  console.log("✓ readiness/claim dirigidos a un item + revisión atribuida (R1 SL-7)");
+}
+
 async function testTenantScoping(): Promise<void> {
   const fake = makeFakeDb();
   await seedChain(fake);
@@ -862,6 +923,7 @@ async function main(): Promise<void> {
   await testCompletionFailsClosedOnLostClaim();
   await testBlockItemAndEventLog();
   await testReviewedItemStoresResolutionEvidence();
+  await testTargetedReadinessClaimAndAttributedReview();
   await testTenantScoping();
   console.log("work-items selftest: all green");
 }

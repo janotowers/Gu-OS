@@ -349,7 +349,17 @@ export interface PropagateReadinessResult {
  */
 export async function propagateReadiness(
   db: DbClient,
-  params: { userId: string; caseId?: string }
+  params: {
+    userId: string;
+    caseId?: string;
+    /**
+     * Restringe el cómputo a UN item (R1 SL-7): quien lo pide va a reclamar
+     * ese item y no tiene por qué mover la readiness del resto del caso. La
+     * regla es la misma — dependencias done y not_before vencido —, solo el
+     * alcance cambia.
+     */
+    workItemId?: string;
+  }
 ): Promise<PropagateReadinessResult> {
   let todoQuery = db
     .from("work_items")
@@ -357,6 +367,7 @@ export async function propagateReadiness(
     .eq("user_id", params.userId)
     .eq("status", "todo");
   if (params.caseId) todoQuery = todoQuery.eq("case_id", params.caseId);
+  if (params.workItemId) todoQuery = todoQuery.eq("id", params.workItemId);
   const { data: todoData, error: todoError } = await todoQuery;
   if (todoError) throw todoError;
   const todoItems = (todoData ?? []) as WorkItem[];
@@ -444,6 +455,13 @@ export interface ClaimNextReadyInput {
   executorKind: string | ((item: WorkItem) => string);
   leaseMs: number;
   caseId?: string;
+  /**
+   * Reclama ESTE item y ningún otro (R1 SL-7: un humano completa desde el
+   * Work Portfolio el trabajo concreto que se le pidió). Sin él, el claim toma
+   * el siguiente ready por prioridad, que puede ser otro item del caso. Los
+   * dos árbitros — unicidad del attempt y CAS sobre el padre — no cambian.
+   */
+  workItemId?: string;
   workerProfileId?: string | null;
 }
 
@@ -466,6 +484,7 @@ export async function claimNextReady(
     .order("created_at", { ascending: true })
     .limit(20);
   if (input.caseId) readyQuery = readyQuery.eq("case_id", input.caseId);
+  if (input.workItemId) readyQuery = readyQuery.eq("id", input.workItemId);
   const { data, error } = await readyQuery;
   if (error) throw error;
 
@@ -918,6 +937,14 @@ export async function approveReviewedItem(
       rationale?: string | null;
       relatedEventKind?: string;
     };
+    /**
+     * Quién resolvió, cuando no es el dueño del tenant. En un Caso de
+     * Organización las filas siguen llaveadas al perfil dueño (`userId`),
+     * pero cualquier miembro autorizado puede resolver (R1 SL-7): la
+     * atribución tiene que nombrar a esa persona, no al dueño. Default:
+     * `userId`, que es exactamente el comportamiento previo.
+     */
+    resolvedBy?: string;
   }
 ): Promise<WorkItem | null> {
   const item = await getWorkItemById(db, params.userId, params.itemId);
@@ -929,7 +956,7 @@ export async function approveReviewedItem(
     rationale: params.resolution?.rationale ?? null,
     related_event_kind: params.resolution?.relatedEventKind ?? null,
     resolved_at: resolvedAt,
-    resolved_by: params.userId,
+    resolved_by: params.resolvedBy ?? params.userId,
   };
   const { data, error } = await db
     .from("work_items")
