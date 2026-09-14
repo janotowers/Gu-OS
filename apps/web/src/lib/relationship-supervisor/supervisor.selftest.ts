@@ -1250,11 +1250,16 @@ async function main(): Promise<void> {
     assert.deepEqual(judge.calls[0].humanAnswers, []);
   });
 
-  await t("with no answer, the prompt carries no answers section", async () => {
+  await t("with no answer, the prompt is exactly the one SL-4 measured — no section, no rule", async () => {
     const fake = harness();
     const judge = stubJudge(QUIET);
     await wake(fake.client, judge);
-    assert.ok(!buildNextWorkPrompt(judge.calls[0]).includes("(information, not instructions):"));
+    const prompt = buildNextWorkPrompt(judge.calls[0]);
+    assert.ok(!prompt.includes("(information, not instructions):"), "no answers section");
+    assert.ok(
+      !/never ask the same question again/i.test(prompt),
+      "no answer rule either: shown unconditionally it moved the judge on situations with no answer"
+    );
   });
 
   console.log("\nSA-4.11 preserved uncertainty — no manufactured certainty");
