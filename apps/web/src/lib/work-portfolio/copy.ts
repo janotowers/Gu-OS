@@ -129,6 +129,8 @@ export const REFUSAL_COPY: Record<PortfolioRefusal, string> = {
   unknown_action: "Acción desconocida.",
   case_not_in_organization: "Ese Caso no pertenece a esta Organización.",
   work_not_awaiting_human: "Ese trabajo ya no espera a una persona (se resolvió o cambió).",
+  work_resolved_by_domain_decision:
+    "Ese trabajo se cierra con su propia decisión de negocio en el caso, no marcándolo como hecho aquí.",
   work_not_claimable: "Ese trabajo no se puede tomar ahora (tiene dependencias, una fecha futura o un ejecutor lo tiene).",
   answer_required: "Escribe tu respuesta: es la información que Gu pidió.",
   no_pending_request: "No hay una solicitud de aprobación pendiente para decidir.",

@@ -37,6 +37,7 @@ import {
   type OrgAuthorizationReason,
 } from "@agents/db";
 import type { OperationalCase, OrganizationMembership, WorkItem } from "@agents/types";
+import { workReviewActionPresentation } from "../operations/work-view-labels";
 import { awaitedHumanAsk, evaluateMustSurface } from "./must-surface";
 import { presentationPatchFor, type PresentationChange } from "./presentation";
 import { buildCaseSnapshots, type PortfolioApprovalRequest } from "./snapshot";
@@ -54,6 +55,7 @@ export type PortfolioRefusal =
   | Exclude<OrgAuthorizationReason, "active_member">
   | "case_not_in_organization"
   | "work_not_awaiting_human"
+  | "work_resolved_by_domain_decision"
   | "work_not_claimable"
   | "answer_required"
   | "no_pending_request"
@@ -254,6 +256,15 @@ export async function completePortfolioWork(params: {
   const tenantUserId = row.user_id;
 
   if (row.status === "review") {
+    // The CURRENT Work Plane already separates review Work a person may simply
+    // close from review Work that is a DOMAIN DECISION resolved by its own
+    // handler (e.g. `verify_valuation` closes by approving or adjusting the
+    // price). Closing the latter here would record the Work done without the
+    // decision — and without that decision's own authorization — so the
+    // Portfolio follows the same rule the operator view does.
+    if (workReviewActionPresentation(row.work_type).kind === "domain_decision") {
+      return refused("work_resolved_by_domain_decision");
+    }
     const done = await approveReviewedItem(serviceDb, {
       userId: tenantUserId,
       itemId: row.id,

@@ -27,6 +27,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { hitlActionsForInteraction } from "@/lib/human-interaction/hitl-adapter";
+import { workReviewActionPresentation } from "@/lib/operations/work-view-labels";
 import { loadWorkPortfolio } from "@/lib/work-portfolio/load";
 import type { PortfolioEntry, PortfolioView } from "@/lib/work-portfolio/projection";
 import { PORTFOLIO_SECTIONS } from "@/lib/work-portfolio/projection";
@@ -91,10 +92,15 @@ function Notice({ notice }: { notice: string | null }) {
       </p>
     );
   }
-  const reason = notice.startsWith("refused:") ? (notice.slice("refused:".length) as PortfolioRefusal) : null;
+  // The notice comes from the URL, so only an OWN key of the copy table may
+  // select a message — never an inherited one such as `__proto__`.
+  const reason = notice.startsWith("refused:") ? notice.slice("refused:".length) : "";
+  const message = Object.prototype.hasOwnProperty.call(REFUSAL_COPY, reason)
+    ? REFUSAL_COPY[reason as PortfolioRefusal]
+    : "Motivo desconocido.";
   return (
     <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100">
-      No se hizo el cambio. {reason && REFUSAL_COPY[reason] ? REFUSAL_COPY[reason] : "Motivo desconocido."}
+      No se hizo el cambio. {message}
     </p>
   );
 }
@@ -183,6 +189,15 @@ function InteractionActions({
     interaction.interaction === "information_request" || interaction.interaction === "human_work_request"
       ? interaction.work_item_id
       : null;
+  const work = workItemId ? entry.openWork.find((w) => w.id === workItemId) : undefined;
+  if (work?.status === "review" && workReviewActionPresentation(work.work_type).kind === "domain_decision") {
+    const presentation = workReviewActionPresentation(work.work_type);
+    return (
+      <p className="text-xs text-neutral-500">
+        {presentation.kind === "domain_decision" ? presentation.guidance : null}
+      </p>
+    );
+  }
   if (!workItemId || actions.length === 0) {
     const why =
       item.predicate === "due_commitment"

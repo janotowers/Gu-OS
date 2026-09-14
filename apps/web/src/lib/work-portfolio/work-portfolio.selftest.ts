@@ -1316,6 +1316,23 @@ async function testActions(): Promise<void> {
     assert.equal(resolution.source, "work_portfolio");
   });
 
+  await t("review Work that is a DOMAIN DECISION is not closable here — it closes through its own decision", async () => {
+    // The CURRENT operator view already refuses a manual close of such Work
+    // (`workReviewActionPresentation`); the Portfolio must not become the way
+    // around the decision and its authorization.
+    const tables = actionTables();
+    tables.work_items[0].status = "review";
+    tables.work_items[0].work_type = "verify_valuation";
+    const fake = createFakeDb({ tables });
+    const result = await completePortfolioWork({
+      serviceDb: fake.client, actorUserId: OWNER, organizationId: ORG, caseId: CASE_ID,
+      workItemId: "work-ask", answer: "cerrar", now: NOW,
+    });
+    assert.deepEqual(result, { status: "refused", reason: "work_resolved_by_domain_decision" });
+    assert.deepEqual(fake.writes, []);
+    assert.equal(fake.tables.work_items[0].status, "review");
+  });
+
   await t("flags off ⇒ both business actions and presentation writes are inert", async () => {
     const off = actionTables();
     off.organization_feature_flags = [];
