@@ -54,6 +54,7 @@ import {
 import { buildRankingFrame } from "./frame";
 import { frameFromInput, mergeRanking, needsAttentionOrder } from "./merge";
 import { rankWorkPortfolio, type RankedWorkPortfolio } from "./index";
+import { createOpenRouterRankingJudge } from "./judge";
 import { loadRankingEvalSet, scoreRankingScenario } from "./eval/run-ranking-eval";
 
 const ORG = "11111111-1111-1111-1111-111111111111";
@@ -564,6 +565,80 @@ async function main(): Promise<void> {
     const { ranked, portfolio } = await rank(fx, slow, { timeoutMs: 25 });
     assert.equal(ranked.ranking.status, "timeout");
     assert.deepEqual(ids(ranked.organizationWork.entries), ids(portfolio.organizationWork.entries));
+  });
+
+  console.log("\nthe production judge — a bounded retry, and whole answers only");
+
+  const validOutput: RankingOutput = { assessments: [], items: [{ case: "c1", kind: "governed", priority: 1 }] };
+  const reply = (content: unknown, status = 200) =>
+    new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }], usage: {} }), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  const hang: typeof fetch = (_url, init) =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+    });
+  const scripted = (steps: Array<typeof fetch>) => {
+    let n = 0;
+    return { fetchImpl: ((url, init) => steps[Math.min(n++, steps.length - 1)](url, init)) as typeof fetch, calls: () => n };
+  };
+  async function withKey<T>(fn: () => Promise<T>): Promise<T> {
+    const before = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "test-key";
+    try {
+      return await fn();
+    } finally {
+      if (before === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = before;
+    }
+  }
+  const signal = () => new AbortController().signal;
+
+  await t("a hung attempt is abandoned and tried once more, inside the pass's bound", async () => {
+    const s = scripted([hang, async () => reply(validOutput)]);
+    const result = await withKey(() => createOpenRouterRankingJudge({ attemptTimeoutMs: 30, fetchImpl: s.fetchImpl }).rank(minimalInput(), signal()));
+    assert.equal(result.ok, true);
+    assert.equal(s.calls(), 2);
+  });
+
+  await t("an invalid answer is tried once more; two invalid answers stay invalid_output — never a partial merge", async () => {
+    const bad = async () => reply({ items: [{ case: "c1", kind: "governed" }] }); // no priority
+    const recovered = scripted([bad, async () => reply(validOutput)]);
+    assert.equal((await withKey(() => createOpenRouterRankingJudge({ fetchImpl: recovered.fetchImpl }).rank(minimalInput(), signal()))).ok, true);
+    const twice = scripted([bad, bad, async () => reply(validOutput)]);
+    const result = await withKey(() => createOpenRouterRankingJudge({ fetchImpl: twice.fetchImpl }).rank(minimalInput(), signal()));
+    assert.deepEqual(result, { ok: false, reason: "invalid_output" });
+    assert.equal(twice.calls(), 2, "at most two attempts");
+  });
+
+  await t("a 5xx is tried once more; a 4xx refusal is not", async () => {
+    const unavailable = scripted([async () => reply({}, 503), async () => reply(validOutput)]);
+    assert.equal((await withKey(() => createOpenRouterRankingJudge({ fetchImpl: unavailable.fetchImpl }).rank(minimalInput(), signal()))).ok, true);
+    const refused = scripted([async () => reply({}, 400), async () => reply(validOutput)]);
+    assert.deepEqual(await withKey(() => createOpenRouterRankingJudge({ fetchImpl: refused.fetchImpl }).rank(minimalInput(), signal())), { ok: false, reason: "model_error" });
+    assert.equal(refused.calls(), 1);
+  });
+
+  await t("the pass's bound wins: an outer abort is rethrown and never retried", async () => {
+    const s = scripted([hang, async () => reply(validOutput)]);
+    const outer = new AbortController();
+    const pending = withKey(() => createOpenRouterRankingJudge({ attemptTimeoutMs: 5_000, fetchImpl: s.fetchImpl }).rank(minimalInput(), outer.signal));
+    setTimeout(() => outer.abort(new Error("pass timeout")), 20);
+    await assert.rejects(pending);
+    assert.equal(s.calls(), 1);
+  });
+
+  await t("with no key there is no call at all", async () => {
+    const s = scripted([async () => reply(validOutput)]);
+    const before = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    try {
+      assert.deepEqual(await createOpenRouterRankingJudge({ fetchImpl: s.fetchImpl }).rank(minimalInput(), signal()), { ok: false, reason: "model_unavailable" });
+    } finally {
+      if (before !== undefined) process.env.OPENROUTER_API_KEY = before;
+    }
+    assert.equal(s.calls(), 0);
   });
 
   console.log("\nflags off ⇒ inert; no candidates ⇒ no call");

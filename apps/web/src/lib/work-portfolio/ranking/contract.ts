@@ -30,8 +30,15 @@ export const RANKING_MAX_WORK_PER_CASE = 6;
 export const RANKING_MAX_RECONSIDERATIONS_PER_CASE = 3;
 /** Any one string copied into the input. Longer text is cut, and says so. */
 export const RANKING_MAX_TEXT_CHARS = 300;
-/** One call per Portfolio load; past this the deterministic order stands. */
+/** The whole pass, per Portfolio load; past this the deterministic order stands. */
 export const RANKING_TIMEOUT_MS = 20_000;
+/**
+ * One attempt's own limit inside that bound. A provider call that hangs is
+ * abandoned, not waited on for the whole budget, so the one retry still fits.
+ */
+export const RANKING_ATTEMPT_TIMEOUT_MS = 9_000;
+/** The first attempt, and one more after a transient failure or an invalid answer. */
+export const RANKING_MAX_ATTEMPTS = 2;
 
 // ============================================================
 // Input
