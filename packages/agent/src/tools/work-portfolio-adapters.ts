@@ -21,8 +21,8 @@
  */
 import { z } from "zod";
 import { tool } from "@langchain/core/tools";
-import { updateToolCallStatus, type DbClient } from "@agents/db";
-import { createTrackedToolCall } from "./tool-call-audit";
+import type { DbClient } from "@agents/db";
+import { runAuditedTool } from "./tool-call-audit";
 import type { ToolContext } from "./tool-context";
 
 export type WorkPortfolioView = "mine" | "organization";
@@ -110,16 +110,11 @@ export function buildWorkPortfolioTools(
         // This tool owns its audit trail: the graph writes no tool_calls row for
         // it (tool-audit-ownership.ts), so it writes and closes its own — what
         // the model read, for whom, and with what outcome. A refusal is a
-        // result and closes as executed; only a failure closes as failed.
-        const record = await createTrackedToolCall(ctx, "work_portfolio_read", { view }, false);
-        const result = await readWorkPortfolioForTool(ctx, deps, view);
-        await updateToolCallStatus(
-          ctx.db,
-          record.id,
-          result.status === "failed" ? "failed" : "executed",
-          result as unknown as Record<string, unknown>
+        // result and closes as executed; a failure, thrown or returned, closes
+        // as failed and stays a result.
+        return JSON.stringify(
+          await runAuditedTool(ctx, "work_portfolio_read", { view }, () => readWorkPortfolioForTool(ctx, deps, view))
         );
-        return JSON.stringify(result);
       },
       {
         name: "work_portfolio_read",
