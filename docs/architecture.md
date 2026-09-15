@@ -31,7 +31,7 @@
 | Intérprete semántico de admisión (R1) | `RELATIONSHIP_ADMISSION_MODEL_ID` | `openai/gpt-5.4-mini` |
 | Juez de continuidad duplicado/supersesión (R1) | `RELATIONSHIP_CONTINUITY_MODEL_ID` | `openai/gpt-5.4-mini` |
 | Supervisor de Caso — juicio de siguiente trabajo (R1) | `RELATIONSHIP_SUPERVISOR_MODEL_ID` | `openai/gpt-5.4-mini` |
-| Work Portfolio — orden contextual de Needs Attention (R1 SL-12) | `RELATIONSHIP_PORTFOLIO_RANKING_MODEL_ID` | `openai/gpt-5.4-mini` |
+| Work Portfolio — orden contextual de Needs Attention (R1 SL-12) | `RELATIONSHIP_PORTFOLIO_RANKING_MODEL_ID` | `openai/gpt-5.4-mini`, con esfuerzo de razonamiento bajo (en `ranking/judge.ts`) |
 | Vision / fotos | `IMAGE_VISION_MODEL_ID` | `openai/gpt-4.1-mini` |
 | Copy de listing | `LISTING_COPY_MODEL_ID` | `openai/gpt-4.1-mini` |
 
