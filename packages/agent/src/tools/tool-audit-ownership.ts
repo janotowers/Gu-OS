@@ -12,16 +12,17 @@
  * requiere confirmación puede depender de esta lista: una tool de riesgo bajo se
  * autoejecuta sin pasar por ahí y debe escribir su propia fila.
  *
- * R1 Cycle 3 order 4 (Slice Plan v1.31 §6): las once tools de confirmación de
- * abajo no escriben fila propia y faltaban aquí, así que al autoejecutarse no
- * quedaba registro. get_user_preferences y list_enabled_tools son de riesgo
- * bajo: el grafo nunca llega a su escritura, y quedan registradas para una
- * decisión, no reparadas. tool-audit-ownership.selftest.ts sostiene ambas
- * reglas contra el código de cada handler.
+ * Una invocación lógica = una fila (Slice Plan §8 Q8): cuando una persona
+ * aprobó la llamada, la tool que escribe su propia fila toma la fila de
+ * confirmación del grafo en vez de crear otra (tool-call-audit.ts).
+ *
+ * R1 Cycle 3 order 4 (Slice Plan v1.32 §6) añadió las once tools de
+ * confirmación de abajo, que no escriben fila propia. Order 5 (§8 Q7) sacó de
+ * aquí get_user_preferences y list_enabled_tools: son de riesgo bajo y ahora se
+ * auditan solas, como las demás. tool-audit-ownership.selftest.ts sostiene
+ * estas reglas contra el código de cada handler.
  */
 const TOOLS_WITHOUT_INTERNAL_AUDIT = new Set([
-  "get_user_preferences",
-  "list_enabled_tools",
   // Confirmation-path tools whose handlers write no row (order 4).
   "archive_user_memory",
   "delete_user_memory",
