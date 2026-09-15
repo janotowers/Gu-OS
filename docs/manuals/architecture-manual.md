@@ -1040,6 +1040,17 @@ Item que espera a una persona y decidir una aprobación (`case_approval.decide`,
 `owner` / `org_admin`); más la presentación personal en `portfolio_presentation_state`.
 No invoca admisión, resolución ni el supervisor.
 
+**Desde SL-12, el orden de Needs Attention puede ser juicio de modelo, pero el piso sigue en
+código.** Con el flag de Organización `portfolio_contextual_ranking` (apagado por defecto),
+una llamada acotada de modelo —solo sobre el snapshot autorizado, con alias en lugar de
+ids— ordena Needs Attention y puede admitir situaciones *contextuales*: discrecionales, sin
+obligación, sujetas a posponer/ocultar y mostradas solo con claims que citan filas del propio
+Caso. Después del modelo, el código re-aplica el piso *must-surface* (presencia, no rango);
+nada se persiste, y ante cualquier falla rige el orden determinista de SL-7. El chat web lee
+la misma proyección con una tool de solo lectura (`work_portfolio_read`), bajo la sesión del
+propio usuario y con la Organización resuelta de sus membresías, nunca de un argumento del
+modelo.
+
 ---
 
 ## 14. Brain Layer futura
@@ -1234,6 +1245,7 @@ El agente no debe mezclar usuarios, organizaciones ni permisos. Hay tres mecanis
 | Autorizacion de negocio | RLS es el piso, no la autorizacion completa, y hay **tres caminos** (ver §3): (1) mutacion de negocio desde ruta de servidor → `authorizeOrgAction`, recibe actor, revalida membresia + rol en el momento, vocabulario cerrado y fail-closed; (2) bootstrap/aprovisionamiento/backfill → caminos `service_role` acotados a su proposito; (3) mutacion explicita del ciclo de vida (`setMembershipStatus`) → primitiva privilegiada **sin actor que no autoriza**: `service_role` da el camino de ejecucion, no la autoridad de negocio, que debe traer ya el llamador. Una membresia `inactive` no otorga nada |
 | Autoridad de runtime | `operational_cases.runtime_authority` es *nullable* y sin default: solo se mueve por una operacion gobernada autorizada |
 | Lectura de Traditional Gu | Solo lectura, por capacidad, con allowlist de colecciones en codigo y chequeo de binding por Organizacion en cada lectura. Ninguna ruta a escritura |
+| Work Portfolio desde el chat (R1 SL-12) | `work_portfolio_read`: solo lectura, con el JWT del propio usuario (`actorDb`), nunca `service_role`; Organizacion resuelta de membresias activas (0 o 2+ fallan cerrado); sin sesion web, se niega |
 | Integraciones OAuth | Tokens por usuario en `user_integrations`, cifrados |
 | MCP (diferido) | Transporte externo, no 4ª pestaña: conectar bajo Conexiones; tools solo vía catálogo governado tras allowlist (finding 27 / Technical Plan §28.14). Cerrado hasta sandboxing + necesidad real. |
 | BigQuery usuario regular | Debe filtrar por `organization_id` |
