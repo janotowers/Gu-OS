@@ -653,7 +653,7 @@ Auditoria:
 
 - `tool_calls` registra argumentos, resultado, status, turn_id y `executor_kind`.
 - Quien escribe la fila: la propia tool, dentro de su handler; o el grafo, solo en el camino de confirmacion (riesgo medio/alto). Al pedir aprobacion la escribe siempre. Al autoejecutar, solo para las tools listadas en `tool-audit-ownership.ts`. Una tool de riesgo bajo se autoejecuta sin fila del grafo, asi que escribe la suya; `tool-audit-ownership.selftest.ts` sostiene esa regla contra cada handler (R1 Cycle 3 order 4).
-- Excepciones registradas, pendientes de decision (Slice Plan R1 §8): `get_user_preferences` y `list_enabled_tools` no dejan fila. Las tools que escriben su propia fila y ademas requieren confirmacion dejan dos cuando una persona las aprueba: la del grafo y la suya.
+- Excepciones registradas, pendientes de decision (Slice Plan R1 §8): `get_user_preferences` y `list_enabled_tools` no dejan fila. Las tools que escriben su propia fila y ademas requieren confirmacion dejan dos cuando una persona las aprueba: la del grafo y la suya. Y la unica politica RLS de `tool_calls` (`for all`, desde `00001`) deja a cada usuario leer, pero tambien insertar, editar o borrar, las filas de sus propias sesiones (Q9).
 - `executor_kind='agent'`: la llamo el LLM.
 - `executor_kind='deterministic'`: la llamo el sistema (por ejemplo, Heartbeat prefetcher).
 
