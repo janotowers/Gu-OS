@@ -1,12 +1,12 @@
 # Integrated R1 Relationship Operations — Slice Plan
 
-> **Version:** v1.35  
-> **Status:** Approved — governing R1 Slice Plan. **SL-0, SL-1, SL-2, SL-3, SL-4 and SL-7 are Done** (§6; SL-1 was reopened once after Done and re-closed; SL-4's Done record took effect on the merge of v1.24, and **SL-7's takes effect on the merge of v1.27 after human review**). SL-7 ran in **Cycle 3 (2026-09-14 → 2026-09-20)** with **Alejandro Torres Padilla** as the confirmed Accountable / DRI (§5). **SL-12's Done record is v1.31** (§6). It was **accepted by the Accountable on 2026-09-15** and takes effect on this version's merge. SL-12 was elaborated and Planned on 2026-09-14, and ran in Cycle 3 with the same Accountable / DRI. Its RS-2 run created **one synthetic evidence Case, which is not a real business Case** (§6). With SL-12 Done, **the READY Horizon is empty**: SL-5, SL-6, SL-8…SL-11 and SL-13 remain rolling-wave stubs, NOT READY, and replenishment was re-tested without result (§1). Current Execution Cycle and Accountable / DRI planning facts are recorded in §5; **execution stage is not owned by this artifact** (Methodology §19.1–§19.2). SL-4 closed carrying one **open carry-forward finding that must be dispositioned before R1 graduation** and that outlives its closure (§4, §6). SL-7's run surfaced a separate, **pre-existing defect in SL-4's delivered supervisor** — a human's answer never reached its context. It was repaired as Cycle 3 order 2 and is **closed**, its eval bars ratified by the Accountable on 2026-09-14 (§5, §6). A **model-variance finding** about SL-4's own eval evidence is recorded alongside it, with the bar unchanged (§4). SL-12's run surfaced another **pre-existing defect**, this one in SL-1's delivered legacy read tools: they write no `tool_calls` audit row. It is classified and dispositioned in §6, and its repair is **Cycle 3 order 4, confirmed by the Accountable on 2026-09-15** (§5). **Order 4 closed with v1.32** (§6). Its sweep recorded two cases for decision (§8 Q7, Q8), and its security review a third (§8 Q9). **The Accountable resolved all three on 2026-09-15**. Their implementation is **Cycle 3 order 5**, which closes with v1.34 (§6). The same decision recorded a **governed security/product question** about chat transcripts after a membership is revoked (§8 Q6)  
+> **Version:** v1.36  
+> **Status:** Approved — governing R1 Slice Plan. **SL-0, SL-1, SL-2, SL-3, SL-4 and SL-7 are Done** (§6; SL-1 was reopened once after Done and re-closed; SL-4's Done record took effect on the merge of v1.24, and **SL-7's takes effect on the merge of v1.27 after human review**). SL-7 ran in **Cycle 3 (2026-09-14 → 2026-09-20)** with **Alejandro Torres Padilla** as the confirmed Accountable / DRI (§5). **SL-12's Done record is v1.31** (§6). It was **accepted by the Accountable on 2026-09-15** and takes effect on this version's merge. SL-12 was elaborated and Planned on 2026-09-14, and ran in Cycle 3 with the same Accountable / DRI. Its RS-2 run created **one synthetic evidence Case, which is not a real business Case** (§6). With SL-12 Done, the READY Horizon was empty. SL-5, SL-6, SL-8…SL-11 and SL-13 remain rolling-wave stubs, NOT READY, and replenishment was re-tested without result (§1). **SL-14 — Recovery of technically blocked Work (shadow)** is now the READY Horizon. The Accountable created it on 2026-09-15 to close SL-4's carry-forward finding (option 2), and it was elaborated to **READY** in v1.36. It is **not Planned**: its Cycle proposal waits in §5. Current Execution Cycle and Accountable / DRI planning facts are recorded in §5; **execution stage is not owned by this artifact** (Methodology §19.1–§19.2). SL-4 closed carrying one **open carry-forward finding that must be dispositioned before R1 graduation** and that outlives its closure (§4, §6). SL-7's run surfaced a separate, **pre-existing defect in SL-4's delivered supervisor** — a human's answer never reached its context. It was repaired as Cycle 3 order 2 and is **closed**, its eval bars ratified by the Accountable on 2026-09-14 (§5, §6). A **model-variance finding** about SL-4's own eval evidence is recorded alongside it, with the bar unchanged (§4). SL-12's run surfaced another **pre-existing defect**, this one in SL-1's delivered legacy read tools: they write no `tool_calls` audit row. It is classified and dispositioned in §6, and its repair is **Cycle 3 order 4, confirmed by the Accountable on 2026-09-15** (§5). **Order 4 closed with v1.32** (§6). Its sweep recorded two cases for decision (§8 Q7, Q8), and its security review a third (§8 Q9). **The Accountable resolved all three on 2026-09-15**. Their implementation is **Cycle 3 order 5**, which closes with v1.34 (§6). The same decision recorded a **governed security/product question** about chat transcripts after a membership is revoked (§8 Q6)  
 > **Owner:** engineering owner (R1)  
 > **Roadmap Increment:** R1 — Relationship Operations v1 — framing record: [`framing-decision-record.md`](framing-decision-record.md)  
 > **Governing Specs:** S1 [`lead-opportunity-lifecycle.md`](../../operating-domains/relationship-operations/specs/lead-opportunity-lifecycle.md) · S2 [`situational-progression-next-work-human-authority.md`](../../operating-domains/relationship-operations/specs/situational-progression-next-work-human-authority.md) · S3 [`visit-progression-outcome-evidence-reconciliation.md`](../../operating-domains/relationship-operations/specs/visit-progression-outcome-evidence-reconciliation.md) · S4 [`work-portfolio-supervisory-experience.md`](../../operating-domains/relationship-operations/specs/work-portfolio-supervisory-experience.md)  
 > **Architecture / ADRs:** [`architecture-analysis.md`](architecture-analysis.md) (AC-1…AC-10) · [ADR-106](../../../adr/ADR-106-organization-native-multiseat-tenancy.md) · [ADR-107](../../../adr/ADR-107-runtime-conversation-authority.md) · [ADR-108](../../../adr/ADR-108-versioned-organization-policy.md) · [ADR-109](../../../adr/ADR-109-generic-case-relationships-lineage.md) · [ADR-110](../../../adr/ADR-110-resource-usage-cost-attribution.md)  
-> **Technical Plan:** [`technical-plan.md`](technical-plan.md) (v1.16)  
+> **Technical Plan:** [`technical-plan.md`](technical-plan.md) (v1.18)  
 > **Supporting sources:** [`legacy-source-audit.md`](legacy-source-audit.md) · [`r1-concept-shared-kernel-mapping.md`](r1-concept-shared-kernel-mapping.md) · [`sl1-legacy-read-credentials.md`](sl1-legacy-read-credentials.md) (SA-1.5 credential scopes) · [`sl1-hosted-evidence.md`](sl1-hosted-evidence.md) (SA-1.2 / SA-1.3 hosted run)  
 > **Development method:** [`agentic-product-software-development-methodology.md`](../../../development/agentic-product-software-development-methodology.md) v0.4.6  
 > **Artifact role:** Owns the **durable Slice contracts** for R1 and their order. It does **not** own intended behavior (the four approved Specs do), consequential architecture (the Architecture Analysis and ADR-106…110 do), approved technical realization and sequencing (the Technical Plan does), just-in-time implementation Tasks and pre-PR execution context (the agent runtime does), or recorded execution state — branch, commits, PR, CI, merge, Actions, environment approvals (GitHub does).
@@ -33,7 +33,13 @@ The **READY Horizon** is the amount of genuinely READY work maintained ahead of 
 - **Maintaining the horizon never lowers the Definition of Ready** (Methodology §10.2). A Slice is not labelled READY to fill the horizon.
 - **READY ≠ PLANNED ≠ EXECUTABLE.** Readiness makes a Slice eligible for Cycle planning; planning confirms Cycle inclusion and a human Accountable / DRI; executability additionally requires prerequisites actually satisfied and capacity available (Methodology §10.2, §12.1).
 
-**Current READY Horizon: empty** *(as of v1.31, effective on its merge)*. **SL-12 leaves the horizon with its Done record** (§6), as SL-3 did on 2026-09-07, SL-4 with v1.24 and SL-7 with v1.27. It had entered the horizon on 2026-09-14. SL-0, SL-1, SL-2, SL-3, SL-4, SL-7 and SL-12 are then Done, and SL-5, SL-6, SL-8…SL-11 and SL-13 remain NOT READY stubs. **The horizon is measured in capacity, not Slice count** (Methodology §10.5), and it now holds none.
+**Current READY Horizon: SL-14** *(as of v1.36)*.
+
+- **How SL-14 entered.** It entered the horizon by a route other than replenishment. The Accountable's disposition of SL-4's carry-forward finding (option 2, 2026-09-15) created it inside already-approved R1 intent, and it was elaborated to READY the same day (§4, §9). It is **not Planned**, and its Cycle proposal in §5 waits on the human.
+- **Its capacity.** Its one frozen range is `2–3 days` / **Low**, which is below the one-to-two-Cycle operating default.
+- **Every other candidate stays blocked.** SL-14 depends on nothing the candidates below depend on, so every verdict in the table stands: they remain blocked on C1, C2 or C6, or on unbuilt Slices.
+
+*The v1.31 state, preserved as it was recorded:* the horizon was empty. **SL-12 leaves the horizon with its Done record** (§6), as SL-3 did on 2026-09-07, SL-4 with v1.24 and SL-7 with v1.27. It had entered the horizon on 2026-09-14. SL-0, SL-1, SL-2, SL-3, SL-4, SL-7 and SL-12 are then Done, and SL-5, SL-6, SL-8…SL-11 and SL-13 remain NOT READY stubs. **The horizon is measured in capacity, not Slice count** (Methodology §10.5), and it now holds none.
 
 **Replenishment re-tested on 2026-09-15, without result — case D of the continuity loop** (Methodology §12.3, §10.5). SL-12's closure changes no dependency fact among the candidates, because nothing depended on SL-12. Every verdict in the table below stands, so **no candidate can be made READY by readiness work**:
 
@@ -104,6 +110,7 @@ Order, dependencies and Release Scope at a glance. Detail lives in §4; technica
 | SL-11 | Authority transfer (selective live) `[L:C2 enforcing]` | behavior | SL-6, SL-9, SL-10 | Each pilot Opportunity is answered by exactly one runtime, and human takeover suppresses Gu while the Case continues | TBD at elaboration | NOT READY — stub |
 | SL-12 | Portfolio v2 (contextual ranking) | behavior | SL-7 ✓ (SL-8 enriches; not a prerequisite — §4) | Needs Attention is ordered by the need for human intervention, with discretionary situations brought forward and every claim grounded in authorized evidence; must-surface work is never suppressed; the same projection is readable from web chat | RS-2 (achieved) | N/A — Done, effective on the merge of v1.31 (accepted 2026-09-15); see §6 |
 | SL-13 | Economics v1 | behavior | SL-9 | The send path emits keyed usage that rolls up to a proven identity, and late valuations land without rewriting history | TBD at elaboration | NOT READY — stub |
+| SL-14 | Recovery of technically blocked Work (shadow) | behavior | SL-4 ✓ | When Work the Supervisor proposed fails technically, the next reconsideration sees why and how often it failed, and chooses retry, replan, reconcile, wait, human input or stop as the situation warrants. Any recovery reuses the Work Plane and gains no authority, and SL-4's carry-forward finding closes | **RS-2** | **READY** — created by the Accountable's decision of 2026-09-15 on SL-4's carry-forward finding (option 2); elaborated and evaluated 2026-09-15 (§4, §9); estimate frozen. **Not Planned**: the Cycle proposal in §5 is not confirmed |
 
 `[L:Cn]` = needs cross-repo contract Cn live (Technical Plan §4). **SL-2 carries no `[L:Cn]` marker.** An earlier reading of Technical Plan §4 recorded C5 as an SL-2 dependency; a targeted revalidation against current legacy source on 2026-09-05 established that **C5's legacy processing/routing enablement and its hosted-evidence environment concerns are not SL-2 readiness dependencies**, and the owning Technical Plan was repaired accordingly in **v1.6** (§4 and Appendix C there). SL-2's dependency set is the one Technical Plan §9 always stated: SL-0 and SL-1. Readiness is a property of the Slice (Methodology §10.2), and its only values are **READY** and **NOT READY**; **readiness assigns no Accountable / DRI, Execution Cycle or planning status** — those are human planning facts, recorded in §5 when confirmed and only cited here. **Done Slices are not evaluated for readiness at all** — SL-0 and now SL-1 are completed history, and **Done is a completion concept, never a third readiness value.**
 
@@ -558,6 +565,8 @@ The human Accountable accepts this as a **known limitation of SL-4**, not as evi
 
 **The finding survives this Slice's closure.** When SL-4 reaches Done, its Done record carries it among the material limitations and the things intentionally not demonstrated, so that **`SL-4 Done` can never be read as proof that technically blocked Work recovery was solved.**
 
+**Dispositioned — 2026-09-15, by the Accountable: option 2.** A new bounded Slice inside already-approved R1 intent closes the finding: **SL-14 — Recovery of technically blocked Work (shadow)** (§4). In the Accountable's words: *"confirmo la opción 2: crea un nuevo bounded Slice dentro de la intención ya aprobada de R1 para cerrar ese finding."* The decision also set SL-14's boundaries, which its contract quotes. Until SL-14 is Done, the finding stays open, and R1's graduation still waits on it. The text above is preserved as written.
+
 **Post-Done, 2026-09-14 — a separate, pre-existing defect in this Slice's delivered supervisor.** SL-7 built the first path for a human to answer an Organization Case's ask, which exposed that the supervisor's context compile never passes the judge what a human answered. The full classification and disposition are in SL-7's Done record (§6): a §15.2 case-B implementation defect, repaired as a proportional bug item owned by this Slice's Accountable and scheduled in Cycle 3 (§5). **It does not reopen SL-4** — none of SA-4.1…SA-4.12 covers consuming a human answer — and it does not touch `work-failed-technically` above, which stays as recorded. **The repair closed on 2026-09-14** (§6).
 
 **Model-variance finding, 2026-09-14 — recorded on the Accountable's decision, the bar unchanged.** The repair's same-day baseline ran this Slice's own prompt and 16 scenarios (`af663e5`, `openai/gpt-5.4-mini`). It breached SL-4's zero-fabrication bar in 2 of 5 runs, where the final ten runs of §6's evidence had held it in all ten.
@@ -904,6 +913,224 @@ The hosted run exercises the reviewed application, executed by the operator proc
 
 ---
 
+### SL-14 — Recovery of technically blocked Work (shadow)
+
+**Created 2026-09-15 by the Accountable's decision on SL-4's carry-forward finding, and elaborated the same day.**
+
+SL-4 closed carrying `work-failed-technically` as an accepted limitation (§4, SL-4): its Supervisor did not recover technically blocked Work. The finding must be dispositioned before R1 graduation, by exactly one of three options. On 2026-09-15 the Accountable chose **option 2**: *"confirmo la opción 2: crea un nuevo bounded Slice dentro de la intención ya aprobada de R1 para cerrar ese finding."* The decision also set the boundaries quoted below.
+
+Everything else here is derived from the governing sources; nothing is invented.
+
+- **This Slice is READY** — see *Readiness* and §9.
+- **It is not Planned.** The decision was explicitly not an admission to any Cycle, and the planning proposal in §5 waits on the human.
+
+- **Type:** behavior
+- **Stage:** **shadow.** SL-14 is numbered after SL-11 only because it was created later. The stages are business and authority gates, not a numbering (Technical Plan §5; §1 here), and the §2 shadow-stage constraint applies to it in full.
+- **Inspectable outcome / value:** Consider Work the Case Supervisor proposed that has **technically failed**: the Work Plane used up its attempts and blocked it. At its next reconsideration, the Supervisor **sees why and how often the Work failed**. It then **chooses situationally** what the responsibility needs:
+  - retry the same Work, through the Work Plane's own recovery transition;
+  - replan with other allowed Work;
+  - reconcile;
+  - wait, with a re-entry path;
+  - ask a person;
+  - or stop, with a recorded reason.
+
+  A technical failure is never read as a commercial signal, never retried by reflex, and never left silently stranded. A recovery reuses the existing Work Plane and gains no authority and no capability. Shadow throughout: no prospect-facing effect is reachable.
+- **Governing behavior / traceability:**
+  - **SL-4's carry-forward finding `work-failed-technically`** (§4, SL-4; its Done record, §6). In SL-4's final measurement, the Supervisor chose `no_op` in 10 of 10 runs for a technically blocked inventory search, which is outside that scenario's acceptable postures. SL-4 did not demonstrate recovery, retry, replanning or reconciliation of technically blocked Work.
+  - **S2** [`situational-progression-next-work-human-authority.md`](../../operating-domains/relationship-operations/specs/situational-progression-next-work-human-authority.md):
+    - §8.18 — execution is not the end of reasoning. After work is attempted, Gu determines what happened, and keeps a **technical execution failure** distinct from commercial results. The result *"may justify"* continuing, branching, adding work, stopping obsolete work, waiting, reconciliation, targeted human contribution, or S1 reconsideration;
+    - §8.17 — *"No material information gain → change strategy, don't loop."* S2 prescribes no fixed product limit, and *"technical safety limits may exist independently"*;
+    - §8.19 — waiting must not become forgotten responsibility, and *"completion/failure of pending Work"* is a re-entry path;
+    - §8.21 — the Supervisor coordinates, while the Work Item and Attempt hold durable execution. A reconsideration must not yield while durable responsibility is stranded;
+    - **EC-15** — *"Material Work technically fails → Retry/replan/reconcile according to contract"*, never *"Convert system failure into business `lost`"*;
+    - **AC-28** — Work that must wait, retry or involve a human uses Work Item durability. Its evidence type is integration;
+    - **AC-48 / EC-33** — Work that succeeds technically and discovers something commercially negative is not a technical failure;
+    - §15 — the rationale rubric for next-work choice.
+  - **Architecture AC-8:**
+    - §13.3 — a durable Work Item exists, among other things, for *"retries/recovery"*;
+    - §13.4 — *"dynamic work may adapt execution, not invent authority"*. The Supervisor may branch, loop, wait or replan only within allowed capabilities, platform bounds, policy and human authority.
+  - **Technical Plan TD-8:**
+    - the per-wake compile of *"open, blocked and recently settled work"*;
+    - postures, and `agent_proposed` Work bounded by allowed capabilities;
+    - quiescence with a reconstructible re-entry path;
+    - the **shared Work Plane** the Technical Plan records as implemented and reusable: bounded attempts, `blocked` with a reason, and the blocked→ready transition.
+  - **Deferred, and therefore out of scope:**
+    - bringing a reconsideration forward when Work blocks. Nothing runs the Supervisor in R1, so this belongs with the change that first wires it to a runtime, as TD-8 records for S2 HP-08's timing;
+    - retiring a Work Item, for which the Work Plane has no transition today;
+    - external effects and unknown-outcome reconciliation (SL-9);
+    - a Relationship-specific retry engine, which SL-4's disposition and the decision both forbid.
+- **Boundaries set by the decision** — the Accountable, 2026-09-15, in their words:
+  - *"reutilizar el Work Plane existente; no crear un Relationship-specific retry engine;"*
+  - *"hacer visible al Case Supervisor la evidencia relevante del Work técnicamente bloqueado, incluyendo la causa y los intentos necesarios para juzgar la situación;"*
+  - *"tratar el fallo de Work como señal para reconsiderar, no como orden determinística de retry;"*
+  - *"permitir que el Supervisor elija situacionalmente entre retry/replan/reconcile/wait/human input/stop según S2 y las capacidades disponibles;"*
+  - *"no ampliar autoridad ni capacidades;"*
+  - *"demostrar que una recuperación usa los mecanismos existentes del Work Plane;"*
+  - *"incluir evaluación explícita del comportamiento model-mediated, con sus bars propuestos y congelados antes de implementación conforme a la Methodology."*
+- **What the code does today** — established on 2026-09-15; this is the elaboration's factual baseline.
+  - **The Work Plane already recovers from transient failure.** It retries a failed attempt up to `max_attempts` (default 3), with optional backoff, and records each failure in an `attempt_failed` event. When the attempts run out, it sets the item `blocked` with `blocked_reason = max_attempts_exhausted`.
+  - **`retryBlockedItem` exists.** It re-readies a blocked item, keeping its attempt history and widening the window by one — but today only an operator calls it.
+  - **The judge cannot see why Work failed.** The compile passes the judge each Work Item as `type — status (origin)`, with no blocked reason, no attempts and no failure.
+  - **The prompt was not enough.** It already calls blocked or failed Work *"unfinished responsibility"* that is usually worth resolving — a line added during SL-4's eval on 2026-09-08 — and the judge still chose `no_op` 10 of 10 times.
+  - **A retry is structurally impossible today.** The executor's deterministic duplicate guard counts a `blocked` item as in flight, so proposing the same Work again is refused, whatever the judge decides.
+  - **Nothing retires a Work Item.** The Work Plane's only `cancelled` transition is for an attempt whose claim was lost.
+- **Dependencies:**
+  - **SL-4 — satisfied** (Done, §6). It provides the Supervisor, its compile, postures, `agent_proposed` Work, the safe-yield gate and the eval set this Slice extends. Case A.
+  - **The shared Work Plane — satisfied.** It is implemented, and TD-8 builds on it: attempts, blocked reasons, events and the blocked→ready transition. Case A.
+  - **The Cycle 3 supervisor repair — satisfied** (closed 2026-09-14, §6). It provides the compile's structure for settled Work.
+  - **Not dependent** on:
+    - SL-5 — waking on failure is excluded;
+    - SL-6;
+    - SL-7 or SL-12 — the Portfolio already never presents technically blocked Work as blocked on a human;
+    - SL-8 to SL-11, or SL-13.
+
+    **No `[L:Cn]` contract gates it.**
+- **Release Scope:** **RS-2 hosted**, derived:
+  - Methodology §14.2 names shadow behavior as typical RS-2;
+  - SL-4, whose Supervisor this Slice extends, declared RS-2;
+  - S2 AC-28 types its evidence as integration.
+
+  **Why not RS-1:** the eval measures the judgment and the deterministic suite the guarantees. Neither shows a recovery executed through the Work Plane on hosted persistence — its versioned transitions, events and attempt history — nor the judge's call correlated in hosted usage.
+
+  The topology is SL-4's: the reviewed code, executed by the operator process against staging, with the model called from that process. No user session is involved. This is not a claim that a Gu OS runtime is deployed in staging.
+- **Estimate:** `2–3 days` elapsed agent-assisted engineering time to evidence-ready — **frozen at READY, 2026-09-15** (Methodology §10.4).
+- **Estimate confidence:** **Low.** The central behavior is model-mediated, and every recent model-mediated eval in R1 breached its bars on its first run: SL-4, the Cycle 3 repair and SL-12. The deterministic work is small and located:
+  - one compile line;
+  - one judge output field;
+  - one executor path over an existing Work Plane transition;
+  - an extension of the verifier's existing seed, wake and verify phases.
+
+  The six-Slice calibration shows engineering estimates biased high. That calibrates bias; it is not a multiplier, and it does not raise confidence where the uncertainty is eval convergence.
+
+**Material risk**
+
+| Dimension | Assessment |
+|---|---|
+| Reflexive retry | The failure the decision forbids: a failure treated as an order to retry. A retry loop burns attempts and cost with no information gain (S2 §8.17). Nothing re-readies Work automatically. A retry is a Supervisor decision, bounded so that a repeated failure forces a change of strategy. The eval's `blind_retry_bar` is zero |
+| Stranded responsibility | The failure SL-4 showed: `no_op` over technically blocked Work while the need still stands. S2 §8.21 forbids yielding with stranded responsibility. The eval's `stranded_failure_bar` is zero |
+| A technical failure read as commercial | S2 EC-15: a system failure must never become business `lost`. SL-4's rubric already checks it, and it stays a failure-rate criterion |
+| Authority / capability widening | AC-8 §13.4. A recovery acts only on the Case's own `agent_proposed` Work, re-attempting a capability that is still available; a replan uses the existing proposal path, within available capabilities. `human`, template and repair Work are never touched, and no effect capability exists in shadow. Asserted deterministically |
+| Duplicate Work | The duplicate guard stays. A retry re-readies the same item, never a copy |
+| Untrusted failure content | Error payloads can carry provider text. The compile passes a bounded summary framed as data — reason, attempts, a short error class and message — never a raw payload or a secret |
+| Cost | A retry spends Work attempts; the Supervisor's own call stays one per reconsideration. The bound on Supervisor-granted retries is an ordinary engineering value (Methodology §14.1), set and tested inside the Slice |
+| Model variance | Measure in repeated independent batches, with a same-day baseline whenever the prompt changes and a holdout frozen before implementation — the Cycle 3 and SL-12 lessons |
+| Replay | The decision, and the Work Plane transition it caused, are reconstructable from durable state: the reconsideration record, and the Work Item's `ready` event attributed to the Supervisor |
+| Tenancy | Reads and writes stay within one Organization's Case. A Work Item of another Case or Organization cannot be re-readied |
+| Rollback / flags | `relationship_ops`; flags off ⇒ inert. No migration is expected |
+
+**Deterministic invariants vs model judgment** (Methodology §13)
+
+| Class | Belongs to | Content |
+|---|---|---|
+| **Deterministic guarantees** | code, tests | The judge sees each blocked or failed item's cause and attempts. Nothing retries without a Supervisor decision. A retry goes through the Work Plane's own transition, on the same item, attributed and bounded. A replan uses the existing proposal path, with the duplicate guard intact. No authority or capability is widened. A stop leaves a recorded reason and a re-entry path. Everything is reconstructable, scoped to one Organization, correlated, and inert with flags off |
+| **Model-mediated judgment** | the judge | Whether retry, replan, reconcile, wait, human input or stop is what the situation needs, given why and how often the Work failed, what is still needed, and what is still available |
+| **Evidence** | deterministic suite + eval + hosted integration | The deterministic suite owns the guarantees, and the eval the judgment against the frozen bars below. The hosted RS-2 run shows a recovery executed through the Work Plane on hosted persistence |
+
+**Slice Acceptance Contract**
+
+| ID | What must be demonstrably true | Governing source | Evidence type |
+|---|---|---|---|
+| SA-14.1 | For each blocked or failed Work Item of the Case, the compile shows the Supervisor **why and how often it failed**: the blocked reason, attempts used and allowed, and a bounded summary of the last failure, framed as data. For a Case with no such Work, the prompt stays byte-identical to today's | S2 §8.18; the decision (visibility); TD-8 | deterministic test |
+| SA-14.2 | **A technical failure is an input to reconsideration, never an automatic retry.** Nothing re-readies blocked Work except a Supervisor decision, and the Work Plane's own bounded attempts are unchanged | the decision; S2 §8.17; AC-8 §13.4 | deterministic test |
+| SA-14.3 | **A retry reuses the Work Plane.** It re-readies the **same** Work Item through the Work Plane's blocked→ready transition, attributed to the Case Supervisor, with its attempt history intact and no duplicate Work Item. It is bounded, so a repeated technical failure cannot be retried again without limit | the decision; S2 EC-15, §8.17; AC-8 §13.3 | deterministic test + hosted verification |
+| SA-14.4 | **A replan uses the existing proposal path**: new `agent_proposed` Work only within the capabilities available to the Case, with the duplicate guard unchanged | S2 §8.18; AC-8 §13.4; TD-8 | deterministic test |
+| SA-14.5 | **No authority or capability is widened.** A recovery acts only on the Case's own `agent_proposed` Work whose capability is still available. It never acts on `human`, template or repair Work, never uses an effect capability, and stays within one Organization | the decision; AC-8 §13.4; ADR-106; SA-4.8 | deterministic test *(slice-local)* |
+| SA-14.6 | **The situational choice meets the S2 rubric**, against the bars below. Given technically blocked Work, the Supervisor chooses among retry, replan, reconcile, wait, targeted human input and a reasoned stop as the situation warrants. It never reads a technical failure as commercial, never retries blindly, and never leaves the responsibility stranded. SL-4's `work-failed-technically` scenario now holds | S2 §8.17–§8.21, EC-15, AC-48, §15; SL-4's finding | eval |
+| SA-14.7 | **Stopping is coherent.** A reconsideration that neither recovers technically blocked Work nor waits for it records why, and leaves a re-entry path, as the safe-yield gate requires | S2 §8.21, §8.19 | deterministic test |
+| SA-14.8 | The recovery decision, and the Work Plane transition it caused, are **reconstructable** from durable state alone | S2 §8.22; SA-4.5 | deterministic test + replay |
+| SA-14.9 | Work that **succeeded** technically but found something commercially negative is **not** a technical failure, and cannot be retried as one | S2 AC-48, EC-33 | deterministic test + eval |
+| SA-14.10 | The Supervisor's call stays **bounded and correlated** to the Organization, as SL-4 established | TD-10 (a); §2 baseline | deterministic test + hosted verification |
+| SA-14.11 | **Hosted, on staging.** A technically blocked Work Item, seeded through the Work Plane's own failure path, is recovered through its blocked→ready transition, with its attempt history intact and nothing else changed. A reconsideration by the production judge over technically blocked Work lands only in existing mechanisms, with its usage correlated | RS-2; the decision (demonstrate) | **hosted verification** |
+
+**SA-14.6 is the only model-mediated assertion**, and every guarantee around it is deterministic.
+
+**Derived clarifications — recorded before any implementation branch.** Each restates what the governing sources already say, where it binds; none is a new decision. Technical Plan v1.18 carries the technical half in TD-8.
+
+- **Failure is a signal, not an order.** S2 §8.18 lists what a result *"may justify"*. Nothing in S2 or AC-8 makes a technical failure trigger a retry by itself, and the decision says so. The Work Plane's own bounded attempts stay the only automatic retry.
+- **Retry means the same Work, through the Work Plane.** AC-8 §13.3 makes the durable Work Item the unit of retries and recovery, and the decision requires reuse. So a Supervisor retry re-readies the blocked item through the existing transition rather than proposing a copy — which the duplicate guard would refuse anyway.
+- **Stop means a recorded decision, not a retirement.** S2 §8.18 lists *"stopping obsolete work"*, but the Work Plane has no transition that retires an item, and the decision forbids new capability. So a stop is a reasoned decision in the reconsideration record, and the item stays blocked and visible.
+- **What counts as a technical failure.** The Work Plane's `max_attempts_exhausted` block is one. This Slice does not re-ready any other blocked reason.
+- **The bound on Supervisor retries is an engineering value** (Methodology §14.1). S2 §8.17 sets the principle — change strategy, don't loop — and says technical limits may exist independently. The number is set and tested inside the Slice; it is not a product threshold.
+
+**Definition of Done (delta over §2)**
+
+- the §2 shared baseline in full, **including the correlation-coverage check**;
+- the **cross-tenant negative suite green**, extended if the recovery path adds a write keyed by Case;
+- deterministic coverage of SA-14.1–SA-14.5 and SA-14.7–SA-14.10, with each test written before the code it guards;
+- **the eval:**
+  - SL-4's scenario set is extended with technically blocked Work scenarios, and a **holdout** is frozen with it, both before implementation;
+  - the bars below are stated before the first run;
+  - it is measured in at least two independent batches of five, on the extended set and on the holdout;
+  - a same-day baseline is held whenever a later change alters the prompt;
+- **the Accountable's ratification of the bars before Done** (Methodology §14.1);
+- **RS-2 hosted evidence**, as specified below;
+- the §2 **implemented-architecture documentation impact** assessment;
+- **SL-4's carry-forward finding recorded as closed**, or, if the evidence does not close it, recorded as still open, with what remains;
+- a Done record stating the environment reached and what the RS-2 run did not prove.
+
+**Eval bars — proposed and frozen by the coding agent on 2026-09-15, at READY, before any implementation branch exists** (Methodology §14.1).
+
+- **Scope:** they apply to this Slice's RS-2 scope only.
+- **Ratification:** it is owed before Done, and may be given with the planning decision, as it was for SL-12.
+- **Changing a bar** after this point is a new governed threshold decision, taking effect prospectively.
+
+The bars:
+
+- **`failure_rate_bar` 0.2** — ordinary semantic accuracy per scenario:
+  - a posture in the scenario's acceptable set;
+  - the recovery action, if any, among its acceptable actions;
+  - a rationale the rubric accepts, including never reading a technical failure as commercial.
+
+  This is the class and value SL-4 and the Cycle 3 repair froze, and the Accountable ratified for those scopes.
+- **`fabricated_work_bar` 0** — inherited unchanged from SL-4: no manufactured work or commitment, and no confident judgment on evidence the scenario marks as too thin.
+- **`reask_bar` 0** — inherited unchanged from the Cycle 3 repair, on answered-ask scenarios.
+- **`blind_retry_bar` 0** — new. It counts a retry of technically blocked Work where the scenario's evidence says a retry cannot help: the same failure recurred after a Supervisor retry, the capability is no longer available, or the need is gone. This is the failure the decision names: a failure treated as an order to retry (S2 §8.17).
+- **`stranded_failure_bar` 0** — new. It counts a reconsideration that leaves technically blocked Work unaddressed while the scenario's need stands: no recovery, no stated wait with a re-entry for it, no ask of a person, and no reasoned stop. This is the failure SL-4's evidence showed (S2 §8.21).
+- **Every run must hold every bar**, over two independent batches of five, on the extended set and on the holdout.
+
+**RS-2 evidence obligations**
+
+The hosted run exercises the reviewed code, executed by the operator process against hosted staging persistence, with the model called from that process. This is SL-4's topology and its verifier (`npm run verify:supervisor`), extended. At minimum the run must show:
+
+1. **A recovery by retry.** A technically blocked `agent_proposed` Work Item is seeded through the Work Plane's own failure path — attempts exhausted, errors recorded — and then recovered by retry through the Work Plane's blocked→ready transition. It must be the same item, attributed to the Supervisor, with its attempt history intact, no duplicate, and claimable again through the Work Plane's ordinary claim. This step demonstrates the mechanism, and may use a deterministic stub decision, recorded as such (`model_id` null).
+2. **A reconsideration by the production judge** over technically blocked Work. Whatever the judge decides must land only in existing mechanisms, and its AI usage must be correlated to the Organization.
+3. **Nothing outside the seeded Case changed**, and flags off ⇒ inert.
+
+- **Prerequisites — each a human boundary:** authorization of the controlled seed in staging. No user session and no migration are expected; if a migration becomes necessary, it goes through `Deliver to staging`.
+- **Boundaries:** no write outside the seeded Case, no authority change, and no retry of Work other than the seed's.
+- **Never to be read as proving:** the judge's choices on the production distribution, which the eval owns; waking the Supervisor on failure; deployment, a hosted URL, production, or scaling.
+
+**Scope, ordering and exclusions**
+
+- **In scope:**
+  - the compile's failure visibility;
+  - the judge's output, extended so it can name a recovery action on a blocked item;
+  - the executor's retry through the existing Work Plane transition, attributed and bounded;
+  - replan, reconcile, wait, human input and stop, through existing mechanisms;
+  - the eval scenarios, the holdout and the bars;
+  - the verifier's seed, wake and verify phases, extended to blocked Work.
+- **Ordering constraints:**
+  1. this record merges before any implementation branch exists;
+  2. the extended scenario set, the holdout and the bars land before the judge they measure is first run with the change;
+  3. the tests for SA-14.2–SA-14.5 and SA-14.7 precede the code they guard;
+  4. the hosted run follows the merge of the reviewed implementation.
+- **Excluded:**
+  - waking the Supervisor when Work blocks, which is runtime wiring;
+  - a cancel or retirement transition for Work Items;
+  - any new capability, effect or authority;
+  - changes to the Work Plane's automatic attempt policy;
+  - a Relationship-specific retry engine;
+  - recovery of `human`, template or repair Work;
+  - unknown-outcome reconciliation of external effects (SL-9).
+
+**Readiness**
+
+- **READY** — determined 2026-09-15. All eight Definition-of-Ready criteria pass; see §9.
+- **Not Planned.** The Accountable's decision explicitly did not admit it to a Cycle. The planning proposal in §5 is **not confirmed**.
+- **Estimate frozen** at `2–3 days` / **Low** on 2026-09-15.
+
+---
+
 ### SL-5, SL-6 and SL-8 … SL-13 — rolling-wave stubs
 
 Deliberately shallow. **SL-7 left this table on 2026-09-09** and carries its full contract above, after its Release Scope question (§8 Q5) was settled by the human Accountable. **SL-12 left it on 2026-09-14**, once SL-7's closure satisfied its hard dependency. Each remaining stub carries only what is needed to prioritize, sequence and reason about dependencies. Detailed acceptance scenarios, edge cases, evidence contracts, estimates and readiness are produced when the Slice is elaborated — inventing them now would manufacture false precision. Content is extracted from Technical Plan v1.4 §9; the "elaborate before READY" column states what is genuinely missing, not a generic placeholder.
@@ -1007,6 +1234,19 @@ A Slice enters this register when the planning facts it records actually exist, 
 Calendar time outside the working windows went mostly to an agent usage-limit interruption overnight, recorded separately in §6 because it is neither engineering nor a decision boundary.
 
 **After SL-12, Cycle 3 holds no Planned Slice and there is no READY Slice to admit** (§1). **Order 4** is the repair of the pre-existing audit gap SL-12 surfaced in SL-1's legacy read tools, under §15.2 case B, following the pattern the Accountable instructed for order 2 on 2026-09-14. The development system proposed it with the closure record, and **the Accountable confirmed it on 2026-09-15** with acceptance of v1.31: its classification, its place in the Cycle, its Accountable / DRI, and a scope that includes the sweep of the other non-exempt tools. It is a repair item, not a Slice, so it widens neither the READY Horizon nor any Slice's scope. It has no prerequisite outside the development system and needs no hosted run (§6), so it is the next executable work.
+
+**SL-14 proposed for Cycle 3 — prepared by the development system on 2026-09-15; NOT confirmed.** Replenishment produced SL-14 by the Accountable's disposition of SL-4's carry-forward finding (v1.36). The Accountable said the decision was not a Cycle admission, and asked for the corresponding planning decision once SL-14 is READY. Methodology §12.1 makes Cycle inclusion and the Accountable / DRI the human's to give, so this is a proposal.
+
+| | |
+|---|---|
+| **Proposed** | **SL-14 — Recovery of technically blocked Work (shadow)** is Planned in Cycle 3 as order 6, for the rest of the window (**to 2026-09-20**) |
+| **Accountable / DRI** | **To be confirmed.** The development system proposes Alejandro Torres Padilla: the Accountable of SL-4, whose finding this Slice closes, and of every Cycle 3 item |
+| **Why it is eligible** | It is READY (§4, §9). SL-4 is Done and the Work Plane is implemented, and no cross-repo contract gates it. It is the only READY Slice, and nothing Planned competes for capacity: Cycle 3's orders 1–5 are closed |
+| **Why now rather than Cycle 4** | Five days remain in the window (2026-09-16 → 2026-09-20), and the frozen estimate is `2–3 days` / Low. The six-Slice calibration shows engineering landing well inside frozen estimates. The hosted run needs one human boundary — the seed authorization — and no user session. The window is workable but not generous: the Low confidence is about eval convergence |
+| **Alternative** | Cycle 4, opening Monday 2026-09-21 under this plan's cadence, if the Accountable prefers to close Cycle 3 as it stands |
+| **Also asked with it, optionally** | Ratification of SL-14's eval bars (§4). It is owed before Done, and may be given now, as it was for SL-12 |
+| **What this proposal does NOT do** | It re-approves no product behavior, architecture, Slice scope or code. It changes no Slice Acceptance assertion, Definition of Done, Release Scope or frozen estimate. It creates no implementation branch: that waits for this version's merge and for the human's confirmation of the Cycle and the Accountable / DRI |
+| **If it cannot close by 2026-09-20** | Explicit re-planning in this register, with working time separated from human wait. The window is not stretched, and neither Release Scope nor evidence is weakened to fit elapsed time |
 
 **Cycle 2 — sequenced plan.** Window **2026-09-05 → 2026-09-13**, confirmed by the human Accountable. This planning decision confirms Cycle inclusion and the Accountable / DRI; it re-approves no product behavior, architecture, Slice scope or code (Methodology §12.1).
 
@@ -1973,6 +2213,7 @@ Against that, the frozen `3–5 days` was **materially conservative — biased h
 | v1.1 | 2026-09-03 | **SL-1 readiness/elaboration pass — SL-1 becomes READY.** First-hand legacy-source revalidation performed with the audit's own §23.1 method against both Traditional Gu repositories as of 2026-09-03 (13 commits / 47 files and 32 commits / 61 files of drift since the 2026-08-31 audit revalidation; both pins still ancestors). **No semantic contract change** was found for any of the four capabilities: the lead and conversation sources are untouched, appointments are untouched, and the property change is confined to the public SEO sitemap path while reaffirming Firestore as the authoritative record. Recorded one new fixture-relevant shape: a property's `user_owner` appears both as a `DocumentReference` and as a text path. Credential dependency **classified case B** with evidence — the credentials do not exist today, but issuance is administered by this team without a third party — resolving Q4. Definition of Done gains the hosted verification capability for a legacy read target, which does not exist in the Supabase-only harness and is therefore built inside the Slice, following the SL-0 `test:rls` precedent. Estimate revised **2–3 → 3–5 days**, confidence Medium, and **frozen at READY**: fixture risk fell because no semantic drift was found, while two net-new capabilities replaced it. RS-2 reconfirmed. Reconciled against **Methodology v0.3.2** after that release corrected the circular case-B rule this very pass exposed. The reconciliation moved the credential boundary on evidence: `organization_tool_secrets` has **zero code references** — table only, no query module, no runtime retrieval, and the `account-tool-secrets.ts` precedent is user-scoped — so seeding its rows cannot be a pre-execution prerequisite without depending on code SL-1 itself builds. The prerequisite now stops at the two external read identities and their secret material being available to the authorized setup path; all Organization-scoped secret handling is in-Slice work. Credential scope was minimized against least privilege: Firestore for the lead, its `wsp_messeges` threads, `users`/`users_sellers`, `properties` and the appointment replica; Mongo **only** for the appointment record, because audit §11.3 proves appointment persistence is not atomic across stores. Mongo `property_data`, `chats`/`messagesv2`, the waProbe arrays, the lead runtime context and BigQuery were all excluded with reasons. Physical names are labelled current provisioning scope, revalidate before issuance — not semantic architecture. **READY means eligible for Cycle planning, not authorized to execute.** No DRI, Execution Cycle, planning status or JIT Task was created. |
 | v1.2 | 2026-09-03 | **First Execution Cycle planning decision.** SL-1 confirmed into **Cycle 1** (**2026-09-03 → 2026-09-10**, ~1 week) with **Alejandro Torres Padilla** as confirmed human Accountable / DRI — the two facts that together constitute `Planned`. Only SL-1 was eligible: it is the sole READY Slice, SL-0 is historical and SL-2…SL-13 are NOT READY stubs. Per Methodology §12.1 the case-B prerequisite is **explicitly sequenced first**, inside the Cycle, as named prerequisite / setup work; under §18 proportionality it is deliberately not a Slice of its own. Provisioning is **pre-execution** work: blocking time on it is recorded as **human / external wait**, and it counts toward neither SL-1's frozen 3–5 day agent-assisted engineering estimate nor its **calendar elapsed**, which §17.1 measures from execution start — a point SL-1 cannot reach until the prerequisite is complete. If provisioning slips far enough to make the Cycle target unrealistic, the Cycle is re-planned **explicitly** rather than the estimate or the Cycle being quietly extended. **SL-1 is Planned but not Executable**: the two external read identities do not exist yet. No JIT Tasks, no implementation, no credentials created. Following §19.2, the register records the Cycle and DRI but never the execution stage. |
 | v1.11 | 2026-09-05 | **Cycle 2 planning decision — human-confirmed.** The human Accountable confirmed **Cycle 2, 2026-09-05 → 2026-09-13**, including **SL-2** and **SL-3**, which are therefore **Planned**; **Alejandro Torres Padilla** is the confirmed **Accountable / DRI** for both, and both frozen estimates carry into the register unchanged (SL-2 `3–5 days` / Low; SL-3 `1–2 days` / Medium). Sequencing is explicit — **SL-2 first, then SL-3** — and **SL-3 remains non-Executable until its bounded SL-2 prerequisite is actually satisfied**: sharing a Cycle sequences a case-B prerequisite, it does not waive one. **SL-4 remains READY and outside Cycle 2.** The **READY Horizon is unchanged at SL-2 + SL-3 + SL-4** (nominal 7–12 days, calibration n=1): Planned Slices are not removed from the horizon, and Cycle 2 draws nominally 4–7 days of it. **Cycle 2 is a deliberate transition window** — Cycle 1's planned window of 2026-09-03 → 2026-09-10 is **not rewritten and was not an error**, but its only Planned Slice reached Done on 2026-09-05, so capacity opened early and the Cycle starts then rather than idling until Monday. **From Cycle 3 the default window is Monday → Sunday** in the team's local calendar — an operating default of this plan, **not a Methodology invariant**. Execution stage is not transcribed here: the register records only Cycle, Accountable, frozen estimate and post-Done actuals, and SL-2's executability is derived from those facts, prerequisite truth and capacity (Methodology §19.1–§19.2). No durable Slice contract, acceptance assertion, Definition of Done, Release Scope, estimate, confidence, READY date or dependency changed; no just-in-time Tasks, implementation, migration, runtime change or external-system mutation occurred. |
+| v1.36 | 2026-09-15 | **SL-14 — Recovery of technically blocked Work (shadow): created by the Accountable's decision, and elaborated to READY; its Cycle admission proposed, not confirmed.** **Decision recorded (2026-09-15, the Accountable):** SL-4's carry-forward finding `work-failed-technically` is dispositioned by **option 2** — a new bounded Slice inside already-approved R1 intent — with the boundaries quoted in §4: reuse the Work Plane with no Relationship-specific retry engine; make the cause and attempts of technically blocked Work visible to the Supervisor; a failure is a signal to reconsider, not an order to retry; a situational choice among retry, replan, reconcile, wait, human input and stop; no widening of authority or capabilities; demonstrate that a recovery uses existing Work Plane mechanisms; explicit eval with bars frozen before implementation. **§4:** the full contract, derived from S2 (§8.17–§8.21, EC-15, AC-28, AC-48, §15), AC-8 (§13.3, §13.4) and TD-8, over the code facts established on 2026-09-15: a retry is structurally impossible today because of the duplicate guard, and the judge never sees why Work failed. It has 11 acceptance assertions, one model-mediated; **Release Scope RS-2** (derived); estimate `2–3 days` / **Low** (frozen); and eval bars frozen at READY — failure 0.2, fabricated work 0, re-ask 0, and two new zero bars, blind retry and stranded failure. SL-4's carry-forward section records the disposition. **§9:** SL-14's Definition-of-Ready evaluation — all eight criteria pass. **§3, §1, header:** SL-14 READY and not Planned; the READY Horizon is SL-14. **§5:** its admission to Cycle 3 as order 6 (to 2026-09-20), or to Cycle 4, is **proposed, not confirmed**, with its Accountable / DRI to be confirmed and bar ratification optionally asked with it. **Technical Plan v1.18** carries the §9 row and the TD-8 technical half. **Header pointer repaired:** v1.31 moved the Technical Plan to v1.17, but this plan's header still named v1.16; it now names v1.18. No other Slice contract, acceptance assertion, bar, Release Scope, estimate or readiness value changes. |
 | v1.35 | 2026-09-15 | **Order 5's migration delivered to staging and verified there — recorded after closure, by the Accountable's authorization of 2026-09-15** (staging only; production not authorized). `Deliver to staging` run `35029684951` delivered `main` @ `b95b83c` and applied exactly `20260915192651_tool_calls_read_own.sql`. The coding agent executed both `staging` environment approvals under that authorization, as in SL-7. The workflow's hosted verification passed 10/10, with forward-era history ending at `20260915192651`. Q9 was then verified in staging, **13/13** (`evidence/tool-calls-rls-staging-2026-09-15.json`, from the new `scripts/verify-tool-calls-rls.ts`): read-only catalog checks, and one rolled-back transaction with synthetic users under the real roles — own-read; cross-user and anon denial; user INSERT refused (`42501`) and UPDATE and DELETE affecting 0 rows; the service role still writing; nothing persisted. **§6:** order 5's closure gains this delivery. **Documentation:** `docs/architecture.md` and the architecture manual now say the migration is applied in staging and not in production. No Slice contract, acceptance assertion, bar, Release Scope, estimate or readiness value is changed. |
 | v1.34 | 2026-09-15 | **Cycle 3 order 5 closed — effective on this version's merge.** It implements the Accountable's decisions of 2026-09-15 (v1.33). **Q8:** one logical tool invocation = one `tool_calls` row. A person's approved confirmation row is taken over by the tool through the graph's invocation scope, and closed exactly once. **Q7:** the two introspection tools self-audit through `runAuditedTool`. **Q9:** forward migration `20260915192651` makes `tool_calls` read-own and written by the service role only. Its six new RLS checks were red in CI under `00001` (run `35014613211`) before the repair. The tests came first and went green unchanged; six mutations are each caught, one of them after a test was added (`bc80b11`). **§6:** the closure — including that the migration is **not delivered** to any hosted environment (`Deliver to staging` is the Accountable's approval), and that no hosted end-to-end confirmation was run. **§8:** Q7–Q9 marked implemented. **§1, §5:** order 5 closed, and Cycle 3 holds no open work. **Documentation:** `docs/architecture.md`'s security section and the architecture manual's *Auditoria*. No Slice contract, acceptance assertion, bar, Release Scope, estimate or readiness value is changed. |
 | v1.33 | 2026-09-15 | **The Accountable's decisions on §8 Q7, Q8 and Q9 recorded, Q9's explanation corrected, and Cycle 3 order 5 scheduled.** **Correction, at the Accountable's request:** v1.32 described Q9 as a `FOR ALL` policy lacking an explicit `WITH CHECK`. The risk is the **write authority** that policy grants each user over their own audit rows — insert, update and delete, not only select. Where no `WITH CHECK` is given, PostgreSQL reuses the applicable `USING` expression. The explanation is corrected in §8 Q9 and §6 and in the architecture manual's *Auditoria*, and the v1.32 wording is not repeated. v1.32 had already merged (PR #64) when the correction was asked for, so it lands here. **§8:** Q7, Q8 and Q9 are **RESOLVED — human decisions of 2026-09-15**, recorded in the Accountable's words: Q7, the two introspection tools self-audit; Q8, one logical invocation = one row, the confirmation row being canonical; Q9, `tool_calls` read-own and not user-writable, with a forward migration and RLS tests. **§5:** **order 5** implements them, decided and scheduled by the Accountable as a bounded audit-semantics and security repair inside Cycle 3 that reopens neither SL-1 nor SL-12. The provenance of each question is preserved. No Slice contract, acceptance assertion, bar, Release Scope, estimate or readiness value is changed. |
@@ -2135,5 +2376,32 @@ The approved sources resolve it without invention. S1 **§8.10** approves `dupli
 **Result: READY.** All eight criteria pass, and the estimate is frozen at this point (Methodology §10.4). **READY is eligibility only.** SL-12 is not Planned, has no Execution Cycle and no confirmed Accountable / DRI, and is not Executable. Its Cycle 3 admission is **proposed** in §5 and waits on the human's confirmation. No just-in-time Tasks exist, and no implementation branch may exist before this record merges. *That is no longer the current fact*: the planning decision of 2026-09-14 supplied Cycle 3 and the confirmed Accountable (§5), effective on the merge of v1.30. This evaluation stays as the dated readiness record and is not re-run.
 
 **What this pass did, and what it deliberately did not.** It classified the stub's SL-8 dependency, and it declared RS-2 by precedent rather than as a new decision. It stated the eval bars before implementation, as SL-4's accepted deviation asks of every later Slice (§6). It carried the Cycle 3 lesson into the Definition of Done: repeated independent batches, and a same-day baseline whenever a prompt changes. It did **not** settle anything S4 or AC-9 leaves open to product: every derived clarification in §4 cites the source that already says it. It did **not** split conversational access into a Slice of its own — the Technical Plan (§9) places it in SL-12, and changing that decomposition would be a planning decision for the human, not an elaboration. It did **not** choose a model: that is engineering inside the Slice, attributed as SL-4 now requires.
+
+---
+
+### SL-14 — Recovery of technically blocked Work (shadow) — evaluated 2026-09-15
+
+| # | Definition-of-Ready criterion (Methodology §10.2) | Result | Basis |
+|---|---|---|---|
+| 1 | Governing behavior / architectural intent sufficiently approved | **Pass** | **S2** (approved) carries the behavior: §8.17–§8.21, EC-15, AC-28, AC-48 and the §15 rubric. **Architecture AC-8** is accepted: §13.3 names durable Work for retries and recovery, and §13.4 says dynamic work adapts execution without inventing authority. **TD-8** and the shared Work Plane are approved and implemented. **The Slice's existence and boundaries** are the Accountable's decision of 2026-09-15 on SL-4's carry-forward finding (§4). Technical Plan **v1.18** derives TD-8's technical half; it decides nothing |
+| 2 | No unresolved consequential product question inside Slice scope | **Pass** | The decision settles what could have been product questions: failure is a signal and not an order; the Supervisor chooses among retry, replan, reconcile, wait, human input and stop; recovery reuses the Work Plane with no new authority or capability. What is left is either a **material eval threshold** (Methodology §14.1), which §4 proposes and freezes with the Accountable ratifying it before Done, or an **engineering value** such as the bound on Supervisor retries, which needs no gate. Retiring a Work Item would have been a question, and it is excluded because no mechanism exists and the decision forbids new capability |
+| 3 | Slice Acceptance Contract stated and testable | **Pass** | SA-14.1 to SA-14.11, each naming a governing source and an evidence type. Exactly one is model-mediated (SA-14.6), and its bars are stated |
+| 4 | The required evidence can be produced — or creating the verification capability is part of the Slice | **Pass** | The deterministic suite and the DB-backed cross-tenant suite exist. SL-4's eval runner and scenario set exist, and this Slice extends them. SL-4's resumable hosted verifier exists (`npm run verify:supervisor`: seed, wake, verify); extending it to seed technically blocked Work is verification capability built inside the Slice, as §10.2 admits |
+| 5 | Release Scope declared | **Pass** | **RS-2 hosted**, derived from Methodology §14.2 (shadow behavior), SL-4's precedent and S2 AC-28's integration evidence. Its minimum evidence and non-claims are in §4. No user session is needed |
+| 6 | Security / tenancy / authority / data / external-effect impact assessed | **Pass** | Eleven-dimension risk table (§4). The one new write re-readies the Case's own `agent_proposed` Work through an existing Work Plane transition, within the authority TD-8 already gives the Supervisor to create that Work (SA-14.5). Failure content reaches the model bounded and framed as data. Tenancy is Case- and Organization-scoped. **External effects: none** — shadow, with no effect capability |
+| 7 | Estimate and estimate confidence recorded | **Pass** | `2–3 days`, **Low**. The driver is named: eval convergence, after three first-run breaches in R1. **Frozen at READY on 2026-09-15** |
+| 8 | Dependencies satisfy the §10.2 rule | **Pass** | **SL-4 satisfied** (Done). **The Work Plane satisfied** (implemented). The Cycle 3 repair is closed. Independent of SL-5 to SL-13, so no `[L:Cn]` cross-repo contract gates it |
+
+**Result: READY.** All eight criteria pass, and the estimate is frozen at this point (Methodology §10.4).
+
+**READY is eligibility only.** SL-14 is not Planned: it has no Execution Cycle, no confirmed Accountable / DRI, and it is not Executable. The Accountable's decision explicitly did not admit it to a Cycle, and the planning proposal in §5 waits on the human. No just-in-time Tasks exist, and no implementation branch may exist before this record merges.
+
+**What this pass did, and what it deliberately did not.**
+
+- **It took the Slice's existence and boundaries from the decision.** It quoted them rather than paraphrasing them.
+- **It established the code facts before deriving anything from them.** A retry is structurally impossible today because of the duplicate guard, and the judge never sees why Work failed. That is what makes the Slice necessary and bounded.
+- **It declared RS-2 by derivation, not by novelty.** It stated the eval bars before implementation, including two new zero bars that restate the decision's two failure directions. It carried the Cycle 3 and SL-12 lessons into the Definition of Done: independent batches, a same-day baseline, and a holdout frozen before implementation.
+- **It did not** add a retirement transition, a new capability or authority, or a runtime wake-up. Each of those is excluded, and each would need its own decision.
+- **It did not** choose a model, or the number that bounds Supervisor retries. Both are engineering inside the Slice.
 
 ---
