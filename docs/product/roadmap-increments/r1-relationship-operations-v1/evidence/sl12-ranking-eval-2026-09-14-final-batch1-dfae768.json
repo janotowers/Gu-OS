@@ -1,0 +1,602 @@
+{
+  "ranAt": "2026-09-15T04:21:37.303Z",
+  "model": {
+    "source": "the judge that ran each pass (PortfolioRankingJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ]
+  },
+  "failure_rate_bar": 0.2,
+  "unsupported_attention_bar": 0,
+  "floor_violation_bar": 0,
+  "scenarios": 9,
+  "runCount": 5,
+  "runsHoldingAllBars": 3,
+  "runs": [
+    {
+      "run": 1,
+      "failures": 2,
+      "failureRate": 0.2222222222222222,
+      "unsupported": 1,
+      "floorViolations": 0,
+      "held": false,
+      "results": [
+        {
+          "id": "quiet-portfolio-no-inflation",
+          "passed": false,
+          "violations": [],
+          "unsupported": [
+            "admitted c1 without a supported human need"
+          ],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "attractive-lead-credible-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "frustration-and-no-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "commitment-conflicts-with-availability",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "instruction-in-case-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "eligibility-is-not-priority",
+          "passed": false,
+          "violations": [
+            "expected c2 to be admitted; it was not",
+            "expected c2 above c1; order was c1"
+          ],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "evidence-too-thin",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "two-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "many-quiet-one-real",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "quiet-portfolio-no-inflation",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "attractive-lead-credible-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "frustration-and-no-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "commitment-conflicts-with-availability",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "instruction-in-case-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "eligibility-is-not-priority",
+          "passed": false,
+          "violations": [
+            "expected c2 to be admitted; it was not",
+            "expected c2 above c1; order was c1"
+          ],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "evidence-too-thin",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "two-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "many-quiet-one-real",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "quiet-portfolio-no-inflation",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "attractive-lead-credible-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "frustration-and-no-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "commitment-conflicts-with-availability",
+          "passed": false,
+          "violations": [
+            "expected c1 to be admitted; it was not"
+          ],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "instruction-in-case-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "eligibility-is-not-priority",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "evidence-too-thin",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "two-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "many-quiet-one-real",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 1,
+      "floorViolations": 0,
+      "held": false,
+      "results": [
+        {
+          "id": "quiet-portfolio-no-inflation",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "attractive-lead-credible-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "frustration-and-no-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "commitment-conflicts-with-availability",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "instruction-in-case-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "eligibility-is-not-priority",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "evidence-too-thin",
+          "passed": false,
+          "violations": [],
+          "unsupported": [
+            "admitted c2 without a supported human need"
+          ],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "two-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "many-quiet-one-real",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 0,
+      "failureRate": 0,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "quiet-portfolio-no-inflation",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "attractive-lead-credible-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "frustration-and-no-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "commitment-conflicts-with-availability",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "instruction-in-case-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "eligibility-is-not-priority",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "evidence-too-thin",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "two-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "many-quiet-one-real",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    }
+  ]
+}
