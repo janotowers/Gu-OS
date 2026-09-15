@@ -39,6 +39,7 @@
     "verify:admission": "tsx scripts/verify-admission.ts",
     "verify:resolution": "tsx scripts/verify-resolution.ts",
     "verify:portfolio": "tsx scripts/verify-portfolio.ts",
+    "verify:tool-calls-rls": "tsx scripts/verify-tool-calls-rls.ts",
     "run:app-against-target": "tsx scripts/run-app-against-target.ts",
     "bootstrap:legacy-credentials": "tsx scripts/bootstrap-legacy-credentials.ts",
     "preflight:schema": "tsx scripts/preflight-schema-state.ts",

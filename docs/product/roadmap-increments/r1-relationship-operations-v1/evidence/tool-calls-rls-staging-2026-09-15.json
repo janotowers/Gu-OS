@@ -1,0 +1,68 @@
+{
+  "ranAt": "2026-09-15T22:16:48.888Z",
+  "scope": "R1 Cycle 3 order 5 — Slice Plan §8 Q9",
+  "environment": "staging",
+  "migration": "20260915192651_tool_calls_read_own.sql",
+  "method": "read-only catalog checks, then one transaction always rolled back: two synthetic users (random ids, never a real person), the real authenticated / anon / service_role roles with request-scoped claims",
+  "checks": [
+    {
+      "label": "migration 20260915192651 is recorded",
+      "ok": true
+    },
+    {
+      "label": "row-level security is enabled on tool_calls",
+      "ok": true
+    },
+    {
+      "label": "the table's policies are exactly the migration's two",
+      "ok": true,
+      "detail": "Service role manages tool calls [ALL]; Users read own tool calls [SELECT]"
+    },
+    {
+      "label": "the user policy is SELECT for authenticated only",
+      "ok": true,
+      "detail": "SELECT to {authenticated}"
+    },
+    {
+      "label": "the 00001 policy granting users write authority is gone",
+      "ok": true
+    },
+    {
+      "label": "a user reads the audit rows of their own sessions",
+      "ok": true
+    },
+    {
+      "label": "another user's audit row is invisible",
+      "ok": true
+    },
+    {
+      "label": "anon reads no audit row",
+      "ok": true
+    },
+    {
+      "label": "a user cannot INSERT an audit row, not even for their own session",
+      "ok": true,
+      "detail": "SQLSTATE 42501"
+    },
+    {
+      "label": "a user cannot UPDATE their own audit row",
+      "ok": true,
+      "detail": "0 row(s) affected"
+    },
+    {
+      "label": "a user cannot DELETE their own audit row",
+      "ok": true,
+      "detail": "0 row(s) affected"
+    },
+    {
+      "label": "the authorized writer, the service role, still opens and closes audit rows",
+      "ok": true
+    },
+    {
+      "label": "nothing persisted: the synthetic users, sessions and rows were rolled back",
+      "ok": true,
+      "detail": "0 row(s)"
+    }
+  ],
+  "passed": true
+}
