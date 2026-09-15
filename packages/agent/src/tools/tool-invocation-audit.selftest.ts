@@ -203,6 +203,26 @@ async function main() {
     assert.deepEqual(tables.tool_calls[0].result_json, JSON.parse(output), "the tool's record stands");
   });
 
+  await t("Q8 after the run: a claimed row keeps the outcome the tool recorded, even when the answer reads otherwise", async () => {
+    // Added after a mutation check: re-closing the row from the answer must
+    // not overwrite what the tool itself recorded.
+    const { client, tables } = fakeDb();
+    tables.tool_calls.push(confirmationRow());
+    const invocation = openToolInvocation("legacy_lead_get_context", "confirmation-1");
+    await invocation.run(async () => {
+      const row = await createTrackedToolCall(ctxFor(client), "legacy_lead_get_context", {}, false);
+      await client.from("tool_calls").update({ status: "failed", result_json: { status: "failed", reason: "source refused" } }).eq("id", row.id);
+    });
+    const closed = await closeToolInvocation(client, {
+      state: invocation.state,
+      graphRowId: "confirmation-1",
+      output: JSON.stringify({ status: "ok" }),
+    });
+    assert.deepEqual(closed, { rowId: "confirmation-1", status: "failed" });
+    assert.equal(tables.tool_calls[0].status, "failed");
+    assert.deepEqual(tables.tool_calls[0].result_json, { status: "failed", reason: "source refused" });
+  });
+
   await t("Q8 after the run: a claimed row the tool left open is closed from the result", async () => {
     const { client, tables } = fakeDb();
     tables.tool_calls.push(confirmationRow());
