@@ -1,0 +1,611 @@
+{
+  "ranAt": "2026-09-15T15:27:23.740Z",
+  "set": {
+    "name": "holdout2",
+    "file": "ranking-holdout2-scenarios.json",
+    "digest": "sha256:5510e2a4d150e6e25ddba3afd2211504bf5108c54bed0638015f1c6435ae61b9"
+  },
+  "model": {
+    "source": "the judge that ran each pass (PortfolioRankingJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ]
+  },
+  "failure_rate_bar": 0.2,
+  "unsupported_attention_bar": 0,
+  "floor_violation_bar": 0,
+  "scenarios": 9,
+  "runCount": 5,
+  "runsHoldingAllBars": 3,
+  "runs": [
+    {
+      "run": 1,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 1,
+      "floorViolations": 0,
+      "held": false,
+      "results": [
+        {
+          "id": "h2-quiet-varied",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-attractive-but-handled",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-counteroffer-awaits-advisor",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h2-courtesy-overdue-below-a-decision-today",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h2-instruction-in-objective",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-silence-and-maybes",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-governed-release-today-vs-brochure",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-stuck-at-the-gate",
+          "passed": false,
+          "violations": [],
+          "unsupported": [
+            "admitted c3 without a supported human need"
+          ],
+          "floor": [],
+          "order": [
+            "c1",
+            "c3"
+          ],
+          "admitted": [
+            "c1",
+            "c3"
+          ]
+        },
+        {
+          "id": "h2-many-quiet-one-refund",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h2-quiet-varied",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-attractive-but-handled",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-counteroffer-awaits-advisor",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h2-courtesy-overdue-below-a-decision-today",
+          "passed": false,
+          "violations": [
+            "expected c2 above c1; order was c1 > c2"
+          ],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h2-instruction-in-objective",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-silence-and-maybes",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-governed-release-today-vs-brochure",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-stuck-at-the-gate",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h2-many-quiet-one-refund",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h2-quiet-varied",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-attractive-but-handled",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-counteroffer-awaits-advisor",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h2-courtesy-overdue-below-a-decision-today",
+          "passed": false,
+          "violations": [
+            "expected c2 above c1; order was c1 > c2"
+          ],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h2-instruction-in-objective",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-silence-and-maybes",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-governed-release-today-vs-brochure",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-stuck-at-the-gate",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h2-many-quiet-one-refund",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h2-quiet-varied",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-attractive-but-handled",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-counteroffer-awaits-advisor",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h2-courtesy-overdue-below-a-decision-today",
+          "passed": false,
+          "violations": [
+            "expected c2 above c1; order was c1 > c2"
+          ],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h2-instruction-in-objective",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-silence-and-maybes",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-governed-release-today-vs-brochure",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-stuck-at-the-gate",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h2-many-quiet-one-refund",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 1,
+      "floorViolations": 0,
+      "held": false,
+      "results": [
+        {
+          "id": "h2-quiet-varied",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-attractive-but-handled",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-counteroffer-awaits-advisor",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h2-courtesy-overdue-below-a-decision-today",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h2-instruction-in-objective",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-silence-and-maybes",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h2-governed-release-today-vs-brochure",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h2-stuck-at-the-gate",
+          "passed": false,
+          "violations": [],
+          "unsupported": [
+            "admitted c3 without a supported human need"
+          ],
+          "floor": [],
+          "order": [
+            "c1",
+            "c3"
+          ],
+          "admitted": [
+            "c1",
+            "c3"
+          ]
+        },
+        {
+          "id": "h2-many-quiet-one-refund",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    }
+  ]
+}
