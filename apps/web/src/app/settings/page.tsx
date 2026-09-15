@@ -104,6 +104,15 @@ export default async function SettingsPage({
     .in("status", ["active", "paused"])
     .order("next_run_at", { ascending: true, nullsFirst: false });
 
+  // Read under the viewer's own session, as the navigation does: RLS returns
+  // only their memberships. Presentation only (see `organizationMember`).
+  const { data: memberships } = await supabase
+    .from("organization_memberships")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .limit(1);
+
   const heartbeatChecklistTemplates = await listHeartbeatChecklistTemplates(
     supabase,
     user.id
@@ -156,6 +165,7 @@ export default async function SettingsPage({
           engagementPolicyOverrides={
             notificationPreferences?.engagement_policy_overrides_jsonb ?? {}
           }
+          organizationMember={(memberships ?? []).length > 0}
         />
       </div>
     </AppShell>

@@ -53,6 +53,12 @@ interface Props {
   googleOAuthReason?: string;
   engagementPolicyTimezone?: string;
   engagementPolicyOverrides?: EngagementPolicyOverrides;
+  /**
+   * Whether the viewer is an active member of some Organization. Presentation
+   * only — it hides toggles for tools that are Organization-scoped; each such
+   * tool still resolves the membership itself and refuses without one.
+   */
+  organizationMember?: boolean;
 }
 
 interface ScheduledTaskItem {
@@ -195,7 +201,14 @@ const TOOL_IDS = [
   "search_user_memories",
   "archive_user_memory",
   "delete_user_memory",
+  "work_portfolio_read",
 ];
+
+/**
+ * Tools that read an Organization's data: offered only to active members, like
+ * the Portfolio's navigation entry (R1 SL-12). Not the gate — the tool is.
+ */
+const ORGANIZATION_MEMBER_TOOL_IDS = new Set(["work_portfolio_read"]);
 
 const TOOL_DEF_BY_ID = new Map(TOOL_CATALOG.map((d) => [d.id, d]));
 
@@ -529,7 +542,11 @@ export function SettingsForm({
   googleOAuthReason,
   engagementPolicyTimezone = "UTC",
   engagementPolicyOverrides = {},
+  organizationMember = false,
 }: Props) {
+  const visibleToolIds = TOOL_IDS.filter(
+    (id) => organizationMember || !ORGANIZATION_MEMBER_TOOL_IDS.has(id)
+  );
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawReturnTo = searchParams.get("return_to");
@@ -1353,7 +1370,7 @@ export function SettingsForm({
 
       await saveBusinessBrain();
 
-      for (const toolId of TOOL_IDS) {
+      for (const toolId of visibleToolIds) {
         await supabase.from("user_tool_settings").upsert(
           {
             user_id: userId,
@@ -2701,7 +2718,7 @@ export function SettingsForm({
           ))}
         </div>
         <div className="space-y-2">
-          {TOOL_IDS.map((id) => {
+          {visibleToolIds.map((id) => {
             const def = TOOL_DEF_BY_ID.get(id);
             const risk = toolRiskForSettings(id);
             return (
