@@ -1,0 +1,309 @@
+{
+  "ranAt": "2026-09-15T16:57:50.298Z",
+  "slice": "SL-12",
+  "releaseScope": "RS-2",
+  "run": "sl12-rs2-2026-09-15",
+  "organization": "sha256:eab41f21d4c319b6",
+  "advisor": "sha256:16489b62fa9cdf77",
+  "seededCase": "sha256:7bb7fb172506b21e",
+  "topology": "application code executed by the operator process against hosted staging persistence, the model called from that process; no deployed Gu OS runtime",
+  "flag": {
+    "key": "portfolio_contextual_ranking",
+    "prior": {
+      "present": false,
+      "enabled": false,
+      "valueText": null
+    },
+    "activatedAt": "2026-09-15T16:54:35.255Z",
+    "scope": "this run only"
+  },
+  "legacySourceReads": 0,
+  "legacySourceWrites": 0,
+  "checkpoints": [
+    {
+      "label": "t0",
+      "takenAt": "2026-09-15T16:54:43.715Z",
+      "flags": {
+        "relationshipOps": true,
+        "contextualRanking": true
+      },
+      "cases": 16,
+      "mustSurface": 1,
+      "containment": {
+        "operational_cases": {
+          "rows": 17,
+          "digest": "sha256:20dc01d9326e1911ad1dc0e52a4db2dd14c57a401a7391a9027c723b7e132327"
+        },
+        "case_facts": {
+          "rows": 39,
+          "digest": "sha256:479d5a01454f8449acc08cebb889eb997f8799ca7ee0eaefd5cb2e7153bcb28a"
+        },
+        "case_subjects": {
+          "rows": 3,
+          "digest": "sha256:529c643695e2d517d07e1285e4553fbc506409464ab40bd39e1f813c656cacc9"
+        },
+        "case_subject_external_refs": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "operational_case_events": {
+          "rows": 29,
+          "digest": "sha256:dbe2f23502a778255fcf35830df4d166bb83d468e1a81e8bd1e92e7b83e193ff"
+        },
+        "case_approvals": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "case_relationships": {
+          "rows": 4,
+          "digest": "sha256:0bf55d5f7dc7c856802582ec2dde988aa22b9df63a8dd4b3a30fdbb09bf786ca"
+        },
+        "work_items": {
+          "rows": 3,
+          "digest": "sha256:07b4fa9dd2611e256b461a44929d849c95d46b497d0fc98d5beba5a7d40c150c"
+        },
+        "work_item_attempts": {
+          "rows": 1,
+          "digest": "sha256:3f20c9d5020a2f67644ee059903230380ba384def3ac4f1073b7487449850214"
+        },
+        "work_item_events": {
+          "rows": 6,
+          "digest": "sha256:af75aa6f75665f5cbd2de5254fde054558fec9993491c6bcfb00e4b366e828d2"
+        },
+        "internal_user_notifications": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "portfolio_presentation_state": {
+          "rows": 1,
+          "digest": "sha256:96bc30a3aa773bc7e8105980a9c00f0a5b1f662a985436d4321a9f07c04712ae"
+        },
+        "organizations": {
+          "rows": 2,
+          "digest": "sha256:0edde9148d861fcc58106ea27913b6f5ee690fd838a8bf0c87ab66c111d7301f"
+        },
+        "organization_memberships": {
+          "rows": 3,
+          "digest": "sha256:e5ad4196cfe4e74409ecf0074fde4b790c138d88cfdaf2b71a89f0e9a99fa0ef"
+        },
+        "organization_feature_flags": {
+          "rows": 3,
+          "digest": "sha256:e85ab03d4ef481cdfa31fc5b5f0df0626774ebf7aca79f1f9154df2e59007887"
+        }
+      },
+      "rankingUsageRows": 4,
+      "portfolioToolCalls": 0
+    },
+    {
+      "label": "t1",
+      "takenAt": "2026-09-15T16:57:41.638Z",
+      "flags": {
+        "relationshipOps": true,
+        "contextualRanking": true
+      },
+      "cases": 16,
+      "mustSurface": 1,
+      "containment": {
+        "operational_cases": {
+          "rows": 17,
+          "digest": "sha256:20dc01d9326e1911ad1dc0e52a4db2dd14c57a401a7391a9027c723b7e132327"
+        },
+        "case_facts": {
+          "rows": 39,
+          "digest": "sha256:479d5a01454f8449acc08cebb889eb997f8799ca7ee0eaefd5cb2e7153bcb28a"
+        },
+        "case_subjects": {
+          "rows": 3,
+          "digest": "sha256:529c643695e2d517d07e1285e4553fbc506409464ab40bd39e1f813c656cacc9"
+        },
+        "case_subject_external_refs": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "operational_case_events": {
+          "rows": 29,
+          "digest": "sha256:dbe2f23502a778255fcf35830df4d166bb83d468e1a81e8bd1e92e7b83e193ff"
+        },
+        "case_approvals": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "case_relationships": {
+          "rows": 4,
+          "digest": "sha256:0bf55d5f7dc7c856802582ec2dde988aa22b9df63a8dd4b3a30fdbb09bf786ca"
+        },
+        "work_items": {
+          "rows": 3,
+          "digest": "sha256:07b4fa9dd2611e256b461a44929d849c95d46b497d0fc98d5beba5a7d40c150c"
+        },
+        "work_item_attempts": {
+          "rows": 1,
+          "digest": "sha256:3f20c9d5020a2f67644ee059903230380ba384def3ac4f1073b7487449850214"
+        },
+        "work_item_events": {
+          "rows": 6,
+          "digest": "sha256:af75aa6f75665f5cbd2de5254fde054558fec9993491c6bcfb00e4b366e828d2"
+        },
+        "internal_user_notifications": {
+          "rows": 0,
+          "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "portfolio_presentation_state": {
+          "rows": 1,
+          "digest": "sha256:96bc30a3aa773bc7e8105980a9c00f0a5b1f662a985436d4321a9f07c04712ae"
+        },
+        "organizations": {
+          "rows": 2,
+          "digest": "sha256:0edde9148d861fcc58106ea27913b6f5ee690fd838a8bf0c87ab66c111d7301f"
+        },
+        "organization_memberships": {
+          "rows": 3,
+          "digest": "sha256:e5ad4196cfe4e74409ecf0074fde4b790c138d88cfdaf2b71a89f0e9a99fa0ef"
+        },
+        "organization_feature_flags": {
+          "rows": 3,
+          "digest": "sha256:e85ab03d4ef481cdfa31fc5b5f0df0626774ebf7aca79f1f9154df2e59007887"
+        }
+      },
+      "rankingUsageRows": 7,
+      "portfolioToolCalls": 1
+    }
+  ],
+  "session": {
+    "rankingCalls": 3,
+    "rankingCallsOk": 3
+  },
+  "captures": {
+    "organizationWork": "sha256:f485f43a0bb8d7f6e7701f2aa1e12560a12995421ca335322ec8123bbed9dbb3",
+    "myWork": "sha256:91c99475b72ac246c0e6688f79265271be11157df812b302543c1e8fc8e790f1",
+    "chatAnswer": "sha256:a8a1ced7519f61da901a3344e9bf3426b4f73708b00a1ee2fbf432d1357c1d55"
+  },
+  "citableKinds": [
+    "case",
+    "case_fact",
+    "case_subject",
+    "work_item",
+    "case_event"
+  ],
+  "otherOrganizationCases": 1,
+  "otherUserPresentationRows": 0,
+  "probe": {
+    "attempted": true,
+    "how": "run by the agent inside the advisor's own signed-in page in the in-app browser, as the Accountable authorized for this run: two PostgREST reads with the advisor's session — another Organization's Cases, and another user's presentation state; the session token was read and used in the page and never returned to the operator; only status codes and row counts came back",
+    "reads": [
+      {
+        "target": "other_organization_cases",
+        "status": 200,
+        "rows": 0
+      },
+      {
+        "target": "other_user_presentation",
+        "status": 200,
+        "rows": 0
+      }
+    ]
+  },
+  "checks": [
+    {
+      "assertion": "setup",
+      "label": "Relationship Operations and the contextual ranking are enabled for the pilot at T0 and T1",
+      "ok": true
+    },
+    {
+      "assertion": "setup",
+      "label": "the pilot holds a must-surface Case at both checkpoints, so the floor is exercised",
+      "ok": true,
+      "detail": "1 stable must-surface Case(s)"
+    },
+    {
+      "assertion": "RS2-1",
+      "label": "the advisor's Organization Work is in Gu's order: the ranking pass ran and ranked",
+      "ok": true,
+      "detail": "view=org status=ranked"
+    },
+    {
+      "assertion": "RS2-1",
+      "label": "Needs Attention shows at least one contextual item, so grounding is exercised",
+      "ok": true,
+      "detail": "1 contextual item(s) shown"
+    },
+    {
+      "assertion": "RS2-1",
+      "label": "every claim shown cites only rows of its own Case",
+      "ok": true,
+      "detail": "7 ref(s) on 2 card(s); 0 not the Case's own; 0 card(s) citing nothing"
+    },
+    {
+      "assertion": "RS2-1",
+      "label": "a contextual item never sits on a governed Case, and never carries a predicate",
+      "ok": true,
+      "detail": "0 misplaced"
+    },
+    {
+      "assertion": "RS2-2",
+      "label": "every must-surface Case is in Organization Work's Needs Attention, visible and governed, whatever its rank",
+      "ok": true,
+      "detail": "1 must-surface Case(s): #2; missing 0"
+    },
+    {
+      "assertion": "RS2-2",
+      "label": "every must-surface Case assigned to the advisor is in My Work's Needs Attention too",
+      "ok": true,
+      "detail": "1 assigned to the advisor; missing 0"
+    },
+    {
+      "assertion": "RS2-3",
+      "label": "the ranking call's AI usage is recorded, correlated to the pilot Organization and the advisor, on the web channel",
+      "ok": true,
+      "detail": "3 ranking call(s) in the session, 3 ok, 0 uncorrelated"
+    },
+    {
+      "assertion": "RS2-4",
+      "label": "the advisor's web chat read the Portfolio through work_portfolio_read, successfully",
+      "ok": true,
+      "detail": "1 successful call(s) in the session"
+    },
+    {
+      "assertion": "RS2-4",
+      "label": "the chat read is the page's projection: its governed Cases are exactly the must-surface Cases of the view it read",
+      "ok": true,
+      "detail": "view=mine; governed 1, expected 1"
+    },
+    {
+      "assertion": "RS2-4",
+      "label": "the chat read holds only the pilot's Cases, none of another Organization",
+      "ok": true,
+      "detail": "15 Case(s) read, 0 foreign"
+    },
+    {
+      "assertion": "RS2-4",
+      "label": "the chat question has a captured answer",
+      "ok": true
+    },
+    {
+      "assertion": "RS2-4",
+      "label": "with the advisor's own session, a read of another Organization's Cases returns nothing (cross-user attempt)",
+      "ok": true,
+      "detail": "status=200 rows=0; 1 exist"
+    },
+    {
+      "assertion": "RS2-4",
+      "label": "with the advisor's own session, a read of another user's presentation state returns nothing",
+      "ok": true,
+      "detail": "status=200 rows=0; 0 such row(s) exist — vacuous"
+    },
+    {
+      "assertion": "boundary",
+      "label": "no business or configuration row changed during the session: the ranking persisted nothing and no authority moved",
+      "ok": true,
+      "detail": "15 tables identical"
+    }
+  ],
+  "passed": true,
+  "notExercised": [
+    "the model's judgment on the production distribution (the eval, SA-12.6, owns the judgment)",
+    "an owner or org_admin session",
+    "Telegram or voice (excluded; the tool refuses without a web session)",
+    "deployment infrastructure, a hosted URL, production build or deployment, domain/CDN, scaling, production operation"
+  ]
+}
