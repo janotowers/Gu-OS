@@ -254,6 +254,9 @@ export async function POST(request: Request) {
       systemPrompt:
         (profile?.agent_system_prompt as string) ?? "Eres un asistente útil.",
       db,
+      // The person's own session: tools that read case-level truth use it
+      // (R1 SL-12 `work_portfolio_read`), never the service role.
+      actorDb: supabase,
       enabledTools: (toolSettings ?? []).map((t: Record<string, unknown>) => ({
         id: t.id as string,
         user_id: t.user_id as string,

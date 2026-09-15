@@ -21,6 +21,7 @@ import type { NotifyResult } from "@/lib/notify";
 import type { DbClient } from "@agents/db";
 import { notifyUserRespectingActiveInternalChannel } from "@/lib/operational-cases/deliver-internal-case-follow-up";
 import { executeGmailSendTool } from "@/lib/gmail/tool-executor";
+import { readWorkPortfolioForChat } from "@/lib/work-portfolio/chat-summary";
 
 let wired = false;
 
@@ -102,6 +103,15 @@ export function ensureAgentToolDepsWired(): void {
         isLegacyReadRefusal(error)
           ? { reason: error.reason, detail: error.detail }
           : null,
+    },
+    // R1 SL-12: read-only conversational access to the Work Portfolio — the
+    // same projection /portfolio renders, read under the person's OWN session
+    // (`actorDb`), with the Organization resolved from their memberships.
+    workPortfolio: {
+      listActorOrganizations: ({ db, actorUserId }) =>
+        listActiveOrganizationIdsForUser(db, actorUserId),
+      readWorkPortfolio: ({ serviceDb, actorDb, actorUserId, organizationId, view }) =>
+        readWorkPortfolioForChat({ serviceDb, actorDb, actorUserId, organizationId, view }),
     },
   });
 }

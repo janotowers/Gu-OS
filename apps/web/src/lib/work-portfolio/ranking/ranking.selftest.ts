@@ -20,6 +20,8 @@
  *   SA-12.7  any model failure leaves SL-7's order and reason codes, visibly;
  *   SA-12.8  nothing is persisted;
  *   SA-12.9  the call is bounded and correlated to the Organization;
+ *   SA-12.10 a conversation reads the page's own projection, under the
+ *            person's own session, and keeps obligations and suggestions apart;
  *   plus flags off ⇒ inert, and the eval set's own consistency.
  */
 import assert from "node:assert/strict";
@@ -29,7 +31,9 @@ import {
   PORTFOLIO_RANKING_STATUSES,
   type PortfolioPresentationState,
 } from "@agents/types";
-import { CONTEXTUAL_COPY, RANKING_STATUS_COPY } from "../copy";
+import { CONTEXTUAL_COPY, PREDICATE_COPY, RANKING_STATUS_COPY } from "../copy";
+import { readWorkPortfolioForChat, summarizePortfolioForChat } from "../chat-summary";
+import { loadWorkPortfolio } from "../load";
 import { createFakeDb, type FakeDb } from "../../relationship-testing/fake-db";
 import type {
   PortfolioCaseSnapshot,
@@ -526,6 +530,110 @@ async function main(): Promise<void> {
     assert.equal((seen as Record<string, unknown>).channel, "web");
   });
 
+  console.log("\nSA-12.10 — a conversation reads the page's own projection");
+
+  await t("the chat read lists the Cases the page lists, in the page's order, read under the person's own session — and writes nothing", async () => {
+    const a = uuid();
+    const b = uuid();
+    const rows = [loaderCaseRow(a, iso(-HOUR)), loaderCaseRow(b, iso(-2 * HOUR))];
+
+    // The page's path: SL-7's loader, then the ranking pass.
+    const pageService = chatServiceDb();
+    const loaded = await loadWorkPortfolio({
+      serviceDb: pageService.client, userDb: createFakeDb({ tables: { operational_cases: rows } }).client,
+      actorUserId: ADVISOR, organizationId: ORG, now: NOW,
+    });
+    assert.equal(loaded.status, "ok");
+    if (loaded.status !== "ok") return;
+    const alias = buildRankingFrame({ portfolio: loaded.portfolio, snapshots: loaded.snapshots, actorRole: "advisor", now: NOW })
+      .cases.find((c) => c.case_id === b)!.ref;
+    const answer = ok({
+      items: [{ case: alias, kind: "contextual", priority: 1, why: claim("Pidió una llamada", [alias]), what_gu_needs: claim("Llamar hoy", [alias]), why_now: claim("Lo pidió para hoy", [alias]) }],
+    });
+    const page = await rankWorkPortfolio({
+      serviceDb: pageService.client, organizationId: ORG, actor: loaded.portfolio.actor,
+      portfolio: loaded.portfolio, snapshots: loaded.snapshots, judge: stubJudge(answer), now: NOW,
+    });
+
+    // The conversation's path, over identical data.
+    const service = chatServiceDb();
+    const user = createFakeDb({ tables: { operational_cases: rows } });
+    const summary = await readWorkPortfolioForChat({
+      serviceDb: service.client, actorDb: user.client, actorUserId: ADVISOR, organizationId: ORG,
+      view: "mine", judge: stubJudge(answer), now: NOW,
+    });
+    assert.equal(summary.status, "ok");
+    if (summary.status !== "ok") return;
+    assert.deepEqual(
+      [...summary.needs_attention.map((n) => n.case_id), ...summary.others.map((o) => o.case_id)],
+      ids(page.myWork.entries),
+      "the same Cases, in the same order"
+    );
+    assert.deepEqual(summary.needs_attention.map((n) => [n.case_id, n.kind, n.rank]), [[b, "contextual", 1]]);
+    assert.ok(user.reads.includes("operational_cases"), "Cases are read under the person's own session");
+    assert.ok(!service.reads.includes("operational_cases"), "never with the service role");
+    assert.deepEqual([...service.writes, ...user.writes], []);
+  });
+
+  await t("governed obligations and Gu's suggestions stay apart; a hidden Case is only counted", async () => {
+    const fx = fixture();
+    const q = aliasOf(fx, fx.quiet.case.id);
+    const hidden: PortfolioPresentationState = {
+      id: uuid(), user_id: ADVISOR, organization_id: ORG, subject_kind: "case", subject_id: fx.waiting.case.id,
+      seen_at: null, snooze_until: null, hidden_at: iso(-HOUR), pinned: false, created_at: iso(-HOUR), updated_at: iso(-HOUR),
+    };
+    const { ranked } = await rank(
+      fx,
+      stubJudge(ok({ items: [{ case: q, kind: "contextual", priority: 1, why: claim("Riesgo", [`${q}.r1`]), what_gu_needs: claim("Una llamada", [q]), why_now: claim("Hoy", [`${q}.r1`]) }] })),
+      { presentation: [hidden] }
+    );
+    const summary = summarizePortfolioForChat(ranked, "organization");
+    assert.equal(summary.order, RANKING_STATUS_COPY.ranked);
+    assert.deepEqual(
+      summary.needs_attention.map((n) => n.case_id),
+      ids(ranked.organizationWork.entries.filter((e) => e.section === "needs_attention"))
+    );
+    const byId = new Map(summary.needs_attention.map((n) => [n.case_id, n]));
+    const governed = byId.get(fx.governed.case.id)!;
+    assert.equal(governed.kind, "governed");
+    assert.equal(governed.contextual, null);
+    assert.ok(governed.governed.length > 0);
+    assert.ok(governed.governed.every((g) => Object.values(PREDICATE_COPY).includes(g.need) && g.why && g.what_gu_needs && g.why_now));
+    const contextual = byId.get(fx.quiet.case.id)!;
+    assert.equal(contextual.kind, "contextual");
+    assert.deepEqual(contextual.governed, [], "a suggestion never carries an obligation");
+    assert.deepEqual(contextual.contextual, { why: "Riesgo", what_gu_needs: "Una llamada", why_now: "Hoy" });
+    assert.equal(summary.hidden_by_you, 1);
+    assert.ok(!JSON.stringify(summary).includes(fx.waiting.case.id), "what the person hid is counted, not listed");
+  });
+
+  await t("when the model fails, the chat names the deterministic order and invents nothing", async () => {
+    const fx = fixture();
+    const { ranked } = await rank(fx, stubJudge({ ok: false, reason: "model_error" }));
+    const summary = summarizePortfolioForChat(ranked, "organization");
+    assert.ok(summary.order.startsWith("Orden determinista"));
+    assert.ok(summary.needs_attention.length > 0);
+    assert.ok(summary.needs_attention.every((n) => n.kind === "governed" && n.rank === null && n.contextual === null));
+  });
+
+  await t("no membership, or Relationship Operations off: a refusal with a hint — no Case read, no model call", async () => {
+    for (const [options, status] of [
+      [{ member: false }, "no_membership"],
+      [{ relationshipOps: false }, "inert"],
+    ] as const) {
+      const service = chatServiceDb(options);
+      const user = createFakeDb({ tables: { operational_cases: [loaderCaseRow(uuid(), iso(-HOUR))] } });
+      const judge = stubJudge(ok({ items: [] }));
+      const result = await readWorkPortfolioForChat({
+        serviceDb: service.client, actorDb: user.client, actorUserId: ADVISOR, organizationId: ORG, view: "mine", judge, now: NOW,
+      });
+      assert.equal(result.status, status);
+      assert.ok("hint" in result && /do not retry/i.test(result.hint));
+      assert.deepEqual(user.reads, [], `${status}: no Case read`);
+      assert.equal(judge.calls.length, 0, `${status}: no model call`);
+    }
+  });
+
   console.log("\nthe viewer is told which order they see");
 
   await t("every ranking status has copy, and every non-ranked one says the order is the deterministic one", () => {
@@ -591,6 +699,33 @@ async function main(): Promise<void> {
   });
 
   console.log(`\nwork-portfolio ranking selftest: ${passed} checks passed`);
+}
+
+/** A Case row as the actor's own-JWT read returns it (SL-7's loader input). */
+function loaderCaseRow(caseId: string, updatedAt: string): Record<string, unknown> {
+  return {
+    id: caseId, user_id: ADVISOR, organization_id: ORG, case_type: "lead_opportunity", case_type_id: "ct-1",
+    status: "active", runtime_authority: "legacy", assigned_to_user_id: ADVISOR, next_action_at: iso(DAY),
+    workflow_definition_version: 1, version: 3, context_jsonb: {}, created_at: iso(-10 * DAY), updated_at: updatedAt,
+  };
+}
+
+/** The service-role side of the loader: the membership, the flags, Work Items. */
+function chatServiceDb(options: { member?: boolean; relationshipOps?: boolean } = {}): FakeDb {
+  const flags: Array<Record<string, unknown>> = [
+    { id: "f2", organization_id: ORG, flag_key: ORGANIZATION_FLAG_KEYS.portfolioContextualRanking, enabled: true, value_text: null },
+  ];
+  if (options.relationshipOps !== false) {
+    flags.push({ id: "f1", organization_id: ORG, flag_key: ORGANIZATION_FLAG_KEYS.relationshipOps, enabled: true, value_text: null });
+  }
+  return createFakeDb({
+    tables: {
+      organization_memberships:
+        options.member === false ? [] : [{ id: "m1", organization_id: ORG, user_id: ADVISOR, role: "advisor", status: "active" }],
+      organization_feature_flags: flags,
+      work_items: [],
+    },
+  });
 }
 
 /** Three cases: c1 governed, c2 and c3 not — the merge's unit fixture. */

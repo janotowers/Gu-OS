@@ -70,6 +70,25 @@ export const TOOL_CATALOG: ToolDefinition[] = [
       required: ["legacy_property_id"],
     },
   },
+
+  // ── Work Portfolio read (R1 SL-12 / TD-9 v2) ───────────────────────
+  //
+  // Read-only conversational access to the same projection /portfolio shows:
+  // governed obligations and Gu's contextual suggestions told apart. It reads
+  // under the person's OWN signed-in web session and refuses without one; the
+  // Organization comes from their memberships, never from the model.
+  {
+    id: "work_portfolio_read",
+    name: "work_portfolio_read",
+    description:
+      "Reads the person's Work Portfolio — what needs them now and why, what Gu is handling, what is waiting — exactly as /portfolio shows it, with governed obligations and Gu's contextual suggestions told apart. Read-only; changes nothing.",
+    risk: "low",
+    parameters_schema: {
+      type: "object",
+      properties: { view: { type: "string", enum: ["mine", "organization"] } },
+      required: [],
+    },
+  },
   {
     id: "get_user_preferences",
     name: "get_user_preferences",

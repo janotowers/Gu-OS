@@ -10,7 +10,15 @@ import type {
 } from "@agents/types";
 
 export interface ToolContext {
+  /** The service role. Never a substitute for the acting user's own authorization. */
   db: DbClient;
+  /**
+   * The acting user's OWN session client (their JWT), when the channel has one
+   * — today only the web chat. Tools that must read under the person's own
+   * authorization (R1 SL-12's Work Portfolio tool) use this and REFUSE without
+   * it, rather than reading with `db`.
+   */
+  actorDb?: DbClient;
   userId: string;
   sessionId: string;
   /** Correlates all tool audit rows for the current user request. */
