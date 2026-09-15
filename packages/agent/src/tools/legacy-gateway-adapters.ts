@@ -19,10 +19,16 @@
  *     may not read something, and needs to not retry. A structured
  *     `status: "refused"` with a reason does that; a thrown error would just
  *     end the turn.
+ *
+ * Every call is audited: each tool writes and closes its own `tool_calls` row,
+ * as the graph expects of every tool not listed in tool-audit-ownership.ts — a
+ * low-risk read auto-executes, and on that path the graph writes none (Cycle 3
+ * order 4, Slice Plan v1.31 §6).
  */
 import { z } from "zod";
 import { tool } from "@langchain/core/tools";
 import type { DbClient } from "@agents/db";
+import { runAuditedTool } from "./tool-call-audit";
 import type { ToolContext } from "./tool-context";
 
 /**
@@ -136,6 +142,17 @@ async function run(
   }
 }
 
+/** Runs one read and audits it in its own `tool_calls` row (see the header). */
+async function auditedRead(
+  deps: LegacyGatewayDeps | null,
+  ctx: ToolContext,
+  toolId: (typeof LEGACY_GATEWAY_TOOL_IDS)[number],
+  input: Record<string, unknown>,
+  call: (organizationId: string) => Promise<unknown>
+): Promise<string> {
+  return JSON.stringify(await runAuditedTool(ctx, toolId, input, () => run(deps, ctx, call)));
+}
+
 /**
  * Builds the four tools. The caller decides availability - these are gated by
  * `LEGACY_GATEWAY_ENABLED` and by the user's own tool settings before this runs.
@@ -151,15 +168,13 @@ export function buildLegacyGatewayTools(
     tools.push(
       tool(
         async (input) =>
-          JSON.stringify(
-            await run(deps, ctx, (organizationId) =>
-              deps!.readLeadContext({
-                db: ctx.db,
-                organizationId,
-                actorUserId: ctx.userId,
-                legacyLeadId: input.legacy_lead_id,
-              })
-            )
+          auditedRead(deps, ctx, "legacy_lead_get_context", input, (organizationId) =>
+            deps!.readLeadContext({
+              db: ctx.db,
+              organizationId,
+              actorUserId: ctx.userId,
+              legacyLeadId: input.legacy_lead_id,
+            })
           ),
         {
           name: "legacy_lead_get_context",
@@ -175,16 +190,14 @@ export function buildLegacyGatewayTools(
     tools.push(
       tool(
         async (input) =>
-          JSON.stringify(
-            await run(deps, ctx, (organizationId) =>
-              deps!.readRecentMessages({
-                db: ctx.db,
-                organizationId,
-                actorUserId: ctx.userId,
-                legacyLeadId: input.legacy_lead_id,
-                limit: input.limit ?? undefined,
-              })
-            )
+          auditedRead(deps, ctx, "legacy_lead_get_recent_messages", input, (organizationId) =>
+            deps!.readRecentMessages({
+              db: ctx.db,
+              organizationId,
+              actorUserId: ctx.userId,
+              legacyLeadId: input.legacy_lead_id,
+              limit: input.limit ?? undefined,
+            })
           ),
         {
           name: "legacy_lead_get_recent_messages",
@@ -203,16 +216,14 @@ export function buildLegacyGatewayTools(
     tools.push(
       tool(
         async (input) =>
-          JSON.stringify(
-            await run(deps, ctx, (organizationId) =>
-              deps!.readDealAppointments({
-                db: ctx.db,
-                organizationId,
-                actorUserId: ctx.userId,
-                legacyDealId: input.legacy_deal_id,
-                legacyAppointmentId: input.legacy_appointment_id ?? undefined,
-              })
-            )
+          auditedRead(deps, ctx, "appointment_get", input, (organizationId) =>
+            deps!.readDealAppointments({
+              db: ctx.db,
+              organizationId,
+              actorUserId: ctx.userId,
+              legacyDealId: input.legacy_deal_id,
+              legacyAppointmentId: input.legacy_appointment_id ?? undefined,
+            })
           ),
         {
           name: "appointment_get",
@@ -231,15 +242,13 @@ export function buildLegacyGatewayTools(
     tools.push(
       tool(
         async (input) =>
-          JSON.stringify(
-            await run(deps, ctx, (organizationId) =>
-              deps!.readPropertyDetails({
-                db: ctx.db,
-                organizationId,
-                actorUserId: ctx.userId,
-                legacyPropertyId: input.legacy_property_id,
-              })
-            )
+          auditedRead(deps, ctx, "property_get_details", input, (organizationId) =>
+            deps!.readPropertyDetails({
+              db: ctx.db,
+              organizationId,
+              actorUserId: ctx.userId,
+              legacyPropertyId: input.legacy_property_id,
+            })
           ),
         {
           name: "property_get_details",
