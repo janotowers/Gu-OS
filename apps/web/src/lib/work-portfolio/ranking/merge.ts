@@ -8,6 +8,9 @@
  *  - **Discretionary is not governed.** Only a Case with no governed need can be
  *    admitted contextually; the admission carries no predicate and no
  *    obligation, and the person's snooze or hide still applies to it.
+ *  - **Affirmed, then grounded.** A contextual item is admitted only if the
+ *    model affirmed its case as needing a person now (`assessments`) — a guard
+ *    that can only remove admissions, never proof that one is supported.
  *  - **Grounding per claim.** A claim is kept only if every alias it cites is one
  *    of that Case's own; an admission needs all three claims.
  *  - **No answer ⇒ SL-7.** With no merge (any model failure), the views pass
@@ -44,6 +47,8 @@ export interface RankingDiagnostics {
   ungrounded_claims: number;
   /** Contextual items not admitted: a claim missing or ungrounded. */
   dropped_admissions: number;
+  /** Contextual items whose case the model did not affirm as needing a person now. */
+  unaffirmed_admissions: number;
   /** Governed cases the model labelled contextual — kept governed. */
   relabelled_governed: number;
   /** Non-governed cases the model labelled governed — ignored. */
@@ -58,6 +63,7 @@ export function emptyDiagnostics(): RankingDiagnostics {
     duplicate_items: 0,
     ungrounded_claims: 0,
     dropped_admissions: 0,
+    unaffirmed_admissions: 0,
     relabelled_governed: 0,
     false_governed: 0,
     governed_unranked: 0,
@@ -88,6 +94,12 @@ export function mergeRanking(frame: RankingFrame, output: RankingOutput): Rankin
   const contextual = new Map<string, ContextualAttention>();
   const diagnostics = emptyDiagnostics();
   const seen = new Set<string>();
+  // A case counts as affirmed only if every statement about it says so: one
+  // "false", or none at all, is enough to keep it out.
+  const verdicts = new Map<string, boolean>();
+  for (const assessment of output.assessments ?? []) {
+    verdicts.set(assessment.case, (verdicts.get(assessment.case) ?? true) && assessment.human_intervention_needed_now === true);
+  }
 
   // Best priority first, so a duplicate keeps the rank the model valued most.
   const items = [...output.items].sort((a, b) => a.priority - b.priority);
@@ -111,6 +123,10 @@ export function mergeRanking(frame: RankingFrame, output: RankingOutput): Rankin
     }
     if (item.kind !== "contextual") {
       diagnostics.false_governed += 1;
+      continue;
+    }
+    if (verdicts.get(item.case) !== true) {
+      diagnostics.unaffirmed_admissions += 1;
       continue;
     }
     const claims = [item.why, item.what_gu_needs, item.why_now];

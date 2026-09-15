@@ -177,6 +177,7 @@ async function main(): Promise<void> {
     const c = frame.cases.find((x) => x.case_id === manifest.seededCaseId)!.ref;
     const g = frame.cases.find((x) => x.case_id === governedCaseId)!.ref;
     const output: RankingOutput = {
+      assessments: [{ case: c, human_intervention_needed_now: true, reason: "Pidió una persona hoy." }],
       items: [
         { case: c, kind: "contextual", priority: 1, why: { text: "Pidió una persona", refs: [`${c}.r1`] }, what_gu_needs: { text: "Llamarle hoy", refs: [c] }, why_now: { text: "Hoy", refs: [`${c}.r1`] } },
         { case: g, kind: "governed", priority: 2 },

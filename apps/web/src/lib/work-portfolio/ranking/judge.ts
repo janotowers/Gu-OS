@@ -4,7 +4,10 @@
  * One bounded model call per Portfolio load. The prompt carries S4's
  * semantics — intervention, not attractiveness; eligibility is not priority;
  * a dependency that may arise later is not attention now; every claim cites
- * the case's own aliases — and treats everything inside a case as data.
+ * the case's own aliases — and treats everything inside a case as data. The
+ * model first states, for every non-governed case, whether a person is needed
+ * now; the merge admits only affirmed cases, so that statement is a guard that
+ * can only remove admissions, never proof that one is supported.
  *
  * Every failure is a typed result, never a guess: no key ⇒ `model_unavailable`,
  * transport or provider failure ⇒ `model_error`, unparseable or off-schema ⇒
@@ -25,10 +28,16 @@ import {
 const MODEL_ROLE = "relationship_portfolio_ranking";
 
 export function buildRankingPrompt(input: RankingInput): string {
+  // Named from the input, so no case can be skipped by omission.
+  const refs = input.cases.map((c) => c.ref).join(", ");
   return [
     "You decide which of ONE person's real-estate Opportunities belong in their Needs Attention list right now, and in what order — by the need for HUMAN INTERVENTION, never by how attractive a lead is.",
     "Return ONLY compact JSON of this shape:",
-    '{"items":[{"case":"c1","kind":"governed|contextual","priority":1,"why":{"text":string,"refs":[string]},"what_gu_needs":{"text":string,"refs":[string]},"why_now":{"text":string,"refs":[string]}}]}',
+    '{"assessments":[{"case":"c2","human_intervention_needed_now":true|false,"reason":string}],"items":[{"case":"c1","kind":"governed|contextual","priority":1,"why":{"text":string,"refs":[string]},"what_gu_needs":{"text":string,"refs":[string]},"why_now":{"text":string,"refs":[string]}}]}',
+    "",
+    "Work in two steps, in this order:",
+    `1. assessments — one for EVERY case, in this order: ${refs}. reason: one short sentence, in Spanish, from that case's own evidence: what is lost, and by when, if no person acts — or that nothing is. human_intervention_needed_now: for a case whose "governed" list is empty, true only if it passes the admission test below, otherwise false; for a governed case, true (it is in Needs Attention whatever you say).`,
+    "2. items — every governed case, plus exactly the non-governed cases you assessed true, ordered by what your reasons say is at stake: the greatest or soonest loss first, whatever the kind. A non-governed case assessed false is never listed.",
     "",
     "Rules:",
     "- Your list IS the person's Needs Attention: every case you list interrupts them. It holds every governed case plus only the non-governed cases a person is needed for now. It is not a ranking of the whole Portfolio: never list a case to say that it needs no one — leave it out.",
@@ -46,6 +55,7 @@ export function buildRankingPrompt(input: RankingInput): string {
     "How to read a case:",
     '- "section" is where the deterministic Portfolio placed it: "needs_attention" (a governed rule applies; see "governed"), "gu_handling" (Gu keeps responsibility and needs no one now), "waiting" (Gu decided to wait for a reply, a time or a signal, and will re-enter), "not_reconsidered" (Gu has not reconsidered it yet — reconsidering is Gu\'s job, so being unreviewed, quiet or old is not by itself a need for a person).',
     '- "work" is Gu\'s own work. A work item — pending, running or unfinished — does not by itself need a person; work that waits for a person (in review, or a question Gu asked) already appears in "governed".',
+    '- "commitments" are promises already made. One not yet due is not governed, but if the evidence shows it cannot be kept as promised — it falls due soon and another fact contradicts it — a person is needed before it is missed: only a person can change a promise.',
     '- "reconsiderations" are Gu\'s own earlier judgments: posture, diagnosis, rationale, outcome. Weigh them as evidence, not as a verdict. A recorded wait is valid only while the next move is really someone else\'s and nothing material is lost by waiting; if the diagnosis shows the prospect is waiting on an answer or a decision only a person can give, or a loss is imminent, a person is needed now even though the posture says wait.',
     "",
     `Viewer's role in the Organization: ${input.actor_role}. Evaluation time: ${input.now}.`,
@@ -96,7 +106,9 @@ export function createOpenRouterRankingJudge(): PortfolioRankingJudge {
           body: JSON.stringify({
             model,
             temperature: 0,
-            max_tokens: 1500,
+            // Assessments for up to 40 cases come before the items; an answer cut
+            // short is invalid, and the deterministic order would stand.
+            max_tokens: 3000,
             response_format: { type: "json_object" },
             usage: { include: true },
             messages: [

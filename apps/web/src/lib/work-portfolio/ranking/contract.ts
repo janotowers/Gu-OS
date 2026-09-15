@@ -98,7 +98,27 @@ const ClaimSchema = z.object({
   refs: z.array(z.string()).min(1).max(8),
 });
 
+/**
+ * The model's explicit statement, per non-governed case, of whether a person's
+ * intervention is needed NOW — a conservative admission guard (the
+ * Accountable's decision of 2026-09-15, option A).
+ *
+ * NECESSARY, NEVER SUFFICIENT. The merge admits a contextual item only when its
+ * case is affirmed here AND every claim is grounded, so the guard can only
+ * remove admissions. An affirmation is the model's own judgment, not proof
+ * that an admission is supported: whether the evidence supports it remains the
+ * eval's to score (SA-12.6), exactly as before. It is never shown and never
+ * persisted.
+ */
+const AssessmentSchema = z.object({
+  case: z.string(),
+  human_intervention_needed_now: z.boolean(),
+  /** One short sentence; read by nobody but the model's own consistency. */
+  reason: z.string().nullish(),
+});
+
 export const RankingOutputSchema = z.object({
+  assessments: z.array(AssessmentSchema).max(RANKING_MAX_CASES * 2).nullish(),
   items: z
     .array(
       z.object({
@@ -117,6 +137,7 @@ export const RankingOutputSchema = z.object({
 
 export type RankingOutput = z.infer<typeof RankingOutputSchema>;
 export type RankingClaim = z.infer<typeof ClaimSchema>;
+export type RankingAssessment = z.infer<typeof AssessmentSchema>;
 
 // ============================================================
 // Frame — the input plus what the merge needs to check it

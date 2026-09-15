@@ -46,6 +46,7 @@ import {
   RANKING_MAX_CASES,
   RANKING_MAX_TEXT_CHARS,
   type PortfolioRankingJudge,
+  type RankingFrame,
   type RankingInput,
   type RankingJudgeResult,
   type RankingOutput,
@@ -210,7 +211,22 @@ function stubJudge(
   };
 }
 
-const ok = (output: RankingOutput): RankingJudgeResult => ({ ok: true, output });
+/**
+ * Fixtures written before the needed-now guard state only `items`. For them,
+ * every contextual item is also affirmed as needed now, so each test keeps
+ * testing what its label says. The guard's own tests pass `assessments`.
+ */
+function affirmed(output: RankingOutput): RankingOutput {
+  if (output.assessments !== undefined) return output;
+  return {
+    ...output,
+    assessments: output.items
+      .filter((item) => item.kind === "contextual")
+      .map((item) => ({ case: item.case, human_intervention_needed_now: true, reason: "fixture" })),
+  };
+}
+const ok = (output: RankingOutput): RankingJudgeResult => ({ ok: true, output: affirmed(output) });
+const mergeAffirmed = (frame: RankingFrame, output: RankingOutput) => mergeRanking(frame, affirmed(output));
 const claim = (text: string, refs: string[]) => ({ text, refs });
 
 async function rank(
@@ -339,14 +355,14 @@ async function main(): Promise<void> {
 
   await t("an unknown case alias in the answer is ignored and counted, never resolved to a Case", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, { items: [{ case: "c99", kind: "contextual", priority: 1, why: claim("w", ["c99"]), what_gu_needs: claim("n", ["c99"]), why_now: claim("t", ["c99"]) }] });
+    const merged = mergeAffirmed(frame, { items: [{ case: "c99", kind: "contextual", priority: 1, why: claim("w", ["c99"]), what_gu_needs: claim("n", ["c99"]), why_now: claim("t", ["c99"]) }] });
     assert.equal(merged.contextual.size, 0);
     assert.equal(merged.diagnostics.unknown_cases, 1);
   });
 
   await t("the merge never admits a GOVERNED case contextually, even with fully grounded claims", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, {
+    const merged = mergeAffirmed(frame, {
       items: [{ case: "c1", kind: "contextual", priority: 1, why: claim("w", ["c1.f1"]), what_gu_needs: claim("n", ["c1"]), why_now: claim("t", ["c1.a1"]) }],
     });
     assert.equal(merged.contextual.has("c1"), false, "governed stays governed at the merge, not only at the view");
@@ -356,7 +372,7 @@ async function main(): Promise<void> {
 
   await t("a model claiming a NON-governed Case is governed creates nothing", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, { items: [{ case: "c2", kind: "governed", priority: 1 }] });
+    const merged = mergeAffirmed(frame, { items: [{ case: "c2", kind: "governed", priority: 1 }] });
     assert.equal(merged.contextual.size, 0);
     assert.deepEqual(needsAttentionOrder(frame, merged), ["c1"], "only the real governed case is in the floor");
   });
@@ -418,7 +434,7 @@ async function main(): Promise<void> {
 
   await t("citing ANOTHER case's alias, or one that does not exist, drops the admission", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, {
+    const merged = mergeAffirmed(frame, {
       items: [
         { case: "c2", kind: "contextual", priority: 1, why: claim("w", ["c1.f1"]), what_gu_needs: claim("n", ["c2"]), why_now: claim("t", ["c2.r1"]) },
         { case: "c3", kind: "contextual", priority: 2, why: claim("w", ["c3.f9"]), what_gu_needs: claim("n", ["c3"]), why_now: claim("t", ["c3"]) },
@@ -431,19 +447,94 @@ async function main(): Promise<void> {
 
   await t("a contextual answer missing any of WHY / WHAT GU NEEDS / WHY NOW is not admitted", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, { items: [{ case: "c2", kind: "contextual", priority: 1, why: claim("w", ["c2"]), what_gu_needs: claim("n", ["c2"]) }] });
+    const merged = mergeAffirmed(frame, { items: [{ case: "c2", kind: "contextual", priority: 1, why: claim("w", ["c2"]), what_gu_needs: claim("n", ["c2"]) }] });
     assert.equal(merged.contextual.size, 0);
   });
 
   await t("a grounded admission keeps the model's words and the rows they cite", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, {
+    const merged = mergeAffirmed(frame, {
       items: [{ case: "c2", kind: "contextual", priority: 1, why: claim("Molestia registrada", ["c2.r1"]), what_gu_needs: claim("Llamar", ["c2"]), why_now: claim("Hoy", ["c2.r1"]) }],
     });
     const admitted = merged.contextual.get("c2");
     assert.ok(admitted);
     assert.equal(admitted.why.text, "Molestia registrada");
     assert.deepEqual(admitted.why.refs, [frame.cases[1].refs["c2.r1"]]);
+  });
+
+  console.log("\nthe needed-now guard — conservative, and never proof of support");
+
+  const grounded = (ref: string) => ({
+    case: ref,
+    kind: "contextual" as const,
+    priority: 1,
+    why: claim("w", [`${ref}.r1`]),
+    what_gu_needs: claim("n", [ref]),
+    why_now: claim("t", [`${ref}.r1`]),
+  });
+
+  await t("a grounded contextual item the model did not affirm as needed now is not admitted", () => {
+    const frame = frameFromInput(minimalInput());
+    for (const output of [{ items: [grounded("c2")] }, { assessments: [], items: [grounded("c2")] }]) {
+      const merged = mergeRanking(frame, output);
+      assert.equal(merged.contextual.size, 0);
+      assert.equal(merged.diagnostics.unaffirmed_admissions, 1);
+    }
+  });
+
+  await t("a 'false' — or any 'false' among several statements about the case — keeps it out", () => {
+    const frame = frameFromInput(minimalInput());
+    for (const assessments of [
+      [{ case: "c2", human_intervention_needed_now: false }],
+      [{ case: "c2", human_intervention_needed_now: true }, { case: "c2", human_intervention_needed_now: false }],
+      [{ case: "c3", human_intervention_needed_now: true }],
+    ]) {
+      assert.equal(mergeRanking(frame, { assessments, items: [grounded("c2")] }).contextual.size, 0);
+    }
+  });
+
+  await t("an affirmation is not proof: an affirmed item citing another case's row, or missing a claim, is still dropped", () => {
+    const frame = frameFromInput(minimalInput());
+    const assessments = [{ case: "c2", human_intervention_needed_now: true }];
+    const foreign = mergeRanking(frame, { assessments, items: [{ ...grounded("c2"), why: claim("w", ["c1.f1"]) }] });
+    assert.equal(foreign.contextual.size, 0);
+    assert.ok(foreign.diagnostics.ungrounded_claims >= 1);
+    assert.equal(mergeRanking(frame, { assessments, items: [{ ...grounded("c2"), why_now: undefined }] }).contextual.size, 0);
+    assert.equal(mergeRanking(frame, { assessments, items: [grounded("c2")] }).contextual.size, 1, "affirmed AND grounded");
+  });
+
+  await t("a governed case's presence never depends on an affirmation, and one cannot make it contextual", () => {
+    const frame = frameFromInput(minimalInput());
+    const denied = mergeRanking(frame, { assessments: [{ case: "c1", human_intervention_needed_now: false }], items: [] });
+    assert.deepEqual(needsAttentionOrder(frame, denied), [frame.cases[0].case_id], "still in the floor");
+    const relabelled = mergeRanking(frame, {
+      assessments: [{ case: "c1", human_intervention_needed_now: true }],
+      items: [{ ...grounded("c1"), why: claim("w", ["c1.f1"]) }],
+    });
+    assert.equal(relabelled.contextual.size, 0);
+  });
+
+  await t("the eval never reads an affirmation as support: an affirmed, grounded admission the scenario forbids is unsupported attention", () => {
+    const quiet = loadRankingEvalSet().scenarios.find((s) => s.id === "quiet-portfolio-no-inflation")!;
+    const score = scoreRankingScenario(quiet, {
+      ok: true,
+      output: {
+        assessments: [{ case: "c1", human_intervention_needed_now: true, reason: "El modelo lo afirma." }],
+        items: [{ case: "c1", kind: "contextual", priority: 1, why: claim("w", ["c1"]), what_gu_needs: claim("n", ["c1"]), why_now: claim("t", ["c1"]) }],
+      },
+    });
+    assert.equal(score.unsupported.length, 1);
+  });
+
+  await t("the guard is neither shown nor kept: an admission carries its claims and nothing of the assessment", () => {
+    const frame = frameFromInput(minimalInput());
+    const merged = mergeRanking(frame, {
+      assessments: [{ case: "c2", human_intervention_needed_now: true, reason: "RAZON-INTERNA" }],
+      items: [grounded("c2")],
+    });
+    const admitted = merged.contextual.get(frame.cases[1].case_id)!;
+    assert.deepEqual(Object.keys(admitted).sort(), ["case_id", "kind", "must_surface", "v", "what_gu_needs", "why", "why_now"]);
+    assert.ok(!JSON.stringify(merged).includes("RAZON-INTERNA"));
   });
 
   console.log("\nSA-12.7 — any model failure leaves SL-7's order, visibly");
