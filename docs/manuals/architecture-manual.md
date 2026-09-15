@@ -1042,7 +1042,7 @@ No invoca admisión, resolución ni el supervisor.
 
 **Desde SL-12, el orden de Needs Attention puede ser juicio de modelo, pero el piso sigue en
 código.** Con el flag de Organización `portfolio_contextual_ranking` (apagado por defecto),
-una llamada acotada de modelo —solo sobre el snapshot autorizado, con alias en lugar de
+una pasada acotada de modelo (a lo sumo dos intentos en 20 s) —solo sobre el snapshot autorizado, con alias en lugar de
 ids— ordena Needs Attention y puede admitir situaciones *contextuales*: discrecionales, sin
 obligación, sujetas a posponer/ocultar y mostradas solo si el modelo afirmó que el Caso necesita
 a una persona ahora (un guard que solo quita admisiones, nunca prueba) y con claims que citan
