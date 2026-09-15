@@ -15,13 +15,16 @@
  * This suite reads every tool handler in this directory and holds each tool to
  * both rules.
  *
- * The one recorded exception is the two low-risk introspection tools the list
- * names: the graph's write for them sits on a path they never take. They are
- * recorded with order 4 for a decision, not repaired here.
+ * Order 4 recorded one exception, the two low-risk introspection tools. The
+ * Accountable resolved it on 2026-09-15 (§8 Q7): they audit themselves like
+ * every low-risk tool, so no tool is exempt from these rules any more. The same
+ * decision on Q8 made a person's approved confirmation row the invocation's one
+ * row, which the graph hands to the tool through its invocation scope. The last
+ * check here holds the graph to that wiring (Cycle 3 order 5).
  *
- * It reads source, not behavior: it guards the ownership map. That each
- * self-auditing handler writes and closes its row on every branch is for that
- * handler's own selftest to prove.
+ * It reads source, not behavior: it guards the ownership map and the wiring.
+ * That each self-auditing handler writes and closes its row on every branch is
+ * for that handler's own selftest to prove.
  */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
@@ -32,8 +35,8 @@ import { toolOwnsAuditTrail } from "./tool-audit-ownership";
 /** A call that writes a `tool_calls` row: the two audit helpers, or the runner built on them. */
 const AUDIT_WRITE = /\b(createTrackedToolCall|createToolCall|runAuditedTool)\s*\(/;
 
-/** Low-risk introspection tools the graph never reaches — recorded, not repaired. */
-const RECORDED_EXCEPTIONS = ["get_user_preferences", "list_enabled_tools"];
+/** Tools still allowed to execute with no row. None since §8 Q7 was resolved (2026-09-15). */
+const RECORDED_EXCEPTIONS: string[] = [];
 
 interface ScannedTool {
   file: string;
@@ -102,7 +105,7 @@ function main() {
     assert.ok(scanned.length >= 55, `the scan found only ${scanned.length} tools`);
     const catalog = new Set(TOOL_CATALOG.map((d) => d.id));
     assert.deepEqual(describe(scanned.filter((s) => !catalog.has(s.name))), [], "every scanned tool is catalogued");
-    for (const id of ["legacy_lead_get_context", "work_portfolio_read", "bash", "calendar_create_event", "gmail_send_email", ...RECORDED_EXCEPTIONS]) {
+    for (const id of ["legacy_lead_get_context", "work_portfolio_read", "bash", "calendar_create_event", "gmail_send_email", "get_user_preferences", "list_enabled_tools"]) {
       assert.ok(scanned.some((s) => s.name === id), `the scan missed ${id}`);
     }
     const names = scanned.map((s) => s.name);
@@ -121,10 +124,21 @@ function main() {
     assert.deepEqual(describe(doubled), [], "these tools would be audited twice when auto-executed");
   });
 
-  t("the recorded exceptions are exactly the tools still unaudited — repairing one means removing it here", () => {
+  t("no low-risk tool executes without a row — the recorded exceptions are exactly the tools still unaudited", () => {
     const stillUnaudited = scanned.filter((s) => !s.writesOwnRow && !toolRequiresConfirmation(s.name)).map((s) => s.name);
     assert.deepEqual(stillUnaudited.sort(), [...RECORDED_EXCEPTIONS].sort());
     for (const id of RECORDED_EXCEPTIONS) assert.equal(toolOwnsAuditTrail(id), false, `${id} stays listed`);
+  });
+
+  t("the graph runs every tool invocation in its scope and closes its row through the shared helpers (§8 Q8)", () => {
+    const graph = readFileSync(path.join(__dirname, "..", "graph.ts"), "utf8");
+    const invokes = graph.match(/\.invoke\(tc\.args\)/g) ?? [];
+    assert.ok(invokes.length >= 1, "the scan found no tool invocation in graph.ts");
+    const scoped = graph.match(/\.run\(\(\)\s*=>\s*\(matchingTool as any\)\.invoke\(tc\.args\)\)/g) ?? [];
+    assert.equal(scoped.length, invokes.length, "every invocation runs inside openToolInvocation(...).run");
+    assert.ok(/openToolInvocation\(tc\.name,\s*trackedToolCallId\)/.test(graph), "the scope carries the graph's row, never a model value");
+    assert.ok(/closeToolInvocation\(/.test(graph), "a finished invocation closes its row through closeToolInvocation");
+    assert.ok(/failToolInvocation\(/.test(graph), "a thrown invocation closes its row through failToolInvocation");
   });
 
   console.log(`\ntool audit ownership selftest: ${passed} checks passed`);

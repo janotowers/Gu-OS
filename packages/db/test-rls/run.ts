@@ -5,7 +5,8 @@
  * SL-2 added `organization_policies` and `source_events`; SL-3 added the
  * M-RESOLUTION-IDENTITY indexes; SL-4 the Case Subjects and wake identity;
  * SL-7 `portfolio_presentation_state` and the Work Portfolio read paths; SL-12
- * the chat tool's Organization resolution and the ranking kill switch.
+ * the chat tool's Organization resolution and the ranking kill switch; Cycle 3
+ * order 5 `tool_calls` as read-own and not user-writable.
  *
  * Technical Plan §8: "Cross-tenant negative suite (two-orgs fixture, read and
  * write paths) required from SL-0 and gating every multi-seat surface."
@@ -2268,6 +2269,107 @@ async function main(): Promise<void> {
       assert.equal(rows.length, 1, "must not create a second membership");
       assert.equal(rows[0].status, "inactive", "reactivation must be explicit");
       assert.equal(rows[0].role, "advisor");
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nCycle 3 order 5 — tool_calls is read-own, not user-writable (Slice Plan §8 Q9)");
+
+    // Since 00001 the table's only policy was FOR ALL over the rows of the
+    // user's own sessions: it granted every user write authority over their own
+    // audit rows. The Accountable decided on 2026-09-15 that the subject of an
+    // audit record reads it but never creates, alters or erases it; writes stay
+    // with the service role, which the application uses for every tool_calls
+    // write. Rows below are written by the superuser outside any request role,
+    // so they persist across the rolled-back cases.
+    const sessionOf = async (userId: string) =>
+      (
+        await client.query<{ id: string }>(
+          "insert into public.agent_sessions (user_id) values ($1) returning id",
+          [userId]
+        )
+      ).rows[0].id;
+    const auditRowIn = async (sessionId: string, toolName: string) =>
+      (
+        await client.query<{ id: string }>(
+          `insert into public.tool_calls (session_id, tool_name, arguments_json, status)
+           values ($1, $2, '{}'::jsonb, 'executed') returning id`,
+          [sessionId, toolName]
+        )
+      ).rows[0].id;
+    const sessionCreatorA = await sessionOf(f.creatorA);
+    const sessionMemberB = await sessionOf(f.memberB);
+    const ownAuditRow = await auditRowIn(sessionCreatorA, "calendar_list_events");
+    const otherAuditRow = await auditRowIn(sessionMemberB, "gmail_send_email");
+
+    const visibleAuditRows = (claims: Claims) =>
+      asRole(client, claims, async () =>
+        (await client.query<{ id: string }>("select id from public.tool_calls")).rows.map((r) => r.id)
+      );
+
+    await t("Q9 a user reads the audit rows of their own sessions", async () => {
+      assert.deepEqual(await visibleAuditRows(authed(f.creatorA)), [ownAuditRow]);
+    });
+
+    await t("Q9 another user's audit rows are invisible, and anon reads none", async () => {
+      assert.deepEqual(await visibleAuditRows(authed(f.memberB)), [otherAuditRow], "each user sees only their own");
+      assert.deepEqual(await visibleAuditRows({ role: "anon" }), []);
+    });
+
+    await t("Q9 a user cannot INSERT an audit row, not even for their own session", async () => {
+      const code = await asRole(client, authed(f.creatorA), () =>
+        errorCode(() =>
+          client.query(
+            "insert into public.tool_calls (session_id, tool_name) values ($1, 'forged_tool')",
+            [sessionCreatorA]
+          )
+        )
+      );
+      assert.equal(code, RLS_VIOLATION, "no policy grants a user write authority over audit rows");
+    });
+
+    await t("Q9 a user cannot UPDATE their own audit row", async () => {
+      const affected = await asRole(client, authed(f.creatorA), async () =>
+        (
+          await client.query(
+            `update public.tool_calls set status = 'failed', result_json = '{"forged":true}'::jsonb
+              where id = $1`,
+            [ownAuditRow]
+          )
+        ).rowCount
+      );
+      assert.equal(affected, 0, "readable, but not updatable");
+      const { rows } = await client.query<{ status: string; result_json: unknown }>(
+        "select status, result_json from public.tool_calls where id = $1",
+        [ownAuditRow]
+      );
+      assert.equal(rows[0].status, "executed");
+      assert.equal(rows[0].result_json, null, "unchanged");
+    });
+
+    await t("Q9 a user cannot DELETE their own audit row", async () => {
+      const affected = await asRole(client, authed(f.creatorA), async () =>
+        (await client.query("delete from public.tool_calls where id = $1", [ownAuditRow])).rowCount
+      );
+      assert.equal(affected, 0);
+      const { rowCount } = await client.query("select 1 from public.tool_calls where id = $1", [ownAuditRow]);
+      assert.equal(rowCount, 1, "still there");
+    });
+
+    await t("Q9 the authorized writer, the service role, still opens and closes audit rows", async () => {
+      await asRole(client, service, async () => {
+        const opened = await client.query<{ id: string }>(
+          `insert into public.tool_calls (session_id, tool_name, status, requires_confirmation)
+           values ($1, 'legacy_lead_get_context', 'approved', false) returning id`,
+          [sessionCreatorA]
+        );
+        assert.equal(opened.rowCount, 1);
+        const closed = await client.query(
+          `update public.tool_calls set status = 'executed', result_json = '{"status":"ok"}'::jsonb
+            where id = $1`,
+          [opened.rows[0].id]
+        );
+        assert.equal(closed.rowCount, 1);
+      });
     });
 
     console.log(`\nRLS suite ok — ${passed} checks passed`);

@@ -8,6 +8,7 @@
     "test:legacy-gateway-tools": "tsx src/tools/legacy-gateway-adapters.selftest.ts",
     "test:work-portfolio-tools": "tsx src/tools/work-portfolio-adapters.selftest.ts",
     "test:tool-audit-ownership": "tsx src/tools/tool-audit-ownership.selftest.ts",
+    "test:tool-invocation-audit": "tsx src/tools/tool-invocation-audit.selftest.ts",
     "test:github-intent": "tsx src/tools/github-intent.selftest.ts",
     "test:calendar-window": "tsx src/tools/calendar-list-window.selftest.ts",
     "test:calendar-display": "tsx src/tools/calendar-event-display.selftest.ts",
