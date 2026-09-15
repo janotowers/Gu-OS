@@ -176,6 +176,8 @@ Do not cross approved scope, relax authority, or redefine intended behavior mere
 
 The decision policy itself is canonical in §12.3 and is deliberately not restated here.
 
+**Estimates and Cycles never pace work.** A Slice estimate is a recorded prediction kept for calibration, and an Execution Cycle is a planning and capacity window. Neither is a minimum duration, a reserve, or a reason to delay executable work, to space execution or to hold a Slice open; work that finishes early returns to the loop at once. The rules are canonical in the [Methodology](docs/development/agentic-product-software-development-methodology.md) §10.4, §12.1 and §17.1 and are not restated here.
+
 **Stop only when** the next meaningful action crosses a genuine human-authority boundary, or no legitimate progress is currently possible. When stopping or escalating, state the exact boundary or blocker, the governing artifact or authority when material, and the smallest concrete human decision or action required. A generic *"done — let me know what you want to do next"* is not a valid stopping condition while legitimate development work can still be derived.
 
 **Continuity never widens authority.** It is a rule about not stalling, not about deciding more. Do not silently settle consequential product behavior, architecture, security/tenancy/authority, external-effect authority, economics, release risk or release authority, accepted-risk decisions, or changes to governing dependencies — the loop stalling is never a reason to. For **material model/eval acceptance thresholds**, follow §14.1. Do not treat an unsettled consequential product-quality or accepted-risk threshold as ordinary engineering authority.
