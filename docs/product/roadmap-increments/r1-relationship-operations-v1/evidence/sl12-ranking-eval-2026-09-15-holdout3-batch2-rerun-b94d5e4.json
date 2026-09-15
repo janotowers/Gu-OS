@@ -1,0 +1,597 @@
+{
+  "ranAt": "2026-09-15T16:16:04.431Z",
+  "set": {
+    "name": "holdout3",
+    "file": "ranking-holdout3-scenarios.json",
+    "digest": "sha256:82fe8495871e34bbcdd5ec5e9133e54089475e4ced47bde1d477a6fc87049a77"
+  },
+  "model": {
+    "source": "the judge that ran each pass (PortfolioRankingJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ]
+  },
+  "failure_rate_bar": 0.2,
+  "unsupported_attention_bar": 0,
+  "floor_violation_bar": 0,
+  "scenarios": 9,
+  "runCount": 5,
+  "runsHoldingAllBars": 5,
+  "runs": [
+    {
+      "run": 1,
+      "failures": 0,
+      "failureRate": 0,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-quiet-mixed",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-attractive-with-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-callback-before-two",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h3-paperwork-below-a-deadline",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-instruction-in-work",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-thin-signals",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-two-governed-notary-vs-thanks",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-work-answers-the-question",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-many-quiet-one-broken-promise",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 0,
+      "failureRate": 0,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-quiet-mixed",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-attractive-with-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-callback-before-two",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h3-paperwork-below-a-deadline",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-instruction-in-work",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-thin-signals",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-two-governed-notary-vs-thanks",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-work-answers-the-question",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-many-quiet-one-broken-promise",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 0,
+      "failureRate": 0,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-quiet-mixed",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-attractive-with-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-callback-before-two",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h3-paperwork-below-a-deadline",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-instruction-in-work",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-thin-signals",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-two-governed-notary-vs-thanks",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-work-answers-the-question",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-many-quiet-one-broken-promise",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 0,
+      "failureRate": 0,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-quiet-mixed",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-attractive-with-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-callback-before-two",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h3-paperwork-below-a-deadline",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-instruction-in-work",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-thin-signals",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-two-governed-notary-vs-thanks",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-work-answers-the-question",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-many-quiet-one-broken-promise",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 0,
+      "failureRate": 0,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-quiet-mixed",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-attractive-with-gu-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-callback-before-two",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "h3-paperwork-below-a-deadline",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-instruction-in-work",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-thin-signals",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "h3-two-governed-notary-vs-thanks",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "h3-work-answers-the-question",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "h3-many-quiet-one-broken-promise",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    }
+  ]
+}
