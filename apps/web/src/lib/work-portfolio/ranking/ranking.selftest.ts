@@ -46,6 +46,7 @@ import {
   RANKING_MAX_CASES,
   RANKING_MAX_TEXT_CHARS,
   type PortfolioRankingJudge,
+  type RankingFrame,
   type RankingInput,
   type RankingJudgeResult,
   type RankingOutput,
@@ -53,6 +54,7 @@ import {
 import { buildRankingFrame } from "./frame";
 import { frameFromInput, mergeRanking, needsAttentionOrder } from "./merge";
 import { rankWorkPortfolio, type RankedWorkPortfolio } from "./index";
+import { createOpenRouterRankingJudge } from "./judge";
 import { loadRankingEvalSet, scoreRankingScenario } from "./eval/run-ranking-eval";
 
 const ORG = "11111111-1111-1111-1111-111111111111";
@@ -210,7 +212,22 @@ function stubJudge(
   };
 }
 
-const ok = (output: RankingOutput): RankingJudgeResult => ({ ok: true, output });
+/**
+ * Fixtures written before the needed-now guard state only `items`. For them,
+ * every contextual item is also affirmed as needed now, so each test keeps
+ * testing what its label says. The guard's own tests pass `assessments`.
+ */
+function affirmed(output: RankingOutput): RankingOutput {
+  if (output.assessments !== undefined) return output;
+  return {
+    ...output,
+    assessments: output.items
+      .filter((item) => item.kind === "contextual")
+      .map((item) => ({ case: item.case, human_intervention_needed_now: true, reason: "fixture" })),
+  };
+}
+const ok = (output: RankingOutput): RankingJudgeResult => ({ ok: true, output: affirmed(output) });
+const mergeAffirmed = (frame: RankingFrame, output: RankingOutput) => mergeRanking(frame, affirmed(output));
 const claim = (text: string, refs: string[]) => ({ text, refs });
 
 async function rank(
@@ -339,14 +356,14 @@ async function main(): Promise<void> {
 
   await t("an unknown case alias in the answer is ignored and counted, never resolved to a Case", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, { items: [{ case: "c99", kind: "contextual", priority: 1, why: claim("w", ["c99"]), what_gu_needs: claim("n", ["c99"]), why_now: claim("t", ["c99"]) }] });
+    const merged = mergeAffirmed(frame, { items: [{ case: "c99", kind: "contextual", priority: 1, why: claim("w", ["c99"]), what_gu_needs: claim("n", ["c99"]), why_now: claim("t", ["c99"]) }] });
     assert.equal(merged.contextual.size, 0);
     assert.equal(merged.diagnostics.unknown_cases, 1);
   });
 
   await t("the merge never admits a GOVERNED case contextually, even with fully grounded claims", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, {
+    const merged = mergeAffirmed(frame, {
       items: [{ case: "c1", kind: "contextual", priority: 1, why: claim("w", ["c1.f1"]), what_gu_needs: claim("n", ["c1"]), why_now: claim("t", ["c1.a1"]) }],
     });
     assert.equal(merged.contextual.has("c1"), false, "governed stays governed at the merge, not only at the view");
@@ -356,7 +373,7 @@ async function main(): Promise<void> {
 
   await t("a model claiming a NON-governed Case is governed creates nothing", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, { items: [{ case: "c2", kind: "governed", priority: 1 }] });
+    const merged = mergeAffirmed(frame, { items: [{ case: "c2", kind: "governed", priority: 1 }] });
     assert.equal(merged.contextual.size, 0);
     assert.deepEqual(needsAttentionOrder(frame, merged), ["c1"], "only the real governed case is in the floor");
   });
@@ -418,7 +435,7 @@ async function main(): Promise<void> {
 
   await t("citing ANOTHER case's alias, or one that does not exist, drops the admission", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, {
+    const merged = mergeAffirmed(frame, {
       items: [
         { case: "c2", kind: "contextual", priority: 1, why: claim("w", ["c1.f1"]), what_gu_needs: claim("n", ["c2"]), why_now: claim("t", ["c2.r1"]) },
         { case: "c3", kind: "contextual", priority: 2, why: claim("w", ["c3.f9"]), what_gu_needs: claim("n", ["c3"]), why_now: claim("t", ["c3"]) },
@@ -431,19 +448,94 @@ async function main(): Promise<void> {
 
   await t("a contextual answer missing any of WHY / WHAT GU NEEDS / WHY NOW is not admitted", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, { items: [{ case: "c2", kind: "contextual", priority: 1, why: claim("w", ["c2"]), what_gu_needs: claim("n", ["c2"]) }] });
+    const merged = mergeAffirmed(frame, { items: [{ case: "c2", kind: "contextual", priority: 1, why: claim("w", ["c2"]), what_gu_needs: claim("n", ["c2"]) }] });
     assert.equal(merged.contextual.size, 0);
   });
 
   await t("a grounded admission keeps the model's words and the rows they cite", () => {
     const frame = frameFromInput(minimalInput());
-    const merged = mergeRanking(frame, {
+    const merged = mergeAffirmed(frame, {
       items: [{ case: "c2", kind: "contextual", priority: 1, why: claim("Molestia registrada", ["c2.r1"]), what_gu_needs: claim("Llamar", ["c2"]), why_now: claim("Hoy", ["c2.r1"]) }],
     });
     const admitted = merged.contextual.get("c2");
     assert.ok(admitted);
     assert.equal(admitted.why.text, "Molestia registrada");
     assert.deepEqual(admitted.why.refs, [frame.cases[1].refs["c2.r1"]]);
+  });
+
+  console.log("\nthe needed-now guard — conservative, and never proof of support");
+
+  const grounded = (ref: string) => ({
+    case: ref,
+    kind: "contextual" as const,
+    priority: 1,
+    why: claim("w", [`${ref}.r1`]),
+    what_gu_needs: claim("n", [ref]),
+    why_now: claim("t", [`${ref}.r1`]),
+  });
+
+  await t("a grounded contextual item the model did not affirm as needed now is not admitted", () => {
+    const frame = frameFromInput(minimalInput());
+    for (const output of [{ items: [grounded("c2")] }, { assessments: [], items: [grounded("c2")] }]) {
+      const merged = mergeRanking(frame, output);
+      assert.equal(merged.contextual.size, 0);
+      assert.equal(merged.diagnostics.unaffirmed_admissions, 1);
+    }
+  });
+
+  await t("a 'false' — or any 'false' among several statements about the case — keeps it out", () => {
+    const frame = frameFromInput(minimalInput());
+    for (const assessments of [
+      [{ case: "c2", human_intervention_needed_now: false }],
+      [{ case: "c2", human_intervention_needed_now: true }, { case: "c2", human_intervention_needed_now: false }],
+      [{ case: "c3", human_intervention_needed_now: true }],
+    ]) {
+      assert.equal(mergeRanking(frame, { assessments, items: [grounded("c2")] }).contextual.size, 0);
+    }
+  });
+
+  await t("an affirmation is not proof: an affirmed item citing another case's row, or missing a claim, is still dropped", () => {
+    const frame = frameFromInput(minimalInput());
+    const assessments = [{ case: "c2", human_intervention_needed_now: true }];
+    const foreign = mergeRanking(frame, { assessments, items: [{ ...grounded("c2"), why: claim("w", ["c1.f1"]) }] });
+    assert.equal(foreign.contextual.size, 0);
+    assert.ok(foreign.diagnostics.ungrounded_claims >= 1);
+    assert.equal(mergeRanking(frame, { assessments, items: [{ ...grounded("c2"), why_now: undefined }] }).contextual.size, 0);
+    assert.equal(mergeRanking(frame, { assessments, items: [grounded("c2")] }).contextual.size, 1, "affirmed AND grounded");
+  });
+
+  await t("a governed case's presence never depends on an affirmation, and one cannot make it contextual", () => {
+    const frame = frameFromInput(minimalInput());
+    const denied = mergeRanking(frame, { assessments: [{ case: "c1", human_intervention_needed_now: false }], items: [] });
+    assert.deepEqual(needsAttentionOrder(frame, denied), [frame.cases[0].case_id], "still in the floor");
+    const relabelled = mergeRanking(frame, {
+      assessments: [{ case: "c1", human_intervention_needed_now: true }],
+      items: [{ ...grounded("c1"), why: claim("w", ["c1.f1"]) }],
+    });
+    assert.equal(relabelled.contextual.size, 0);
+  });
+
+  await t("the eval never reads an affirmation as support: an affirmed, grounded admission the scenario forbids is unsupported attention", () => {
+    const quiet = loadRankingEvalSet().scenarios.find((s) => s.id === "quiet-portfolio-no-inflation")!;
+    const score = scoreRankingScenario(quiet, {
+      ok: true,
+      output: {
+        assessments: [{ case: "c1", human_intervention_needed_now: true, reason: "El modelo lo afirma." }],
+        items: [{ case: "c1", kind: "contextual", priority: 1, why: claim("w", ["c1"]), what_gu_needs: claim("n", ["c1"]), why_now: claim("t", ["c1"]) }],
+      },
+    });
+    assert.equal(score.unsupported.length, 1);
+  });
+
+  await t("the guard is neither shown nor kept: an admission carries its claims and nothing of the assessment", () => {
+    const frame = frameFromInput(minimalInput());
+    const merged = mergeRanking(frame, {
+      assessments: [{ case: "c2", human_intervention_needed_now: true, reason: "RAZON-INTERNA" }],
+      items: [grounded("c2")],
+    });
+    const admitted = merged.contextual.get(frame.cases[1].case_id)!;
+    assert.deepEqual(Object.keys(admitted).sort(), ["case_id", "kind", "must_surface", "v", "what_gu_needs", "why", "why_now"]);
+    assert.ok(!JSON.stringify(merged).includes("RAZON-INTERNA"));
   });
 
   console.log("\nSA-12.7 — any model failure leaves SL-7's order, visibly");
@@ -473,6 +565,80 @@ async function main(): Promise<void> {
     const { ranked, portfolio } = await rank(fx, slow, { timeoutMs: 25 });
     assert.equal(ranked.ranking.status, "timeout");
     assert.deepEqual(ids(ranked.organizationWork.entries), ids(portfolio.organizationWork.entries));
+  });
+
+  console.log("\nthe production judge — a bounded retry, and whole answers only");
+
+  const validOutput: RankingOutput = { assessments: [], items: [{ case: "c1", kind: "governed", priority: 1 }] };
+  const reply = (content: unknown, status = 200) =>
+    new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }], usage: {} }), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  const hang: typeof fetch = (_url, init) =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+    });
+  const scripted = (steps: Array<typeof fetch>) => {
+    let n = 0;
+    return { fetchImpl: ((url, init) => steps[Math.min(n++, steps.length - 1)](url, init)) as typeof fetch, calls: () => n };
+  };
+  async function withKey<T>(fn: () => Promise<T>): Promise<T> {
+    const before = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "test-key";
+    try {
+      return await fn();
+    } finally {
+      if (before === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = before;
+    }
+  }
+  const signal = () => new AbortController().signal;
+
+  await t("a hung attempt is abandoned and tried once more, inside the pass's bound", async () => {
+    const s = scripted([hang, async () => reply(validOutput)]);
+    const result = await withKey(() => createOpenRouterRankingJudge({ attemptTimeoutMs: 30, fetchImpl: s.fetchImpl }).rank(minimalInput(), signal()));
+    assert.equal(result.ok, true);
+    assert.equal(s.calls(), 2);
+  });
+
+  await t("an invalid answer is tried once more; two invalid answers stay invalid_output — never a partial merge", async () => {
+    const bad = async () => reply({ items: [{ case: "c1", kind: "governed" }] }); // no priority
+    const recovered = scripted([bad, async () => reply(validOutput)]);
+    assert.equal((await withKey(() => createOpenRouterRankingJudge({ fetchImpl: recovered.fetchImpl }).rank(minimalInput(), signal()))).ok, true);
+    const twice = scripted([bad, bad, async () => reply(validOutput)]);
+    const result = await withKey(() => createOpenRouterRankingJudge({ fetchImpl: twice.fetchImpl }).rank(minimalInput(), signal()));
+    assert.deepEqual(result, { ok: false, reason: "invalid_output" });
+    assert.equal(twice.calls(), 2, "at most two attempts");
+  });
+
+  await t("a 5xx is tried once more; a 4xx refusal is not", async () => {
+    const unavailable = scripted([async () => reply({}, 503), async () => reply(validOutput)]);
+    assert.equal((await withKey(() => createOpenRouterRankingJudge({ fetchImpl: unavailable.fetchImpl }).rank(minimalInput(), signal()))).ok, true);
+    const refused = scripted([async () => reply({}, 400), async () => reply(validOutput)]);
+    assert.deepEqual(await withKey(() => createOpenRouterRankingJudge({ fetchImpl: refused.fetchImpl }).rank(minimalInput(), signal())), { ok: false, reason: "model_error" });
+    assert.equal(refused.calls(), 1);
+  });
+
+  await t("the pass's bound wins: an outer abort is rethrown and never retried", async () => {
+    const s = scripted([hang, async () => reply(validOutput)]);
+    const outer = new AbortController();
+    const pending = withKey(() => createOpenRouterRankingJudge({ attemptTimeoutMs: 5_000, fetchImpl: s.fetchImpl }).rank(minimalInput(), outer.signal));
+    setTimeout(() => outer.abort(new Error("pass timeout")), 20);
+    await assert.rejects(pending);
+    assert.equal(s.calls(), 1);
+  });
+
+  await t("with no key there is no call at all", async () => {
+    const s = scripted([async () => reply(validOutput)]);
+    const before = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    try {
+      assert.deepEqual(await createOpenRouterRankingJudge({ fetchImpl: s.fetchImpl }).rank(minimalInput(), signal()), { ok: false, reason: "model_unavailable" });
+    } finally {
+      if (before !== undefined) process.env.OPENROUTER_API_KEY = before;
+    }
+    assert.equal(s.calls(), 0);
   });
 
   console.log("\nflags off ⇒ inert; no candidates ⇒ no call");
@@ -647,34 +813,44 @@ async function main(): Promise<void> {
 
   console.log("\neval set");
 
-  await t("the eval set carries the ratified bars and is internally consistent", () => {
-    const set = loadRankingEvalSet();
-    assert.equal(set.failure_rate_bar, 0.2);
-    assert.equal(set.unsupported_attention_bar, 0);
-    assert.equal(set.floor_violation_bar, 0);
-    assert.equal(set.batches, 2);
-    assert.equal(set.runs_per_batch, 5);
-    const seen = new Set<string>();
-    for (const s of set.scenarios) {
-      assert.ok(!seen.has(s.id), `duplicate scenario ${s.id}`);
-      seen.add(s.id);
-      const refs = s.input.cases.map((c) => c.ref);
-      assert.deepEqual(
-        s.input.cases.filter((c) => c.governed.length > 0).map((c) => c.ref).sort(),
-        [...s.governed].sort(),
-        `${s.id}: governed list matches the input`
-      );
-      for (const ref of [...s.expect_contextual, ...s.must_not_admit, ...s.order_pairs.flat()]) {
-        assert.ok(refs.includes(ref), `${s.id}: ${ref} is a case of the scenario`);
+  await t("every eval set carries the ratified bars, unchanged, and is internally consistent", () => {
+    const main = loadRankingEvalSet("main");
+    const holdout = loadRankingEvalSet("holdout");
+    const holdout2 = loadRankingEvalSet("holdout2");
+    const holdout3 = loadRankingEvalSet("holdout3");
+    for (const [name, set] of [["main", main], ["holdout", holdout], ["holdout2", holdout2], ["holdout3", holdout3]] as const) {
+      assert.equal(set.failure_rate_bar, 0.2, name);
+      assert.equal(set.unsupported_attention_bar, 0, name);
+      assert.equal(set.floor_violation_bar, 0, name);
+      assert.equal(set.batches, 2, name);
+      assert.equal(set.runs_per_batch, 5, name);
+      const seen = new Set<string>();
+      for (const s of set.scenarios) {
+        assert.ok(!seen.has(s.id), `duplicate scenario ${s.id}`);
+        seen.add(s.id);
+        const refs = s.input.cases.map((c) => c.ref);
+        assert.deepEqual(
+          s.input.cases.filter((c) => c.governed.length > 0).map((c) => c.ref).sort(),
+          [...s.governed].sort(),
+          `${s.id}: governed list matches the input`
+        );
+        for (const ref of [...s.expect_contextual, ...s.must_not_admit, ...s.order_pairs.flat()]) {
+          assert.ok(refs.includes(ref), `${s.id}: ${ref} is a case of the scenario`);
+        }
+        assert.ok(!s.expect_contextual.some((r) => s.must_not_admit.includes(r)), `${s.id}: expect and forbid are disjoint`);
+        assert.ok(!s.expect_contextual.some((r) => s.governed.includes(r)), `${s.id}: a governed case cannot be admitted contextually`);
+        assert.equal(typeof s.rubric, "string");
       }
-      assert.ok(!s.expect_contextual.some((r) => s.must_not_admit.includes(r)), `${s.id}: expect and forbid are disjoint`);
-      assert.ok(!s.expect_contextual.some((r) => s.governed.includes(r)), `${s.id}: a governed case cannot be admitted contextually`);
-      assert.equal(typeof s.rubric, "string");
+      const covered = new Set(set.scenarios.flatMap((s) => s.covers ?? []));
+      for (const required of ["no_inflation", "no_attractiveness", "contextual_admission", "eligibility_not_priority", "untrusted_content", "governed_floor", "evidence_too_thin"]) {
+        assert.ok(covered.has(required), `the ${name} set covers ${required}`);
+      }
     }
-    const covered = new Set(set.scenarios.flatMap((s) => s.covers ?? []));
-    for (const required of ["no_inflation", "no_attractiveness", "contextual_admission", "eligibility_not_priority", "untrusted_content", "governed_floor", "evidence_too_thin"]) {
-      assert.ok(covered.has(required), `the set covers ${required}`);
-    }
+    // Each holdout measures the same contract at the same granularity, with
+    // different situations: one failure weighs the same against the 20% bar.
+    for (const h of [holdout, holdout2, holdout3]) assert.equal(h.scenarios.length, main.scenarios.length);
+    const ids = [main, holdout, holdout2, holdout3].flatMap((set) => set.scenarios.map((s) => s.id));
+    assert.equal(new Set(ids).size, ids.length, "no scenario is shared between sets");
   });
 
   await t("the scorer counts an unsupported admission, a missed one and a pair out of order — and nothing when right", () => {

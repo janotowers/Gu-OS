@@ -30,8 +30,15 @@ export const RANKING_MAX_WORK_PER_CASE = 6;
 export const RANKING_MAX_RECONSIDERATIONS_PER_CASE = 3;
 /** Any one string copied into the input. Longer text is cut, and says so. */
 export const RANKING_MAX_TEXT_CHARS = 300;
-/** One call per Portfolio load; past this the deterministic order stands. */
+/** The whole pass, per Portfolio load; past this the deterministic order stands. */
 export const RANKING_TIMEOUT_MS = 20_000;
+/**
+ * One attempt's own limit inside that bound. A provider call that hangs is
+ * abandoned, not waited on for the whole budget, so the one retry still fits.
+ */
+export const RANKING_ATTEMPT_TIMEOUT_MS = 12_000;
+/** The first attempt, and one more after a transient failure or an invalid answer. */
+export const RANKING_MAX_ATTEMPTS = 2;
 
 // ============================================================
 // Input
@@ -98,7 +105,27 @@ const ClaimSchema = z.object({
   refs: z.array(z.string()).min(1).max(8),
 });
 
+/**
+ * The model's explicit statement, per non-governed case, of whether a person's
+ * intervention is needed NOW — a conservative admission guard (the
+ * Accountable's decision of 2026-09-15, option A).
+ *
+ * NECESSARY, NEVER SUFFICIENT. The merge admits a contextual item only when its
+ * case is affirmed here AND every claim is grounded, so the guard can only
+ * remove admissions. An affirmation is the model's own judgment, not proof
+ * that an admission is supported: whether the evidence supports it remains the
+ * eval's to score (SA-12.6), exactly as before. It is never shown and never
+ * persisted.
+ */
+const AssessmentSchema = z.object({
+  case: z.string(),
+  human_intervention_needed_now: z.boolean(),
+  /** One short sentence; read by nobody but the model's own consistency. */
+  reason: z.string().nullish(),
+});
+
 export const RankingOutputSchema = z.object({
+  assessments: z.array(AssessmentSchema).max(RANKING_MAX_CASES * 2).nullish(),
   items: z
     .array(
       z.object({
@@ -117,6 +144,7 @@ export const RankingOutputSchema = z.object({
 
 export type RankingOutput = z.infer<typeof RankingOutputSchema>;
 export type RankingClaim = z.infer<typeof ClaimSchema>;
+export type RankingAssessment = z.infer<typeof AssessmentSchema>;
 
 // ============================================================
 // Frame — the input plus what the merge needs to check it
