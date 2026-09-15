@@ -261,7 +261,7 @@ function AttentionCard({
     ["Por qué ahora", item.why_now],
   ];
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/40">
+    <div data-predicate={item.predicate} className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/40">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="amber">{PREDICATE_COPY[item.predicate]}</Badge>
         <span className="text-[11px] text-neutral-500">obligación gobernada · no se puede ocultar</span>
@@ -289,7 +289,9 @@ function AttentionCard({
 /**
  * A discretionary attention item (SL-12): the model's words, each shown with
  * the durable rows it cites — the merge kept it only because every one of them
- * is this Case's own. Rendered as text, never as markup.
+ * is this Case's own. Rendered as text, never as markup. Each cited row also
+ * carries its full identity in `data-claim-ref`, so a hosted verification can
+ * check, from the rendered page, that every claim shown cites its own Case.
  */
 function ContextualCard({ item }: { item: ContextualAttention }) {
   const rows: Array<[string, ContextualAttention["why"]]> = [
@@ -310,7 +312,12 @@ function ContextualCard({ item }: { item: ContextualAttention }) {
             <dd className="text-neutral-900 dark:text-neutral-100">
               {claim.text}
               <span className="ml-2 font-mono text-[10px] text-neutral-400">
-                {claim.refs.map(shortRef).join(" · ")}
+                {claim.refs.map((ref, i) => (
+                  <span key={`${ref.kind}:${ref.id}`} data-claim-ref={`${ref.kind}:${ref.id}`}>
+                    {i > 0 ? " · " : ""}
+                    {shortRef(ref)}
+                  </span>
+                ))}
               </span>
             </dd>
           </div>
@@ -389,7 +396,18 @@ function CaseCard({
         : "Sin asignar";
   const latest = entry.posture.basis;
   return (
-    <article id={`case-${entry.case.id}`} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+    <article
+      id={`case-${entry.case.id}`}
+      // Inert data for hosted verification (SL-12 RS-2): what this card shows,
+      // as the ranked view decided it. Presentation only; nothing reads it back.
+      data-portfolio-entry=""
+      data-case-id={entry.case.id}
+      data-section={entry.section}
+      data-kind={entry.attention.length > 0 ? "governed" : entry.contextual ? "contextual" : "none"}
+      data-rank={entry.rank ?? undefined}
+      data-visible={String(entry.presentation.visible)}
+      className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+    >
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
@@ -524,7 +542,7 @@ function PortfolioSections({
   })).filter((group) => group.entries.length > 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-portfolio-view={view} data-ranking-status={ranking.status}>
       {sections.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700">
           No hay Casos en esta vista.

@@ -207,8 +207,9 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
 
   function builder(name: string) {
     const filters: Filter[] = [];
-    let mode: "select" | "insert" | "update" | "delete" = "select";
+    let mode: "select" | "insert" | "update" | "delete" | "upsert" = "select";
     let pending: Row[] = [];
+    let conflictColumns: string[] = [];
     let patch: Row = {};
     let orderColumn: string | null = null;
     let orderAscending = true;
@@ -282,6 +283,26 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
         return { rows: affected, error: null };
       }
 
+      if (mode === "upsert") {
+        writes.push(name);
+        const affected: Row[] = [];
+        for (const row of pending) {
+          const existing =
+            conflictColumns.length > 0
+              ? table(name).find((candidate) => conflictColumns.every((column) => candidate[column] === row[column]))
+              : undefined;
+          if (existing) {
+            Object.assign(existing, row);
+            affected.push(existing);
+            continue;
+          }
+          const withId: Row = { id: randomUUID(), ...(defaults[name] ?? {}), ...row };
+          table(name).push(withId);
+          affected.push(withId);
+        }
+        return { rows: affected, error: null };
+      }
+
       reads.push(name);
       queries.push({ table: name, filters: [...filters] });
       let rows = table(name).filter((row) => matches(row, filters));
@@ -314,6 +335,20 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
       },
       delete: () => {
         mode = "delete";
+        return self;
+      },
+      /**
+       * PostgREST `.upsert(values, { onConflict })`: update the row matching the
+       * conflict columns, else insert. The SL-12 verifier's bounded flag
+       * activation writes through `setOrganizationFlag`, which upserts.
+       */
+      upsert: (values: Row | Row[], opts?: { onConflict?: string }) => {
+        mode = "upsert";
+        pending = Array.isArray(values) ? values : [values];
+        conflictColumns = (opts?.onConflict ?? "")
+          .split(",")
+          .map((column) => column.trim())
+          .filter(Boolean);
         return self;
       },
       eq: (column: string, value: unknown) => {
