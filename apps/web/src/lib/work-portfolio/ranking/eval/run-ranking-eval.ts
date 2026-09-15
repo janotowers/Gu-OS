@@ -24,11 +24,11 @@
  * Requires a real model. Without `OPENROUTER_API_KEY` it refuses rather than
  * reporting a vacuous pass.
  *
- * TWO SETS. `PORTFOLIO_RANKING_EVAL_SET=main` (default) is the set the first
- * three measurements used and whose failures shaped the prompt's wording;
- * `=holdout` is the set frozen on 2026-09-15 before the next repair, never used
- * for tuning (see its `recorded`). Every artifact names the set it measured and
- * binds to it by digest.
+ * SETS. `PORTFOLIO_RANKING_EVAL_SET=main` (default) is the set every
+ * measurement uses, whose failures shaped the prompt's wording. `=holdout` and
+ * `=holdout2` were each frozen before a repair and never used for tuning; a
+ * holdout is spent once its results are observed (see each file's `recorded`).
+ * Every artifact names the set it measured and binds to it by digest.
  */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -91,7 +91,10 @@ export interface RankingEvalSet {
 
 export const EVAL_SET_FILES = {
   main: "ranking-scenarios.json",
+  /** Frozen at d1cea87; spent by the fourth measurement (e57bb63). */
   holdout: "ranking-holdout-scenarios.json",
+  /** Frozen after the fourth measurement, before repair round 4. */
+  holdout2: "ranking-holdout2-scenarios.json",
 } as const;
 export type EvalSetName = keyof typeof EVAL_SET_FILES;
 

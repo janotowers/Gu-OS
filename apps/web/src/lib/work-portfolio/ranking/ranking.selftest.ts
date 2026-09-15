@@ -738,10 +738,11 @@ async function main(): Promise<void> {
 
   console.log("\neval set");
 
-  await t("both eval sets carry the ratified bars, unchanged, and are internally consistent", () => {
+  await t("every eval set carries the ratified bars, unchanged, and is internally consistent", () => {
     const main = loadRankingEvalSet("main");
     const holdout = loadRankingEvalSet("holdout");
-    for (const [name, set] of [["main", main], ["holdout", holdout]] as const) {
+    const holdout2 = loadRankingEvalSet("holdout2");
+    for (const [name, set] of [["main", main], ["holdout", holdout], ["holdout2", holdout2]] as const) {
       assert.equal(set.failure_rate_bar, 0.2, name);
       assert.equal(set.unsupported_attention_bar, 0, name);
       assert.equal(set.floor_violation_bar, 0, name);
@@ -769,11 +770,11 @@ async function main(): Promise<void> {
         assert.ok(covered.has(required), `the ${name} set covers ${required}`);
       }
     }
-    // The holdout measures the same contract at the same granularity, with
+    // Each holdout measures the same contract at the same granularity, with
     // different situations: one failure weighs the same against the 20% bar.
-    assert.equal(holdout.scenarios.length, main.scenarios.length);
-    const mainIds = new Set(main.scenarios.map((s) => s.id));
-    assert.ok(holdout.scenarios.every((s) => !mainIds.has(s.id)), "no scenario is shared");
+    for (const h of [holdout, holdout2]) assert.equal(h.scenarios.length, main.scenarios.length);
+    const ids = [main, holdout, holdout2].flatMap((set) => set.scenarios.map((s) => s.id));
+    assert.equal(new Set(ids).size, ids.length, "no scenario is shared between sets");
   });
 
   await t("the scorer counts an unsupported admission, a missed one and a pair out of order — and nothing when right", () => {
