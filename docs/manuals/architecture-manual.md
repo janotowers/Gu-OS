@@ -652,11 +652,13 @@ Ejecucion:
 Auditoria:
 
 - `tool_calls` registra argumentos, resultado, status, turn_id y `executor_kind`.
-- Quien escribe la fila: la propia tool, dentro de su handler; o el grafo, solo en el camino de confirmacion (riesgo medio/alto). Al pedir aprobacion la escribe siempre. Al autoejecutar, solo para las tools listadas en `tool-audit-ownership.ts`. Una tool de riesgo bajo se autoejecuta sin fila del grafo, asi que escribe la suya; `tool-audit-ownership.selftest.ts` sostiene esa regla contra cada handler (R1 Cycle 3 order 4).
-- Excepciones vigentes, ya decididas el 2026-09-15 (Slice Plan R1 §8 Q7–Q9) y en reparacion como Cycle 3 order 5:
-  - `get_user_preferences` y `list_enabled_tools` no dejan fila.
-  - Las tools que escriben su propia fila y ademas requieren confirmacion dejan dos cuando una persona las aprueba: la del grafo y la suya.
-  - La unica politica RLS de `tool_calls` (`FOR ALL`, desde `00001`) concede a cada usuario **autoridad de escritura** sobre las filas de sus propias sesiones: no solo leerlas, tambien insertarlas, editarlas o borrarlas.
+- **Una invocacion logica de tool = una fila** (R1 Cycle 3 order 5, Slice Plan §8 Q8). Quien la escribe:
+  - Si una persona aprobo la llamada, la fila de confirmacion que abrio el grafo es la canonica y termina en `executed` o `failed`. Una tool que se audita sola la toma y la cierra: el grafo abre un scope por invocacion (`openToolInvocation`) y `createTrackedToolCall` reutiliza solo la fila aprobada de esa sesion y esa tool. A una tool que no se audita sola la cierra el grafo. Nunca se crea una segunda fila.
+  - Al autoejecutar sin fila de confirmacion, la tool escribe la suya. El grafo solo escribe por las tools listadas en `tool-audit-ownership.ts`, que requieren confirmacion y no se auditan solas.
+  - Una tool de riesgo bajo se autoejecuta sin fila del grafo, asi que escribe la suya con `runAuditedTool`. Esto incluye `get_user_preferences` y `list_enabled_tools` (§8 Q7).
+  - Si la tool lanza un error, se cierra como `failed` la fila de esa invocacion; solo se crea una cuando no habia ninguna.
+  - Lo prueban `tool-audit-ownership.selftest.ts` (cada handler y el cableado del grafo) y `tool-invocation-audit.selftest.ts` (el comportamiento).
+- **`tool_calls` es de solo lectura para su usuario** (§8 Q9, migracion `20260915192651`). Cada usuario autenticado lee las filas de sus propias sesiones, pero no puede insertar, editar ni borrar. Escribe solo la aplicacion, con `service_role`. Lo prueba el suite RLS. Hasta esa migracion, la politica `FOR ALL` de `00001` concedia a cada usuario autoridad de escritura sobre sus propias filas de auditoria.
 - `executor_kind='agent'`: la llamo el LLM.
 - `executor_kind='deterministic'`: la llamo el sistema (por ejemplo, Heartbeat prefetcher).
 

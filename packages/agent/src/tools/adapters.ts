@@ -67,7 +67,7 @@ import {
 } from "./work-portfolio-adapters";
 import { defaultSkillsRoot } from "../skills/runtime";
 import type { ToolContext } from "./tool-context";
-import { createTrackedToolCall } from "./tool-call-audit";
+import { createTrackedToolCall, runAuditedTool } from "./tool-call-audit";
 import type {
   ToolApprovalMode,
   ToolApprovalPolicy,
@@ -811,18 +811,23 @@ export function buildLangChainTools(ctx: ToolContext) {
   if (isToolAvailable("get_user_preferences", ctx)) {
     tools.push(
       tool(
-        async () => {
-          const { getProfile } = await import("@agents/db");
-          const profile = await getProfile(ctx.db, ctx.userId);
-          return JSON.stringify({
-            name: profile.name,
-            timezone: profile.timezone,
-            language: profile.language,
-            agent_name: profile.agent_name,
-            email: profile.email ?? null,
-            phone: profile.phone ?? null,
-          });
-        },
+        // Low risk, so it auto-executes and writes its own tool_calls row
+        // (R1 Cycle 3 order 5, Slice Plan §8 Q7).
+        async () =>
+          JSON.stringify(
+            await runAuditedTool(ctx, "get_user_preferences", {}, async () => {
+              const { getProfile } = await import("@agents/db");
+              const profile = await getProfile(ctx.db, ctx.userId);
+              return {
+                name: profile.name,
+                timezone: profile.timezone,
+                language: profile.language,
+                agent_name: profile.agent_name,
+                email: profile.email ?? null,
+                phone: profile.phone ?? null,
+              };
+            })
+          ),
         {
           name: "get_user_preferences",
           description:
@@ -911,13 +916,17 @@ export function buildLangChainTools(ctx: ToolContext) {
   if (isToolAvailable("list_enabled_tools", ctx)) {
     tools.push(
       tool(
-        async () => {
-          const enabled = ctx.enabledTools
-            .filter((t) => t.enabled)
-            .map((t) => t.tool_id)
-            .filter((id) => isToolAvailable(id, ctx));
-          return JSON.stringify(enabled);
-        },
+        // Low risk, so it auto-executes and writes its own tool_calls row
+        // (R1 Cycle 3 order 5, Slice Plan §8 Q7).
+        async () =>
+          JSON.stringify(
+            await runAuditedTool(ctx, "list_enabled_tools", {}, async () =>
+              ctx.enabledTools
+                .filter((t) => t.enabled)
+                .map((t) => t.tool_id)
+                .filter((id) => isToolAvailable(id, ctx))
+            )
+          ),
         {
           name: "list_enabled_tools",
           description:

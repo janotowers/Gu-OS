@@ -53,6 +53,43 @@ export async function updateToolCallStatus(
   if (error) throw error;
 }
 
+/**
+ * The approved confirmation row of one tool invocation, while it is still
+ * open: the one row a tool may take over as its execution record, so that
+ * one logical invocation leaves one `tool_calls` row (R1 Cycle 3 order 5,
+ * Slice Plan §8 Q8). Anything else — another session's row, another tool's,
+ * one still awaiting a person, one already closed — returns null.
+ */
+export async function getApprovedToolCallForInvocation(
+  db: DbClient,
+  args: { toolCallId: string; sessionId: string; toolName: string }
+): Promise<ToolCall | null> {
+  const { data, error } = await db
+    .from("tool_calls")
+    .select("*")
+    .eq("id", args.toolCallId)
+    .eq("session_id", args.sessionId)
+    .eq("tool_name", args.toolName)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ToolCall | null) ?? null;
+}
+
+/** A row's current status, or null when there is no such row. */
+export async function getToolCallStatus(
+  db: DbClient,
+  toolCallId: string
+): Promise<ToolCall["status"] | null> {
+  const { data, error } = await db
+    .from("tool_calls")
+    .select("status")
+    .eq("id", toolCallId)
+    .maybeSingle();
+  if (error) throw error;
+  return ((data as { status?: ToolCall["status"] } | null)?.status ?? null) as ToolCall["status"] | null;
+}
+
 export async function getPendingToolCall(db: DbClient, toolCallId: string) {
   const { data } = await db
     .from("tool_calls")

@@ -61,7 +61,12 @@ import {
   resolveToolApprovalMode,
   toolOwnsAuditTrail,
 } from "./tools/adapters";
-import { buildToolCallMetadata } from "./tools/tool-call-audit";
+import {
+  buildToolCallMetadata,
+  closeToolInvocation,
+  failToolInvocation,
+  openToolInvocation,
+} from "./tools/tool-call-audit";
 import {
   getGlobalSkillRegistry,
   getSkillRegistryForUser,
@@ -2399,10 +2404,15 @@ export async function runAgent(input: AgentInput): Promise<AgentOutput> {
           message: `Ejecutando herramienta: ${tc.name}.`,
           toolName: tc.name,
         });
+        // One logical invocation = one tool_calls row (Slice Plan §8 Q8): the
+        // scope carries the row this graph opened — a person's approved
+        // confirmation, or the auto-execute row of a listed tool — so a tool
+        // that audits itself takes it over instead of writing a second one.
+        const invocation = openToolInvocation(tc.name, trackedToolCallId);
         let result: unknown;
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          result = await (matchingTool as any).invoke(tc.args);
+          result = await invocation.run(() => (matchingTool as any).invoke(tc.args));
         } catch (err) {
           const rawMessage = err instanceof Error ? err.message : String(err);
           const serialized =
@@ -2427,16 +2437,23 @@ export async function runAgent(input: AgentInput): Promise<AgentOutput> {
             `[agent] tool invocation failed name=${tc.name} error=${message}`
           );
           try {
-            const record = await createToolCall(
-              db,
-              state.sessionId,
-              tc.name,
-              (tc.args as Record<string, unknown>) ?? {},
-              false,
-              turnId,
-              { metadata: graphToolCallMetadata() }
-            );
-            await updateToolCallStatus(db, record.id, "failed", payload);
+            // Closes this invocation's one row as failed; creates it only
+            // when there is none, e.g. input refused before any handler ran.
+            await failToolInvocation(db, {
+              state: invocation.state,
+              graphRowId: trackedToolCallId,
+              payload,
+              createRow: () =>
+                createToolCall(
+                  db,
+                  state.sessionId,
+                  tc.name,
+                  (tc.args as Record<string, unknown>) ?? {},
+                  false,
+                  turnId,
+                  { metadata: graphToolCallMetadata() }
+                ),
+            });
           } catch (auditErr) {
             console.error("[agent] failed to audit tool validation error:", auditErr);
           }
@@ -2470,57 +2487,29 @@ export async function runAgent(input: AgentInput): Promise<AgentOutput> {
           }
         }
 
-        if (trackedToolCallId) {
-          try {
-            const parsed = JSON.parse(resultStr) as Record<string, unknown>;
-            const hasError =
-              typeof parsed === "object" &&
-              parsed !== null &&
-              typeof parsed.error === "string";
-            if (hasError) {
-              await updateToolCallStatus(
-                db,
-                trackedToolCallId,
-                "failed",
-                parsed
-              );
-              emitEvent({
-                type: "tool_completed",
-                message: `La herramienta ${tc.name} falló.`,
-                toolName: tc.name,
-                details: { status: "failed", toolCallId: trackedToolCallId },
-              });
-            } else {
-              await updateToolCallStatus(
-                db,
-                trackedToolCallId,
-                "executed",
-                parsed
-              );
-              emitEvent({
-                type: "tool_completed",
-                message: `La herramienta ${tc.name} terminó.`,
-                toolName: tc.name,
-                details: { status: "executed", toolCallId: trackedToolCallId },
-              });
-            }
-          } catch {
-            await updateToolCallStatus(db, trackedToolCallId, "executed", {
-              raw: resultStr,
-            });
-            emitEvent({
-              type: "tool_completed",
-              message: `La herramienta ${tc.name} terminó.`,
-              toolName: tc.name,
-              details: { status: "executed", toolCallId: trackedToolCallId },
-            });
-          }
+        // The invocation's one row: a confirmation row the tool took over and
+        // closed stands; one it left open, or a graph row it never took over,
+        // is closed here from the answer; a row the tool created is its own.
+        const closed = await closeToolInvocation(db, {
+          state: invocation.state,
+          graphRowId: trackedToolCallId,
+          output: resultStr,
+        });
+        if (closed?.status === "failed") {
+          emitEvent({
+            type: "tool_completed",
+            message: `La herramienta ${tc.name} falló.`,
+            toolName: tc.name,
+            details: { status: "failed", toolCallId: closed.rowId },
+          });
         } else {
           emitEvent({
             type: "tool_completed",
             message: `La herramienta ${tc.name} terminó.`,
             toolName: tc.name,
-            details: { status: "executed" },
+            details: closed
+              ? { status: "executed", toolCallId: closed.rowId }
+              : { status: "executed" },
           });
         }
       } else {

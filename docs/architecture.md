@@ -304,6 +304,7 @@ Estado (2026-07-31): **Phase 1 completa** con `enforcing` activo en el tenant pi
 ## Seguridad
 
 - **RLS** en tablas con datos de usuario; `calendar_booking_links` solo gestionada por el dueño vía policies. APIs públicas usan **service role** solo en el servidor para resolver el token sin sesión del visitante.
+- **El rastro de auditoría de tools (`tool_calls`) es de solo lectura para su usuario** (R1 Cycle 3 order 5, migración forward `20260915192651`). Cada usuario autenticado lee las filas de sus propias sesiones, pero no puede insertarlas, editarlas ni borrarlas; las escribe solo la aplicación, con `service_role`. **Una invocación lógica de tool deja una fila**: cuando una persona aprueba una llamada, la fila de confirmación es la canónica. La migración está en el repositorio; su entrega a staging sigue el camino de release (`Deliver to staging`).
 - **Tokens OAuth** cifrados en aplicación (`ENCRYPTION_KEY`).
 - **Enlaces /book/**: tratar el token como secreto; HTTPS en producción.
 
