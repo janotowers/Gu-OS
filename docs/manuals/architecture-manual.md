@@ -662,7 +662,7 @@ Auditoria:
   - Una tool de riesgo bajo se autoejecuta sin fila del grafo, asi que escribe la suya con `runAuditedTool`. Esto incluye `get_user_preferences` y `list_enabled_tools` (§8 Q7).
   - Si la tool lanza un error, se cierra como `failed` la fila de esa invocacion; solo se crea una cuando no habia ninguna.
   - Lo prueban `tool-audit-ownership.selftest.ts` (cada handler y el cableado del grafo) y `tool-invocation-audit.selftest.ts` (el comportamiento).
-- **`tool_calls` es de solo lectura para su usuario** (§8 Q9, migracion `20260915192651`). Cada usuario autenticado lee las filas de sus propias sesiones, pero no puede insertar, editar ni borrar. Escribe solo la aplicacion, con `service_role`. Lo prueba el suite RLS. Hasta esa migracion, la politica `FOR ALL` de `00001` concedia a cada usuario autoridad de escritura sobre sus propias filas de auditoria.
+- **`tool_calls` es de solo lectura para su usuario** (§8 Q9, migracion `20260915192651`). Cada usuario autenticado lee las filas de sus propias sesiones, pero no puede insertar, editar ni borrar. Escribe solo la aplicacion, con `service_role`. Lo prueba el suite RLS. La migracion esta aplicada en staging desde el 2026-09-15 y se verifico alli (`npm run verify:tool-calls-rls`); produccion no la tiene. Hasta esa migracion, la politica `FOR ALL` de `00001` concedia a cada usuario autoridad de escritura sobre sus propias filas de auditoria.
 - `executor_kind='agent'`: la llamo el LLM.
 - `executor_kind='deterministic'`: la llamo el sistema (por ejemplo, Heartbeat prefetcher).
 
