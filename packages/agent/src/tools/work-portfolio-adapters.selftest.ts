@@ -184,6 +184,20 @@ async function main() {
     assert.equal(failedAudit.rows[0].status, "failed");
   });
 
+  await t("a throw while resolving the Organization closes the row as failed and comes back as a result", async () => {
+    // Were it thrown, the graph would write a second row for the same call.
+    const audit = auditDb();
+    const [tool] = buildWorkPortfolioTools(
+      ctx(audit.client),
+      deps({ listActorOrganizations: async () => { throw new Error("memberships unavailable"); } }),
+      () => true
+    ) as unknown as Invoker[];
+    const output = JSON.parse(String(await tool.invoke({})));
+    assert.deepEqual(output, { status: "failed", error: "memberships unavailable" });
+    assert.equal(audit.rows.length, 1);
+    assert.equal(audit.rows[0].status, "failed");
+  });
+
   console.log(`\nwork-portfolio tool selftest: ${passed} checks passed`);
 }
 

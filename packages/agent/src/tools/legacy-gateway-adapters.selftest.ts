@@ -4,9 +4,10 @@
  * This is the tool-surface half of SA-1.7. The gateway's own selftests
  * (`apps/web/src/lib/legacy-gateway/legacy-gateway.selftest.ts`) prove the
  * reads; these prove that what a model can reach is exactly four bounded reads,
- * that the Organization is never taken from a model argument, and that a
- * refusal comes back as a result the model can act on rather than as a failed
- * turn.
+ * that the Organization is never taken from a model argument, that a refusal
+ * comes back as a result the model can act on rather than as a failed turn, and
+ * that every call is audited in `tool_calls`, which the graph leaves to the tool
+ * (Cycle 3 order 4, Slice Plan v1.31 §6).
  */
 import assert from "node:assert/strict";
 import { TOOL_CATALOG } from "./catalog";
@@ -16,6 +17,7 @@ import {
   resolveToolOrganization,
   type LegacyGatewayDeps,
 } from "./legacy-gateway-adapters";
+import { toolOwnsAuditTrail } from "./tool-audit-ownership";
 import type { ToolContext } from "./tool-context";
 
 /**
@@ -34,9 +36,35 @@ function asInvokers(tools: ReturnType<typeof buildLegacyGatewayTools>): Invoker[
 const ORG = "11111111-1111-1111-1111-111111111111";
 const OTHER_ORG = "22222222-2222-2222-2222-222222222222";
 
-function fakeCtx(): ToolContext {
+/** Just enough of `tool_calls` for createToolCall / updateToolCallStatus. */
+function auditDb() {
+  const rows: Array<Record<string, unknown>> = [];
+  const client = {
+    from(table: string) {
+      assert.equal(table, "tool_calls", "a legacy read tool writes its audit row and nothing else");
+      return {
+        insert(row: Record<string, unknown>) {
+          const withId = { id: `tool-call-${rows.length + 1}`, ...row };
+          rows.push(withId);
+          return { select: () => ({ single: async () => ({ data: withId, error: null }) }) };
+        },
+        update(patch: Record<string, unknown>) {
+          return {
+            eq: async (_column: string, id: string) => {
+              Object.assign(rows.find((r) => r.id === id) ?? {}, patch);
+              return { error: null };
+            },
+          };
+        },
+      };
+    },
+  };
+  return { client: client as unknown as ToolContext["db"], rows };
+}
+
+function fakeCtx(db: ToolContext["db"] = auditDb().client): ToolContext {
   return {
-    db: {} as ToolContext["db"],
+    db,
     userId: "user-1",
     sessionId: "session-1",
     enabledTools: [],
@@ -44,6 +72,14 @@ function fakeCtx(): ToolContext {
     channel: "web",
   };
 }
+
+/** One valid input per tool, and the gateway read it must reach. */
+const VALID_INPUT: Record<(typeof LEGACY_GATEWAY_TOOL_IDS)[number], Record<string, unknown>> = {
+  legacy_lead_get_context: { legacy_lead_id: "lead-1" },
+  legacy_lead_get_recent_messages: { legacy_lead_id: "lead-1", limit: 5 },
+  appointment_get: { legacy_deal_id: "deal-1" },
+  property_get_details: { legacy_property_id: "property-1" },
+};
 
 function fakeDeps(overrides: Partial<LegacyGatewayDeps> = {}): LegacyGatewayDeps {
   return {
@@ -255,12 +291,84 @@ async function testRefusalsAreResults(): Promise<void> {
   console.log("  ok  refusal, failure and not_configured come back as results, not exceptions");
 }
 
+function testTheGraphLeavesTheAuditToTheTool(): void {
+  // Low risk means no confirmation, and on that path the graph writes no row
+  // for any tool; tool-audit-ownership.ts also says these tools own theirs.
+  for (const toolId of LEGACY_GATEWAY_TOOL_IDS) {
+    assert.equal(toolOwnsAuditTrail(toolId), true, `${toolId} must write its own tool_calls row`);
+  }
+  console.log("  ok  the graph writes no audit row for these tools, so each must write its own");
+}
+
+async function testEveryCallWritesAndClosesItsOwnRow(): Promise<void> {
+  for (const toolId of LEGACY_GATEWAY_TOOL_IDS) {
+    const audit = auditDb();
+    const [readTool] = asInvokers(
+      buildLegacyGatewayTools(fakeCtx(audit.client), fakeDeps(), (id) => id === toolId)
+    );
+    const output = JSON.parse((await readTool.invoke(VALID_INPUT[toolId])) as string);
+    assert.equal(output.status, "ok");
+    assert.equal(audit.rows.length, 1, `${toolId} writes exactly one row per call`);
+    const [row] = audit.rows;
+    assert.equal(row.tool_name, toolId);
+    assert.equal(row.session_id, "session-1");
+    assert.deepEqual(row.arguments_json, VALID_INPUT[toolId], `${toolId} records its arguments`);
+    assert.equal(row.status, "executed", `${toolId} closes its row`);
+    assert.deepEqual(row.result_json, output, `${toolId} records what it returned`);
+  }
+  console.log("  ok  every call writes and closes its own tool_calls row: arguments, outcome and what was read");
+}
+
+async function testRefusalsCloseAsExecutedAndFailuresAsFailed(): Promise<void> {
+  const only = (id: string) => id === "legacy_lead_get_context";
+  const invokeWith = async (deps: LegacyGatewayDeps | null) => {
+    const audit = auditDb();
+    const [readTool] = asInvokers(buildLegacyGatewayTools(fakeCtx(audit.client), deps, only));
+    const output = JSON.parse((await readTool.invoke({ legacy_lead_id: "lead-1" })) as string);
+    assert.equal(audit.rows.length, 1, "one row, whatever the outcome");
+    return { output, row: audit.rows[0] };
+  };
+  class Refusal extends Error {
+    readonly name = "LegacyReadRefusal";
+    constructor(readonly reason: string) {
+      super(reason);
+    }
+  }
+
+  // A refusal is a result: the tool ran and answered, so the row is executed.
+  for (const [deps, status] of [
+    [fakeDeps({ readLeadContext: async () => { throw new Refusal("belongs_to_another_organization"); } }), "refused"],
+    [fakeDeps({ listActorOrganizations: async () => [ORG, OTHER_ORG] }), "organization_not_resolved"],
+    [null, "not_configured"],
+  ] as const) {
+    const { output, row } = await invokeWith(deps);
+    assert.equal(output.status, status);
+    assert.equal(row.status, "executed", `a ${status} result closes as executed`);
+  }
+
+  // A failed read closes as failed.
+  const failedRead = await invokeWith(fakeDeps({ readLeadContext: async () => { throw new Error("source unreachable"); } }));
+  assert.equal(failedRead.output.status, "failed");
+  assert.equal(failedRead.row.status, "failed");
+
+  // So does a throw before the read — resolving the Organization — and it comes
+  // back as a result: were it thrown, the graph would write a second row.
+  const failedResolution = await invokeWith(fakeDeps({ listActorOrganizations: async () => { throw new Error("memberships unavailable"); } }));
+  assert.equal(failedResolution.output.status, "failed");
+  assert.equal(failedResolution.output.error, "memberships unavailable");
+  assert.equal(failedResolution.row.status, "failed");
+  console.log("  ok  a refusal closes as executed; a failure, even before the read, closes as failed and stays a result");
+}
+
 async function main(): Promise<void> {
   console.log("legacy gateway tool surface selftest");
   testCatalogEntriesAreReadOnly();
   testAvailabilityGating();
   await testOrganizationIsResolvedNeverSupplied();
   await testRefusalsAreResults();
+  testTheGraphLeavesTheAuditToTheTool();
+  await testEveryCallWritesAndClosesItsOwnRow();
+  await testRefusalsCloseAsExecutedAndFailuresAsFailed();
   console.log("legacy gateway tool surface selftest ok");
 }
 
