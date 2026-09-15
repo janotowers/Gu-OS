@@ -817,7 +817,8 @@ async function main(): Promise<void> {
     const main = loadRankingEvalSet("main");
     const holdout = loadRankingEvalSet("holdout");
     const holdout2 = loadRankingEvalSet("holdout2");
-    for (const [name, set] of [["main", main], ["holdout", holdout], ["holdout2", holdout2]] as const) {
+    const holdout3 = loadRankingEvalSet("holdout3");
+    for (const [name, set] of [["main", main], ["holdout", holdout], ["holdout2", holdout2], ["holdout3", holdout3]] as const) {
       assert.equal(set.failure_rate_bar, 0.2, name);
       assert.equal(set.unsupported_attention_bar, 0, name);
       assert.equal(set.floor_violation_bar, 0, name);
@@ -847,8 +848,8 @@ async function main(): Promise<void> {
     }
     // Each holdout measures the same contract at the same granularity, with
     // different situations: one failure weighs the same against the 20% bar.
-    for (const h of [holdout, holdout2]) assert.equal(h.scenarios.length, main.scenarios.length);
-    const ids = [main, holdout, holdout2].flatMap((set) => set.scenarios.map((s) => s.id));
+    for (const h of [holdout, holdout2, holdout3]) assert.equal(h.scenarios.length, main.scenarios.length);
+    const ids = [main, holdout, holdout2, holdout3].flatMap((set) => set.scenarios.map((s) => s.id));
     assert.equal(new Set(ids).size, ids.length, "no scenario is shared between sets");
   });
 

@@ -25,8 +25,8 @@
  * reporting a vacuous pass.
  *
  * SETS. `PORTFOLIO_RANKING_EVAL_SET=main` (default) is the set every
- * measurement uses, whose failures shaped the prompt's wording. `=holdout` and
- * `=holdout2` were each frozen before a repair and never used for tuning; a
+ * measurement uses, whose failures shaped the prompt's wording. `=holdout`,
+ * `=holdout2` and `=holdout3` were each frozen before a repair and never used for tuning; a
  * holdout is spent once its results are observed (see each file's `recorded`).
  * Every artifact names the set it measured and binds to it by digest.
  */
@@ -93,8 +93,10 @@ export const EVAL_SET_FILES = {
   main: "ranking-scenarios.json",
   /** Frozen at d1cea87; spent by the fourth measurement (e57bb63). */
   holdout: "ranking-holdout-scenarios.json",
-  /** Frozen after the fourth measurement, before repair round 4. */
+  /** Frozen at 80b0643; spent by the fifth measurement (551a305). */
   holdout2: "ranking-holdout2-scenarios.json",
+  /** Frozen after the fifth measurement, before repair round 5. */
+  holdout3: "ranking-holdout3-scenarios.json",
 } as const;
 export type EvalSetName = keyof typeof EVAL_SET_FILES;
 
