@@ -647,34 +647,42 @@ async function main(): Promise<void> {
 
   console.log("\neval set");
 
-  await t("the eval set carries the ratified bars and is internally consistent", () => {
-    const set = loadRankingEvalSet();
-    assert.equal(set.failure_rate_bar, 0.2);
-    assert.equal(set.unsupported_attention_bar, 0);
-    assert.equal(set.floor_violation_bar, 0);
-    assert.equal(set.batches, 2);
-    assert.equal(set.runs_per_batch, 5);
-    const seen = new Set<string>();
-    for (const s of set.scenarios) {
-      assert.ok(!seen.has(s.id), `duplicate scenario ${s.id}`);
-      seen.add(s.id);
-      const refs = s.input.cases.map((c) => c.ref);
-      assert.deepEqual(
-        s.input.cases.filter((c) => c.governed.length > 0).map((c) => c.ref).sort(),
-        [...s.governed].sort(),
-        `${s.id}: governed list matches the input`
-      );
-      for (const ref of [...s.expect_contextual, ...s.must_not_admit, ...s.order_pairs.flat()]) {
-        assert.ok(refs.includes(ref), `${s.id}: ${ref} is a case of the scenario`);
+  await t("both eval sets carry the ratified bars, unchanged, and are internally consistent", () => {
+    const main = loadRankingEvalSet("main");
+    const holdout = loadRankingEvalSet("holdout");
+    for (const [name, set] of [["main", main], ["holdout", holdout]] as const) {
+      assert.equal(set.failure_rate_bar, 0.2, name);
+      assert.equal(set.unsupported_attention_bar, 0, name);
+      assert.equal(set.floor_violation_bar, 0, name);
+      assert.equal(set.batches, 2, name);
+      assert.equal(set.runs_per_batch, 5, name);
+      const seen = new Set<string>();
+      for (const s of set.scenarios) {
+        assert.ok(!seen.has(s.id), `duplicate scenario ${s.id}`);
+        seen.add(s.id);
+        const refs = s.input.cases.map((c) => c.ref);
+        assert.deepEqual(
+          s.input.cases.filter((c) => c.governed.length > 0).map((c) => c.ref).sort(),
+          [...s.governed].sort(),
+          `${s.id}: governed list matches the input`
+        );
+        for (const ref of [...s.expect_contextual, ...s.must_not_admit, ...s.order_pairs.flat()]) {
+          assert.ok(refs.includes(ref), `${s.id}: ${ref} is a case of the scenario`);
+        }
+        assert.ok(!s.expect_contextual.some((r) => s.must_not_admit.includes(r)), `${s.id}: expect and forbid are disjoint`);
+        assert.ok(!s.expect_contextual.some((r) => s.governed.includes(r)), `${s.id}: a governed case cannot be admitted contextually`);
+        assert.equal(typeof s.rubric, "string");
       }
-      assert.ok(!s.expect_contextual.some((r) => s.must_not_admit.includes(r)), `${s.id}: expect and forbid are disjoint`);
-      assert.ok(!s.expect_contextual.some((r) => s.governed.includes(r)), `${s.id}: a governed case cannot be admitted contextually`);
-      assert.equal(typeof s.rubric, "string");
+      const covered = new Set(set.scenarios.flatMap((s) => s.covers ?? []));
+      for (const required of ["no_inflation", "no_attractiveness", "contextual_admission", "eligibility_not_priority", "untrusted_content", "governed_floor", "evidence_too_thin"]) {
+        assert.ok(covered.has(required), `the ${name} set covers ${required}`);
+      }
     }
-    const covered = new Set(set.scenarios.flatMap((s) => s.covers ?? []));
-    for (const required of ["no_inflation", "no_attractiveness", "contextual_admission", "eligibility_not_priority", "untrusted_content", "governed_floor", "evidence_too_thin"]) {
-      assert.ok(covered.has(required), `the set covers ${required}`);
-    }
+    // The holdout measures the same contract at the same granularity, with
+    // different situations: one failure weighs the same against the 20% bar.
+    assert.equal(holdout.scenarios.length, main.scenarios.length);
+    const mainIds = new Set(main.scenarios.map((s) => s.id));
+    assert.ok(holdout.scenarios.every((s) => !mainIds.has(s.id)), "no scenario is shared");
   });
 
   await t("the scorer counts an unsupported admission, a missed one and a pair out of order — and nothing when right", () => {

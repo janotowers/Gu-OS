@@ -23,7 +23,14 @@
  *
  * Requires a real model. Without `OPENROUTER_API_KEY` it refuses rather than
  * reporting a vacuous pass.
+ *
+ * TWO SETS. `PORTFOLIO_RANKING_EVAL_SET=main` (default) is the set the first
+ * three measurements used and whose failures shaped the prompt's wording;
+ * `=holdout` is the set frozen on 2026-09-15 before the next repair, never used
+ * for tuning (see its `recorded`). Every artifact names the set it measured and
+ * binds to it by digest.
  */
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -82,10 +89,25 @@ export interface RankingEvalSet {
   scenarios: RankingScenario[];
 }
 
-export function loadRankingEvalSet(): RankingEvalSet {
-  return JSON.parse(
-    readFileSync(path.join(__dirname, "ranking-scenarios.json"), "utf8")
-  ) as RankingEvalSet;
+export const EVAL_SET_FILES = {
+  main: "ranking-scenarios.json",
+  holdout: "ranking-holdout-scenarios.json",
+} as const;
+export type EvalSetName = keyof typeof EVAL_SET_FILES;
+
+function readSetText(name: EvalSetName): string {
+  // Line endings normalized, so the digest is the committed content's on
+  // every platform (a Windows checkout rewrites them).
+  return readFileSync(path.join(__dirname, EVAL_SET_FILES[name]), "utf8").replace(/\r\n/g, "\n");
+}
+
+export function loadRankingEvalSet(name: EvalSetName = "main"): RankingEvalSet {
+  return JSON.parse(readSetText(name)) as RankingEvalSet;
+}
+
+/** SHA-256 of the set as committed — binds an artifact to the exact scenarios it measured. */
+export function evalSetDigest(name: EvalSetName = "main"): string {
+  return `sha256:${createHash("sha256").update(readSetText(name)).digest("hex")}`;
 }
 
 export interface RankingScenarioScore {
@@ -193,7 +215,14 @@ async function main(): Promise<void> {
     console.error("eval:portfolio-ranking requires OPENROUTER_API_KEY — the point is to exercise a real model.");
     process.exit(1);
   }
-  const set = loadRankingEvalSet();
+  const setName = (process.env.PORTFOLIO_RANKING_EVAL_SET ?? "main") as EvalSetName;
+  if (!(setName in EVAL_SET_FILES)) {
+    console.error(`PORTFOLIO_RANKING_EVAL_SET must be one of ${Object.keys(EVAL_SET_FILES).join(", ")}.`);
+    process.exit(1);
+  }
+  const set = loadRankingEvalSet(setName);
+  const setDigest = evalSetDigest(setName);
+  console.log(`set: ${setName} (${EVAL_SET_FILES[setName]}, ${setDigest})`);
   const runCount = Math.max(1, Number(process.env.PORTFOLIO_RANKING_EVAL_RUNS ?? 1));
   const runs: RunOutcome[] = [];
   for (let i = 1; i <= runCount; i += 1) {
@@ -222,6 +251,7 @@ async function main(): Promise<void> {
       JSON.stringify(
         {
           ranAt: new Date().toISOString(),
+          set: { name: setName, file: EVAL_SET_FILES[setName], digest: setDigest },
           model: { source: "the judge that ran each pass (PortfolioRankingJudge.modelId)", ids: [...new Set(runs.map((r) => r.modelId))] },
           failure_rate_bar: set.failure_rate_bar,
           unsupported_attention_bar: set.unsupported_attention_bar,
