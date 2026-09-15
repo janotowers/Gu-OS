@@ -1,6 +1,6 @@
 # Gu OS Agentic Product & Software Development Methodology
 
-> **Version:** v0.4.6  
+> **Version:** v0.4.7  
 > **Status:** Canonical development methodology  
 > **Scope:** Tool-agnostic, product-portable operating method for humans + coding agents  
 > **Intended repo path:** `docs/development/agentic-product-software-development-methodology.md`
@@ -448,6 +448,16 @@ Use simple ranges — for example `≤ 0.5 day`, `~1 day`, `1–2 days`, `2–3 
 
 **An estimate is a planning signal, not evidence.** It never contributes to a Definition of Done, and it is never presented as a measured result. Calibration of estimate bias and variance is handled empirically in Section 17.1.
 
+**An estimate never introduces waiting** *(v0.4.7)*. A frozen estimate is a recorded prediction, kept so the estimate model can be calibrated against what actually happened (Section 17.1). It is **not** a minimum duration, a reserved window, a budget to be spent, or a pacing mechanism.
+
+- Work proceeds as fast as the work itself and its **real** gates allow — evidence that must be produced, and decisions that are genuinely a human's.
+- **Finishing materially earlier than the estimate is a normal and desirable outcome.** It is calibration data, never a reason to slow down, to space execution, or to hold a Slice open.
+- An estimate is never a reason to defer starting work that is Planned and Executable, nor to schedule it later than it could begin.
+- The estimate predicts **active agent-assisted engineering time** (Section 17.1, metric 2). It does not predict calendar elapsed, which also holds human and external wait.
+
+| **A frozen estimate is not re-opened by being wrong.** Its value is precisely that it recorded a prediction before the work. Recording what actually happened beside it is how the model improves; editing it afterwards destroys the only evidence it exists to provide. |
+|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+
 ## 10.5 READY Horizon and readiness replenishment
 
 Rolling-wave planning (Section 10) says later work may stay coarse. It does not say the near horizon may run dry. The **READY Horizon** is the amount of sufficiently elaborated READY work maintained *ahead of* current execution, so that development does not stall unnecessarily between Slices or between Cycles.
@@ -597,6 +607,14 @@ The methodology is designed for strong agent autonomy without collapsing human a
 An **Execution Cycle** is a short, tool-agnostic planning time box, analogous in spirit to a Scrum Sprint. Approximately one week is a reasonable operational starting point; **the length is not a methodology invariant** and should be revised from evidence.
 
 The Execution Cycle is a short-horizon *planning container*. It does **not** replace product roadmap sequencing, architecture dependencies, evidence gates or release authority.
+
+**A Cycle is a planning and capacity window, not a pacing mechanism** *(v0.4.7)*. Its dates bound what was planned into it and the capacity it assumes. They never justify:
+
+- delaying work that is Planned and Executable now;
+- spacing execution so that the work fills the window;
+- waiting for the window to end before looking for the next legitimate work.
+
+When Planned work finishes earlier than the window, the **Development Continuity Loop applies immediately** (Section 12.3): the next legitimate action is identified then, not at the Cycle boundary. A Cycle whose work closes early is a calibration signal and an opportunity to replenish or re-plan — never a failure, and never a reason to idle. What still bounds the pace is unchanged: genuine human-authority boundaries, prerequisites that are not yet satisfied, and evidence that takes the time it takes.
 
 **How a Cycle is formed.** The system or agent may propose READY Slices for the upcoming Cycle based on roadmap priority, dependencies, capacity, estimates, risk and continuity of work in progress, and may propose an Accountable / DRI for each. The human or team then reviews the proposed Cycle.
 
@@ -950,13 +968,19 @@ The same loop applies to how we plan, not only to what we ship. Slice estimation
 | **#** | **Recorded**                                                                                                       |
 |-------|----------------------------------------------------------------------------------------------------------------------|
 | 1     | Initial estimate range + confidence, **frozen when the Slice becomes READY** and not edited afterwards.              |
-| 2     | Actual agent-assisted engineering elapsed time to evidence-ready.                                                    |
+| 2     | Actual **active** agent-assisted engineering elapsed time to evidence-ready — the time work was actually being done.  |
 | 3     | Human/external wait time, recorded **separately** from (2).                                                          |
 | 4     | Total calendar elapsed time from execution start to evidence-ready / Done — preferably derived from timestamps.      |
 | 5     | Re-planning events: count and concise cause, mapped where possible to the failure classification in Section 15.      |
 | 6     | Reopen / rework after Done, and the artifact that owned the defect.                                                  |
 | 7     | Declared Release Scope versus the Release Scope actually required.                                                   |
 | 8     | Whether new verification capability had to be created inside the Slice.                                              |
+
+**Keep the three times apart** *(v0.4.7)*. Metrics (2) active engineering, (3) human/external wait and (4) calendar elapsed are recorded **separately**, and never conflated or summed into a single "duration".
+
+- The estimate (1) is a prediction of **(2)**, and is compared only against it.
+- Time that is neither engineering nor a human decision — an interrupted session, an agent usage or spend limit, a provider outage, an environment failure — is recorded with **(3)** and labelled for what it was, so it can never be read as engineering time.
+- **(4)** is the honest total and belongs in the record, but it is not what the estimate predicts, and a large (4) with a small (2) is a statement about waiting, not about engineering.
 
 Deliberately **not** collected yet: story points, velocity, burndown, a productivity multiplier, or per-Task time as a required metric.
 
@@ -1317,6 +1341,22 @@ v0.4.6 makes **one authority rule explicit** — who may merge a pull request �
 
 **Historical version notes preserved.** Sections 23.1–23.10 are unchanged; only pointers naming the **active** version move to v0.4.6.
 
+# 23.12 v0.4.7 update note
+
+v0.4.7 makes **one prospective clarification**, in the words the human Accountable used on 2026-09-15: a Slice estimate and an Execution Cycle are planning instruments, and **neither is a reason to wait**. It surfaced in R1, where six Slices had finished well inside frozen estimates and a Cycle window still bounded when the next work was looked for.
+
+**Estimates (Section 10.4).** A frozen estimate is a recorded prediction kept for calibration. It is not a minimum duration, a reserved window, a budget to spend, or a pace. Finishing materially earlier is a normal outcome and calibration data. The estimate predicts active agent-assisted engineering time, not calendar elapsed.
+
+**Cycles (Section 12.1).** A Cycle is a planning and capacity window. Its dates never justify delaying Planned and Executable work, spacing execution to fill the window, or waiting for the window to end before looking for the next legitimate work. When Planned work finishes early, the Development Continuity Loop applies immediately.
+
+**Calibration (Section 17.1).** Active engineering time, human/external wait and calendar elapsed stay three separate records, never summed into one "duration". The estimate is compared against active engineering time alone, and time that is neither engineering nor a human decision is recorded as wait and labelled.
+
+**What changes in practice.** Work that is executable proceeds as fast as the work and its real human gates allow, and a Slice that closes early returns to the continuity loop at once instead of waiting for a Cycle boundary.
+
+**What it explicitly does not change.** No human-authority boundary moves. Estimates are still frozen at READY and never re-opened for being wrong; **historical estimates and recorded actuals are not restated**, since this clarification changes how estimates are read and how future work is estimated, not the history. Cycle inclusion and the confirmed Accountable / DRI remain the human's (Section 12.1), evidence and Release Scope are untouched (Section 14.2), and nothing here licenses skipping a gate to go faster.
+
+**Historical version notes preserved.** Sections 23.1–23.11 are unchanged; only pointers naming the **active** version move to v0.4.7.
+
 # 24. Working glossary
 
 | **Term**                             | **Working definition**                                                                                                                                                                                   |
@@ -1337,7 +1377,7 @@ v0.4.6 makes **one authority rule explicit** — who may merge a pull request �
 | Slice Plan                           | Integrated canonical artifact owning the durable Slice contracts and their order — normally one per Roadmap Increment, or per bounded Initiative where one is genuinely used. Not one per Spec / ADR / Technical Plan, and not a live execution-state store. |
 | Slice Acceptance Contract            | The concise, testable statement of what one Slice must demonstrate — its inspectable outcome, the governing acceptance scenarios it proves, relevant paths and edge cases, and any slice-local assertions. |
 | Task                                 | An implementation execution unit derived just in time by the coding agent after a Slice is Ready, Planned and Executable; not canonical Markdown truth.                                                    |
-| Execution Cycle                      | Short, tool-agnostic planning time box holding the Slices planned for the near horizon. A planning container, not a sequencing, evidence or release authority.                                             |
+| Execution Cycle                      | Short, tool-agnostic planning time box holding the Slices planned for the near horizon. A planning container, not a sequencing, evidence or release authority — and not a pacing mechanism: its dates never justify delaying executable work (Section 12.1).                                             |
 | Proposed / Planned                   | Slice planning statuses inside an Execution Cycle: system-proposed (Accountable may be suggested), then human/team-confirmed **with a confirmed Accountable / DRI**. Deliberately not called *committed*.  |
 | Executable                           | Derived condition: a Planned Slice (so with a confirmed Accountable) whose prerequisites are actually satisfied and for which execution capacity is available. Ready is not Planned; Planned is not necessarily Executable. |
 | Definition of Ready                  | Readiness condition of the Slice itself — governing behavior approved, acceptance contract testable, evidence achievable, Release Scope declared, risk assessed, estimate recorded, dependencies classified. Not an approval gate, and not dependent on anyone being assigned. |
