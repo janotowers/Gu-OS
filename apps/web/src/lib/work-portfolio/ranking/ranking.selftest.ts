@@ -24,7 +24,12 @@
  */
 import assert from "node:assert/strict";
 import { currentAiUsageContext } from "@agents/agent";
-import { ORGANIZATION_FLAG_KEYS, type PortfolioPresentationState } from "@agents/types";
+import {
+  ORGANIZATION_FLAG_KEYS,
+  PORTFOLIO_RANKING_STATUSES,
+  type PortfolioPresentationState,
+} from "@agents/types";
+import { CONTEXTUAL_COPY, RANKING_STATUS_COPY } from "../copy";
 import { createFakeDb, type FakeDb } from "../../relationship-testing/fake-db";
 import type {
   PortfolioCaseSnapshot,
@@ -519,6 +524,17 @@ async function main(): Promise<void> {
     assert.equal((seen as Record<string, unknown>).organizationId, ORG);
     assert.equal((seen as Record<string, unknown>).userId, ADVISOR);
     assert.equal((seen as Record<string, unknown>).channel, "web");
+  });
+
+  console.log("\nthe viewer is told which order they see");
+
+  await t("every ranking status has copy, and every non-ranked one says the order is the deterministic one", () => {
+    for (const status of PORTFOLIO_RANKING_STATUSES) {
+      const text = RANKING_STATUS_COPY[status];
+      assert.ok(text && text.length > 10, `copy for ${status}`);
+      if (status !== "ranked") assert.ok(text.startsWith("Orden determinista"), `${status} names the fallback`);
+    }
+    assert.ok(CONTEXTUAL_COPY.note.includes("no es una obligación"), "a contextual item never reads as governed");
   });
 
   console.log("\neval set");

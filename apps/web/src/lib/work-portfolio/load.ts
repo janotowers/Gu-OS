@@ -32,7 +32,7 @@ import {
 } from "@agents/db";
 import type { OrganizationMembership } from "@agents/types";
 import { buildWorkPortfolio, type WorkPortfolio } from "./projection";
-import { buildCaseSnapshots } from "./snapshot";
+import { buildCaseSnapshots, type PortfolioCaseSnapshot } from "./snapshot";
 
 export type LoadWorkPortfolioResult =
   | { status: "no_membership" }
@@ -41,6 +41,11 @@ export type LoadWorkPortfolioResult =
       status: "ok";
       membership: OrganizationMembership;
       portfolio: WorkPortfolio;
+      /**
+       * The authorized snapshots the projection was built from — the only input
+       * the SL-12 ranking pass may read (AC-9 §14.2).
+       */
+      snapshots: PortfolioCaseSnapshot[];
       /** True when the Organization has more Cases than one read projects. */
       truncated: boolean;
     };
@@ -91,5 +96,5 @@ export async function loadWorkPortfolio(params: {
     presentation,
     now,
   });
-  return { status: "ok", membership, portfolio, truncated: cases.length >= PORTFOLIO_CASE_LIMIT };
+  return { status: "ok", membership, portfolio, snapshots, truncated: cases.length >= PORTFOLIO_CASE_LIMIT };
 }

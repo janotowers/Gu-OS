@@ -22,6 +22,7 @@ import {
 import {
   PORTFOLIO_SNOOZE_OPTIONS_DAYS,
   type AttentionProjection,
+  type ContextualAttention,
   type DurableRef,
 } from "@agents/types";
 import { AppShell } from "@/components/app-shell";
@@ -29,12 +30,21 @@ import { createClient } from "@/lib/supabase/server";
 import { hitlActionsForInteraction } from "@/lib/human-interaction/hitl-adapter";
 import { workReviewActionPresentation } from "@/lib/operations/work-view-labels";
 import { loadWorkPortfolio } from "@/lib/work-portfolio/load";
-import type { PortfolioEntry, PortfolioView } from "@/lib/work-portfolio/projection";
+import type { PortfolioEntry } from "@/lib/work-portfolio/projection";
 import { PORTFOLIO_SECTIONS } from "@/lib/work-portfolio/projection";
 import {
+  createOpenRouterRankingJudge,
+  rankWorkPortfolio,
+  type RankedPortfolioEntry,
+  type RankedPortfolioView,
+  type RankingSummary,
+} from "@/lib/work-portfolio/ranking";
+import {
   authorityCopy,
+  CONTEXTUAL_COPY,
   POSTURE_COPY,
   PREDICATE_COPY,
+  RANKING_STATUS_COPY,
   REFUSAL_COPY,
   renderClause,
   SECTION_COPY,
@@ -276,6 +286,40 @@ function AttentionCard({
   );
 }
 
+/**
+ * A discretionary attention item (SL-12): the model's words, each shown with
+ * the durable rows it cites — the merge kept it only because every one of them
+ * is this Case's own. Rendered as text, never as markup.
+ */
+function ContextualCard({ item }: { item: ContextualAttention }) {
+  const rows: Array<[string, ContextualAttention["why"]]> = [
+    [CONTEXTUAL_COPY.why, item.why],
+    [CONTEXTUAL_COPY.whatGuNeeds, item.what_gu_needs],
+    [CONTEXTUAL_COPY.whyNow, item.why_now],
+  ];
+  return (
+    <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-900 dark:bg-sky-950/40">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge tone="sky">{CONTEXTUAL_COPY.badge}</Badge>
+        <span className="text-[11px] text-neutral-500">{CONTEXTUAL_COPY.note}</span>
+      </div>
+      <dl className="mt-2 space-y-1.5 text-sm">
+        {rows.map(([label, claim]) => (
+          <div key={label}>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{label}</dt>
+            <dd className="text-neutral-900 dark:text-neutral-100">
+              {claim.text}
+              <span className="ml-2 font-mono text-[10px] text-neutral-400">
+                {claim.refs.map(shortRef).join(" · ")}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function PresentationControls({
   entry,
   organizationId,
@@ -330,7 +374,7 @@ function CaseCard({
   actorUserId,
   formatInstant,
 }: {
-  entry: PortfolioEntry;
+  entry: RankedPortfolioEntry;
   organizationId: string;
   view: View;
   actorUserId: string;
@@ -356,6 +400,9 @@ function CaseCard({
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
+          {entry.section === "needs_attention" && entry.rank !== null ? (
+            <Badge tone="amber">{CONTEXTUAL_COPY.rank(entry.rank)}</Badge>
+          ) : null}
           {entry.presentation.pinned ? <Badge tone="violet">Fijado</Badge> : null}
           <Badge tone={entry.case.runtime_authority === "gu_os" ? "sky" : "neutral"}>
             <span title={authority.detail}>{authority.label}</span>
@@ -388,6 +435,12 @@ function CaseCard({
         <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
           Lo {entry.presentation.userSuppression === "hidden" ? "ocultaste" : "pospusiste"}, pero sigue visible: contiene una obligación gobernada que tu vista personal no puede quitar.
         </p>
+      ) : null}
+
+      {entry.contextual ? (
+        <div className="mt-3">
+          <ContextualCard item={entry.contextual} />
+        </div>
       ) : null}
 
       {entry.attention.length > 0 ? (
@@ -452,12 +505,14 @@ function CaseCard({
 
 function PortfolioSections({
   portfolioView,
+  ranking,
   organizationId,
   view,
   actorUserId,
   formatInstant,
 }: {
-  portfolioView: PortfolioView;
+  portfolioView: RankedPortfolioView;
+  ranking: RankingSummary;
   organizationId: string;
   view: View;
   actorUserId: string;
@@ -481,6 +536,9 @@ function PortfolioSections({
             {SECTION_COPY[section].title} <span className="text-neutral-400">({entries.length})</span>
           </h2>
           <p className="mb-2 text-xs text-neutral-500">{SECTION_COPY[section].note}</p>
+          {section === "needs_attention" ? (
+            <p className="mb-2 text-xs text-neutral-500">{RANKING_STATUS_COPY[ranking.status]}</p>
+          ) : null}
           <div className="space-y-3">
             {entries.map((entry) => (
               <CaseCard
@@ -569,10 +627,20 @@ export default async function WorkPortfolioPage({
 
   const { data: profile } = await userDb.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
   const formatInstant = instantFormatter((profile as { timezone?: string } | null)?.timezone ?? null);
-  const { portfolio } = result;
+  // SL-12: the contextual ranking pass, over the Portfolio SL-7 just built and
+  // nothing else. Off, failing or slow, it returns SL-7's order and says so.
+  const portfolio = await rankWorkPortfolio({
+    serviceDb,
+    organizationId,
+    actor: result.portfolio.actor,
+    portfolio: result.portfolio,
+    snapshots: result.snapshots,
+    judge: createOpenRouterRankingJudge(),
+    now: new Date(),
+  });
   const current = view === "org" ? portfolio.organizationWork : portfolio.myWork;
-  const needs = (v: PortfolioView) => v.entries.filter((e) => e.section === "needs_attention").length;
-  const tab = (target: View, label: string, v: PortfolioView) => {
+  const needs = (v: RankedPortfolioView) => v.entries.filter((e) => e.section === "needs_attention").length;
+  const tab = (target: View, label: string, v: RankedPortfolioView) => {
     const params = new URLSearchParams({ org: organizationId, view: target });
     const active = view === target;
     return (
@@ -609,6 +677,7 @@ export default async function WorkPortfolioPage({
         ) : null}
         <PortfolioSections
           portfolioView={current}
+          ranking={portfolio.ranking}
           organizationId={organizationId}
           view={view}
           actorUserId={user.id}
