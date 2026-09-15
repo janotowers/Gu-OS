@@ -12,6 +12,10 @@ Inventario canónico. **Defaults y lectura de env** viven en [`packages/agent/sr
 | Skill selector | `SKILL_SELECTOR_MODEL_ID` | `anthropic/claude-haiku-4.5` | `createSkillSelectorModel` |
 | Business Brain reviewer | `BUSINESS_BRAIN_REVIEWER_MODEL_ID` | `anthropic/claude-haiku-4.5` | `createBusinessBrainReviewerModel` |
 | Clasificador conversacional de casos (+ 2ª opinión HITL `unclear`) | `OPERATIONAL_CONVERSATION_CLASSIFIER_MODEL_ID` | `openai/gpt-5.4-mini` | `apps/web/.../operational-conversation-classifier.ts`, `pending-decision-unclear-classifier.ts` |
+| Intérprete semántico de admisión (R1 SL-2) | `RELATIONSHIP_ADMISSION_MODEL_ID` | `openai/gpt-5.4-mini` | `apps/web/src/lib/relationship-admission/interpreter.ts` |
+| Juez de continuidad duplicado/supersesión (R1 SL-3) | `RELATIONSHIP_CONTINUITY_MODEL_ID` | `openai/gpt-5.4-mini` | `apps/web/src/lib/relationship-resolution/continuity-judge.ts` |
+| Supervisor de Caso — juicio de siguiente trabajo (R1 SL-4) | `RELATIONSHIP_SUPERVISOR_MODEL_ID` | `openai/gpt-5.4-mini` | `apps/web/src/lib/relationship-supervisor/next-work-judge.ts` |
+| Work Portfolio — orden contextual de Needs Attention (R1 SL-12) | `RELATIONSHIP_PORTFOLIO_RANKING_MODEL_ID` | `openai/gpt-5.4-mini`, con esfuerzo de razonamiento bajo | `apps/web/src/lib/work-portfolio/ranking/judge.ts`, solo con el flag `portfolio_contextual_ranking` encendido (apagado por defecto) |
 | Vision / fotos | `IMAGE_VISION_MODEL_ID` | `openai/gpt-4.1-mini` | `packages/agent/.../realestate-adapters.ts` |
 | Copy de listing | `LISTING_COPY_MODEL_ID` | `openai/gpt-4.1-mini` | `packages/agent/.../realestate-adapters.ts` |
 | Embeddings memoria | `MEMORY_EMBEDDING_MODEL` | `google/gemini-embedding-001` | `packages/agent/src/embeddings.ts` |
