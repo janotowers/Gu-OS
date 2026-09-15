@@ -1,0 +1,593 @@
+{
+  "ranAt": "2026-09-15T14:36:09.770Z",
+  "set": {
+    "name": "holdout",
+    "file": "ranking-holdout-scenarios.json",
+    "digest": "sha256:436564d416d9adfd22f432179b5c06b8d9641b0029c06085ec8fce9e5a0ab7a1"
+  },
+  "model": {
+    "source": "the judge that ran each pass (PortfolioRankingJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ]
+  },
+  "failure_rate_bar": 0.2,
+  "unsupported_attention_bar": 0,
+  "floor_violation_bar": 0,
+  "scenarios": 9,
+  "runCount": 5,
+  "runsHoldingAllBars": 5,
+  "runs": [
+    {
+      "run": 1,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "holdout-quiet-work-and-waits",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-high-value-credible-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-prospect-waits-on-a-price-answer",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-minor-ask-below-a-real-loss",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "holdout-urgent-note-in-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-thin-and-stale",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-complaint-among-quiet",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-many-quiet-one-question",
+          "passed": false,
+          "violations": [
+            "expected c7 to be admitted; it was not"
+          ],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 0,
+      "failureRate": 0,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "holdout-quiet-work-and-waits",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-high-value-credible-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-prospect-waits-on-a-price-answer",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-minor-ask-below-a-real-loss",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "holdout-urgent-note-in-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-thin-and-stale",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-complaint-among-quiet",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-many-quiet-one-question",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 0,
+      "failureRate": 0,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "holdout-quiet-work-and-waits",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-high-value-credible-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-prospect-waits-on-a-price-answer",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-minor-ask-below-a-real-loss",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "holdout-urgent-note-in-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-thin-and-stale",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-complaint-among-quiet",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-many-quiet-one-question",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 0,
+      "failureRate": 0,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "holdout-quiet-work-and-waits",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-high-value-credible-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-prospect-waits-on-a-price-answer",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-minor-ask-below-a-real-loss",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "holdout-urgent-note-in-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-thin-and-stale",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-complaint-among-quiet",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-many-quiet-one-question",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c7"
+          ],
+          "admitted": [
+            "c7"
+          ]
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 1,
+      "failureRate": 0.1111111111111111,
+      "unsupported": 0,
+      "floorViolations": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "holdout-quiet-work-and-waits",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-high-value-credible-path",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-prospect-waits-on-a-price-answer",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-minor-ask-below-a-real-loss",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2",
+            "c1"
+          ],
+          "admitted": [
+            "c2"
+          ]
+        },
+        {
+          "id": "holdout-urgent-note-in-data",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-thin-and-stale",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        },
+        {
+          "id": "holdout-governed-by-consequence",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1",
+            "c2"
+          ],
+          "admitted": []
+        },
+        {
+          "id": "holdout-complaint-among-quiet",
+          "passed": true,
+          "violations": [],
+          "unsupported": [],
+          "floor": [],
+          "order": [
+            "c1"
+          ],
+          "admitted": [
+            "c1"
+          ]
+        },
+        {
+          "id": "holdout-many-quiet-one-question",
+          "passed": false,
+          "violations": [
+            "expected c7 to be admitted; it was not"
+          ],
+          "unsupported": [],
+          "floor": [],
+          "order": [],
+          "admitted": []
+        }
+      ]
+    }
+  ]
+}
