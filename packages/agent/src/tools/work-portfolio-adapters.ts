@@ -16,10 +16,13 @@
  *     actor's active memberships; zero or several fail closed.
  *   * **A refusal is a result.** The model needs to know it may not read, and
  *     not retry.
+ *   * **Every call is audited.** The tool writes its own `tool_calls` row, as
+ *     the graph expects of every tool not exempted in tool-audit-ownership.ts.
  */
 import { z } from "zod";
 import { tool } from "@langchain/core/tools";
-import type { DbClient } from "@agents/db";
+import { updateToolCallStatus, type DbClient } from "@agents/db";
+import { createTrackedToolCall } from "./tool-call-audit";
 import type { ToolContext } from "./tool-context";
 
 export type WorkPortfolioView = "mine" | "organization";
@@ -102,8 +105,22 @@ export function buildWorkPortfolioTools(
   if (!isAvailable("work_portfolio_read")) return [];
   return [
     tool(
-      async (input) =>
-        JSON.stringify(await readWorkPortfolioForTool(ctx, deps, input.view ?? "mine")),
+      async (input) => {
+        const view = input.view ?? "mine";
+        // This tool owns its audit trail: the graph writes no tool_calls row for
+        // it (tool-audit-ownership.ts), so it writes and closes its own — what
+        // the model read, for whom, and with what outcome. A refusal is a
+        // result and closes as executed; only a failure closes as failed.
+        const record = await createTrackedToolCall(ctx, "work_portfolio_read", { view }, false);
+        const result = await readWorkPortfolioForTool(ctx, deps, view);
+        await updateToolCallStatus(
+          ctx.db,
+          record.id,
+          result.status === "failed" ? "failed" : "executed",
+          result as unknown as Record<string, unknown>
+        );
+        return JSON.stringify(result);
+      },
       {
         name: "work_portfolio_read",
         description:
