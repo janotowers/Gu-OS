@@ -36,7 +36,7 @@ export const RANKING_TIMEOUT_MS = 20_000;
  * One attempt's own limit inside that bound. A provider call that hangs is
  * abandoned, not waited on for the whole budget, so the one retry still fits.
  */
-export const RANKING_ATTEMPT_TIMEOUT_MS = 9_000;
+export const RANKING_ATTEMPT_TIMEOUT_MS = 12_000;
 /** The first attempt, and one more after a transient failure or an invalid answer. */
 export const RANKING_MAX_ATTEMPTS = 2;
 
