@@ -4,7 +4,8 @@
  * Landed at SL-0 and extended by every Slice that adds a multi-seat surface:
  * SL-2 added `organization_policies` and `source_events`; SL-3 added the
  * M-RESOLUTION-IDENTITY indexes; SL-4 the Case Subjects and wake identity;
- * SL-7 `portfolio_presentation_state` and the Work Portfolio read paths.
+ * SL-7 `portfolio_presentation_state` and the Work Portfolio read paths; SL-12
+ * the chat tool's Organization resolution and the ranking kill switch.
  *
  * Technical Plan §8: "Cross-tenant negative suite (two-orgs fixture, read and
  * write paths) required from SL-0 and gating every multi-seat surface."
@@ -1864,6 +1865,113 @@ async function main(): Promise<void> {
           ).rowCount
         );
         assert.equal(orgAChildren, 0, `${who}: no child row of an Org A Case`);
+      }
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-12 Work Portfolio v2 — the ranking pass and the chat tool (SA-12.11)");
+
+    // Neither new surface adds a read shape. The ranking pass reads only the
+    // snapshots SL-7's loader built (the read paths above; the module selftest
+    // proves it reads nothing else) plus its Organization's flag, with the
+    // service role. The chat tool resolves the Organization from memberships,
+    // then runs that same loader under the person's own JWT. What the database
+    // must still guarantee: the resolution yields ACTIVE memberships only, and
+    // the ranking kill switch is not a member's to read across tenants or flip.
+    const resolveOrganizations = (userId: string) =>
+      asRole(client, service, async () =>
+        (
+          await client.query<{ organization_id: string }>(
+            // `listActiveOrganizationIdsForUser` — the chat tool's resolution.
+            `select organization_id from public.organization_memberships
+              where user_id = $1 and status = 'active'`,
+            [userId]
+          )
+        ).rows.map((r) => r.organization_id)
+      );
+
+    await t("SA-12.11 the chat tool resolves ACTIVE memberships only: none for a revoked member or a non-member, Org B alone for an Org B member", async () => {
+      assert.deepEqual(await resolveOrganizations(f.revokedA), []);
+      assert.deepEqual(await resolveOrganizations(f.legacyUser), []);
+      assert.deepEqual(await resolveOrganizations(f.memberB), [f.orgB]);
+      assert.deepEqual(await resolveOrganizations(f.memberA2), [f.orgA]);
+    });
+
+    await t("SA-12.11 through the Organization it resolves, an Org B member's Portfolio holds no Org A Case", async () => {
+      const [resolved] = await resolveOrganizations(f.memberB);
+      const reads = await portfolioReads(f.memberB, resolved);
+      assert.ok(reads.caseIds.includes(f.orgCaseB), "their own Organization's Case");
+      assert.ok(!reads.caseIds.includes(f.orgCaseA) && !reads.caseIds.includes(f.orgCaseA2));
+    });
+
+    await t("SA-12.11 the ranking kill switch: invisible across tenants, and no user session can write it", async () => {
+      // Persisted for this check only (the connection user bypasses RLS), and
+      // removed at the end so later sections see the fixture unchanged.
+      await client.query(
+        `insert into public.organization_feature_flags (organization_id, flag_key, enabled)
+         values ($1, 'portfolio_contextual_ranking', false)`,
+        [f.orgA]
+      );
+      try {
+        const visible = (userId: string) =>
+          asRole(client, authed(userId), async () =>
+            (
+              await client.query(
+                `select 1 from public.organization_feature_flags
+                  where organization_id = $1 and flag_key = 'portfolio_contextual_ranking'`,
+                [f.orgA]
+              )
+            ).rowCount
+          );
+        assert.equal(await visible(f.memberA2), 1, "an active member may read their Organization's flag");
+        for (const userId of [f.revokedA, f.memberB, f.legacyUser]) {
+          assert.equal(await visible(userId), 0, "nothing of Org A's flags");
+        }
+
+        for (const [who, userId] of [
+          ["active member", f.memberA2],
+          ["revoked member", f.revokedA],
+          ["Org B member", f.memberB],
+          ["non-member", f.legacyUser],
+        ] as const) {
+          const insert = await errorCode(() =>
+            asRole(client, authed(userId), () =>
+              client.query(
+                `insert into public.organization_feature_flags (organization_id, flag_key, enabled)
+                 values ($1, 'portfolio_contextual_ranking_probe', true)`,
+                [f.orgA]
+              )
+            )
+          );
+          assert.equal(insert, "42501", `${who}: insert refused`);
+          // An UPDATE is either refused outright or matches no row the policies
+          // let it touch — both leave the flag as it was.
+          let updated = 0;
+          const update = await errorCode(async () => {
+            updated = await asRole(client, authed(userId), async () =>
+              (
+                await client.query(
+                  `update public.organization_feature_flags set enabled = true
+                    where organization_id = $1 and flag_key = 'portfolio_contextual_ranking'`,
+                  [f.orgA]
+                )
+              ).rowCount ?? 0
+            );
+          });
+          assert.ok(update === "42501" || (update === null && updated === 0), `${who}: update had no effect`);
+        }
+        const after = await client.query<{ enabled: boolean }>(
+          `select enabled from public.organization_feature_flags
+            where organization_id = $1 and flag_key = 'portfolio_contextual_ranking'`,
+          [f.orgA]
+        );
+        assert.deepEqual(after.rows.map((r) => r.enabled), [false], "the switch is still off");
+      } finally {
+        await client.query(
+          `delete from public.organization_feature_flags
+            where organization_id = $1 and flag_key = 'portfolio_contextual_ranking'`,
+          [f.orgA]
+        );
       }
     });
 
