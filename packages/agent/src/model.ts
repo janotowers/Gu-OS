@@ -76,6 +76,13 @@ export const DEFAULT_RELATIONSHIP_CONTINUITY_MODEL_ID = "openai/gpt-5.4-mini";
  * `RELATIONSHIP_SUPERVISOR_MODEL_ID`.
  */
 export const DEFAULT_RELATIONSHIP_SUPERVISOR_MODEL_ID = "openai/gpt-5.4-mini";
+/**
+ * Default del pase de ranking contextual del Work Portfolio (R1 SL-12). Mismo
+ * modelo por defecto que el supervisor: ningún artefacto de gobierno prescribe
+ * uno, y la tarea es de la misma clase (juicio situacional corto con salida
+ * JSON estricta). Override con `RELATIONSHIP_PORTFOLIO_RANKING_MODEL_ID`.
+ */
+export const DEFAULT_RELATIONSHIP_PORTFOLIO_RANKING_MODEL_ID = "openai/gpt-5.4-mini";
 /** Default vision (analyze_property_images y tools de foto). */
 export const DEFAULT_IMAGE_VISION_MODEL_ID = "openai/gpt-4.1-mini";
 /** Default redacción comercial (prepare_listing_description_draft). */
@@ -123,6 +130,11 @@ export const RELATIONSHIP_CONTINUITY_MODEL_ID =
 export const RELATIONSHIP_SUPERVISOR_MODEL_ID =
   process.env.RELATIONSHIP_SUPERVISOR_MODEL_ID?.trim() ||
   DEFAULT_RELATIONSHIP_SUPERVISOR_MODEL_ID;
+
+/** Pase de ranking contextual del Work Portfolio SL-12 (env override > default). */
+export const RELATIONSHIP_PORTFOLIO_RANKING_MODEL_ID =
+  process.env.RELATIONSHIP_PORTFOLIO_RANKING_MODEL_ID?.trim() ||
+  DEFAULT_RELATIONSHIP_PORTFOLIO_RANKING_MODEL_ID;
 
 /** Vision / análisis de imágenes (env override > default). */
 export const IMAGE_VISION_MODEL_ID =

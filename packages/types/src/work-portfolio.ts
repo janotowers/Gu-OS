@@ -133,6 +133,57 @@ export interface AttentionProjection {
 }
 
 // ============================================================
+// Contextual (discretionary) attention — S4 §6.1, §6.4; TD-9 v2 (R1 SL-12)
+// ============================================================
+
+/**
+ * One claim of a contextual attention item: the model's wording, anchored to
+ * the durable rows it cites. It is shown only if EVERY ref resolved to a row of
+ * the same Case in the authorized snapshot (Slice Plan SA-12.5). Whether the
+ * rows actually support the wording is the eval rubric's to judge — a
+ * validator cannot prove it.
+ */
+export interface GroundedClaim {
+  text: string;
+  refs: readonly DurableRef[];
+}
+
+/**
+ * A discretionary attention item — the contextual human-value path.
+ *
+ * Deliberately NOT an `AttentionProjection`. It carries no predicate, creates
+ * no obligation, and a person's snooze or hide applies to it ("discretionary is
+ * not governed", Slice Plan SL-12 and Technical Plan v1.16). It exists only in
+ * one Portfolio load's presentation and is never persisted (SA-12.8).
+ */
+export interface ContextualAttention {
+  v: 1;
+  kind: "contextual";
+  case_id: string;
+  must_surface: false;
+  why: GroundedClaim;
+  what_gu_needs: GroundedClaim;
+  why_now: GroundedClaim;
+}
+
+/**
+ * How one Portfolio load was ordered. Anything but `ranked` means SL-7's
+ * deterministic order and reason codes stand, with nothing contextual — and
+ * the page says so (SA-12.7).
+ */
+export const PORTFOLIO_RANKING_STATUSES = [
+  "ranked",
+  "disabled",
+  "no_candidates",
+  "model_unavailable",
+  "model_error",
+  "timeout",
+  "invalid_output",
+] as const;
+
+export type PortfolioRankingStatus = (typeof PORTFOLIO_RANKING_STATUSES)[number];
+
+// ============================================================
 // Presentation state — the only thing the Portfolio owns
 // ============================================================
 

@@ -131,7 +131,8 @@ function sectionOf(attention: readonly AttentionProjection[], snapshot: Portfoli
   return "not_reconsidered";
 }
 
-function compareEntries(a: PortfolioEntry, b: PortfolioEntry): number {
+/** SL-7's deterministic order — also SL-12's fallback, and its order for anything the model did not rank. */
+export function compareEntries(a: PortfolioEntry, b: PortfolioEntry): number {
   const bySection = PORTFOLIO_SECTIONS.indexOf(a.section) - PORTFOLIO_SECTIONS.indexOf(b.section);
   if (bySection !== 0) return bySection;
   // Pinning reorders within a section; it can never move an entry out of one.

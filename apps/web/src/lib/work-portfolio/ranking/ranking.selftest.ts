@@ -178,7 +178,7 @@ function portfolioOf(snapshots: readonly PortfolioCaseSnapshot[], presentation: 
 }
 
 function flagsDb(ranking: boolean): FakeDb {
-  const flags = [
+  const flags: Array<Record<string, unknown>> = [
     { id: "f1", organization_id: ORG, flag_key: ORGANIZATION_FLAG_KEYS.relationshipOps, enabled: true, value_text: null },
   ];
   if (ranking) {
@@ -333,6 +333,16 @@ async function main(): Promise<void> {
     const merged = mergeRanking(frame, { items: [{ case: "c99", kind: "contextual", priority: 1, why: claim("w", ["c99"]), what_gu_needs: claim("n", ["c99"]), why_now: claim("t", ["c99"]) }] });
     assert.equal(merged.contextual.size, 0);
     assert.equal(merged.diagnostics.unknown_cases, 1);
+  });
+
+  await t("the merge never admits a GOVERNED case contextually, even with fully grounded claims", () => {
+    const frame = frameFromInput(minimalInput());
+    const merged = mergeRanking(frame, {
+      items: [{ case: "c1", kind: "contextual", priority: 1, why: claim("w", ["c1.f1"]), what_gu_needs: claim("n", ["c1"]), why_now: claim("t", ["c1.a1"]) }],
+    });
+    assert.equal(merged.contextual.has("c1"), false, "governed stays governed at the merge, not only at the view");
+    assert.equal(merged.priorities.get("c1"), 1, "its rank is still honoured");
+    assert.equal(merged.diagnostics.relabelled_governed, 1);
   });
 
   await t("a model claiming a NON-governed Case is governed creates nothing", () => {

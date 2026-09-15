@@ -124,6 +124,13 @@ export const ORGANIZATION_FLAG_KEYS = {
   appointmentEffects: "relationship_appointment_effects",
   runtimeAuthorityTransfer: "relationship_runtime_authority_transfer",
   legacyEventIngestion: "legacy_event_ingestion",
+  /**
+   * R1 SL-12: the Work Portfolio's contextual ranking pass. Off (absent) ⇒ no
+   * model call and SL-7's deterministic order — the kill switch for a
+   * model-mediated, cost-bearing step. Only consulted while `relationship_ops`
+   * is on.
+   */
+  portfolioContextualRanking: "portfolio_contextual_ranking",
 } as const;
 
 export type OrganizationFlagKey =
