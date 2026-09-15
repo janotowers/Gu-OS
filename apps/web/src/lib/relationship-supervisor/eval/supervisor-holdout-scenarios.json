@@ -1,0 +1,302 @@
+{
+  "recorded": {
+    "what": "SL-14 holdout — INVENTED, and frozen on 2026-09-15 before the implementation changed the judge. Six situations covering the same S2 semantics as the extended set with different Work, capabilities and needs. It shares no scenario id and no situation with supervisor-scenarios.json, and it is run only after the implementation is final, so it is independent evidence for what the change did.",
+    "bars": "The same five bars as the main set, at the same values. They are the Accountable's ratified bars for SL-14's RS-2 scope (Slice Plan §4)."
+  },
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "reask_bar": 0,
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0,
+  "bar_rationale": "Identical to the main set's bars; see supervisor-scenarios.json.",
+  "scenarios": [
+    {
+      "id": "h-blocked-valuation-transient",
+      "label": "A valuation lookup blocked by a transient provider error, with the answer still needed",
+      "covers": [
+        "blocked_work_recovery"
+      ],
+      "rubric": "The valuation failed technically and the seller is waiting for a number. Retrying is the obvious recovery; replanning with another available capability and leaving the blocked Work is also defensible.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Saber en cuánto puede vender su casa",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: quedo al pendiente del estimado"
+        ],
+        "workSummary": [
+          "[w1] valuation_lookup — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el proveedor de valuación respondió 502"
+        ],
+        "postureHistory": [
+          "work — se propuso obtener el estimado"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "valuation_lookup"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "wait",
+        "targeted_human_input"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "retry",
+        "leave"
+      ],
+      "requires_disposition": true
+    },
+    {
+      "id": "h-blocked-identical-error-twice",
+      "label": "The same failure returned after a Supervisor retry of a document build",
+      "covers": [
+        "blocked_work_recovery",
+        "loop_stopping"
+      ],
+      "rubric": "One retry was already granted and the same error returned. Another retry is looping; a person, another strategy or an explicit wait is what the situation needs.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Recibir la propuesta por escrito",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ¿me la puedes mandar por escrito?"
+        ],
+        "workSummary": [
+          "[w1] proposal_document — blocked (agent_proposed): technical failure, 4 of 4 attempts used; last error: la plantilla del documento sigue sin resolver"
+        ],
+        "postureHistory": [
+          "work — se propuso generar la propuesta",
+          "work — se reintentó generar la propuesta; falló igual"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "generate_proposal"
+        ]
+      },
+      "acceptable_postures": [
+        "targeted_human_input",
+        "gather_research_reconcile",
+        "wait"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "retry_is_blind": true,
+      "requires_disposition": true
+    },
+    {
+      "id": "h-blocked-capability-removed",
+      "label": "The capability behind the blocked Work was removed from the Case",
+      "covers": [
+        "blocked_work_recovery",
+        "capability_gap"
+      ],
+      "rubric": "Nothing available can run the blocked Work. The gap is the finding; retrying cannot help.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Agendar una visita esta semana",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ¿podemos verla el sábado?"
+        ],
+        "workSummary": [
+          "[w1] calendar_availability — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: la integración de calendario fue desconectada"
+        ],
+        "postureHistory": [
+          "work — se propuso revisar disponibilidad"
+        ],
+        "availableCapabilities": [
+          "read_case_facts"
+        ]
+      },
+      "acceptable_postures": [
+        "targeted_human_input",
+        "wait",
+        "gather_research_reconcile"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "retry_is_blind": true,
+      "requires_disposition": true,
+      "must_report_capability_gap": true
+    },
+    {
+      "id": "h-blocked-need-overtaken",
+      "label": "The blocked Work was overtaken by what the prospect did next",
+      "covers": [
+        "blocked_work_recovery",
+        "loop_stopping"
+      ],
+      "rubric": "The prospect already chose another property, so the blocked comparison has no value left. Leaving it with that reason is coherent; retrying repeats work nobody needs.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 0,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Elegir entre dos casas",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ya me decidí por la del norte, avancemos con esa"
+        ],
+        "workSummary": [
+          "[w1] comparison_document — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el generador de documentos respondió 500"
+        ],
+        "postureHistory": [
+          "work — se propuso generar la comparación"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "generate_comparison"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "no_op",
+        "wait"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "retry_is_blind": true,
+      "requires_disposition": true
+    },
+    {
+      "id": "h-blocked-replan-cheaper-source",
+      "label": "Another available source answers what the blocked Work was for",
+      "covers": [
+        "blocked_work_recovery",
+        "adaptive_replanning"
+      ],
+      "rubric": "The blocked source is down, and a different available capability answers the same question. Replanning with it, and leaving the blocked Work with that reason, advances the objective.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Confirmar si la casa acepta crédito Infonavit",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: necesito saber si acepta Infonavit"
+        ],
+        "workSummary": [
+          "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el proveedor de inventario está caído"
+        ],
+        "postureHistory": [
+          "work — se propuso consultar inventario"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "lookup_property_details"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "requires_disposition": true,
+      "must_propose_work": true
+    },
+    {
+      "id": "h-succeeded-but-unfavourable",
+      "label": "The Work ran and the answer was unfavourable",
+      "covers": [
+        "blocked_work_recovery"
+      ],
+      "rubric": "The check ran correctly and the answer was no. That is a commercial fact, not a technical failure: nothing is retried, and the strategy adapts.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar con crédito Infonavit",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ¿sí acepta Infonavit?"
+        ],
+        "workSummary": [
+          "lookup_property_details — done (agent_proposed): la propiedad no acepta Infonavit"
+        ],
+        "postureHistory": [
+          "work — se propuso verificar la forma de pago"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "targeted_human_input",
+        "wait"
+      ],
+      "recoverable_aliases": [],
+      "not_recoverable": true
+    }
+  ]
+}

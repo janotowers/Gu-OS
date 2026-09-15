@@ -19,12 +19,13 @@
       "WHAT THE RATIFICATION MUST WEIGH. The bars were frozen before the first run and never moved, and no expectation or scoring changed at any point. But the implementation was repaired twice after observed breaches, and the second repair was prompted by one of the two new scenarios, so the final wording was shaped by this set and the new scenarios are NOT an independent holdout. The guard against regressing the sixteen unchanged situations is structural, not statistical: their prompts are byte-identical to SL-4's. Separately, the same-day baseline breached the zero-fabrication bar in 2 of its 5 runs, while the fifteen later runs of those same byte-identical sixteen prompts had none. That puts SL-4's zero bar at the edge of this model's variance rather than reliably held — an observation about SL-4's evidence, reported to the Accountable and not absorbed here."
     ],
     "repairBarsRatifiedBy": "RATIFIED by Alejandro Torres Padilla, the Accountable, on 2026-09-14 (−06:00) — AFTER the runs recorded in `repairRunHistory`, and after reviewing that evidence and its caveats. The ratification is scoped to this repair and its current shadow evidence: `failure_rate_bar` 0.2, `fabricated_work_bar` 0, `reask_bar` 0. The sequence, exactly as it occurred: (1) the bars were PROPOSED AND FROZEN BY THE CODING AGENT before the first extended run (commit 94c5636); (2) the implementation was repaired after observed breaches (d9ce566, 29658e3), and the bars never moved; (3) the Accountable ratified them afterwards. This is not a prior human approval, and it does not become a standing threshold for later Slices, the assisted or live stages, or production (Methodology §14.1).",
-    "sl4BaselineVarianceFinding": "A MODEL-VARIANCE FINDING about SL-4's evidence, recorded on the Accountable's decision of 2026-09-14. On 2026-09-14, SL-4's own prompt and 16 scenarios (af663e5, openai/gpt-5.4-mini) breached SL-4's zero-fabrication bar in 2 of 5 runs; SL-4's final ten runs had held it in all ten. The bar is NOT changed or relaxed. The observed REAL fabrication — `attention-already-consumed` proposing an inventory search where no work is warranted — stands as observed and is not reinterpreted, and the historical run is not rewritten. The keyword detector's flag on `contact-me-after-the-twentieth` is not a reason to loosen the threshold or rewrite that run. If the detector is later shown to be semantically wrong, that is a SEPARATE verifier defect, repaired only with evidence that preserves the underlying fabrication contract."
+    "sl4BaselineVarianceFinding": "A MODEL-VARIANCE FINDING about SL-4's evidence, recorded on the Accountable's decision of 2026-09-14. On 2026-09-14, SL-4's own prompt and 16 scenarios (af663e5, openai/gpt-5.4-mini) breached SL-4's zero-fabrication bar in 2 of 5 runs; SL-4's final ten runs had held it in all ten. The bar is NOT changed or relaxed. The observed REAL fabrication — `attention-already-consumed` proposing an inventory search where no work is warranted — stands as observed and is not reinterpreted, and the historical run is not rewritten. The keyword detector's flag on `contact-me-after-the-twentieth` is not a reason to loosen the threshold or rewrite that run. If the detector is later shown to be semantically wrong, that is a SEPARATE verifier defect, repaired only with evidence that preserves the underlying fabrication contract.",
+    "sl14ScenariosFrozen": "FROZEN 2026-09-15, BEFORE THE JUDGE WAS TOUCHED (SL-14 ordering constraint 2). Seven scenarios were added for technically blocked Work: a transient failure worth retrying; the same failure after a Supervisor retry; a capability that is gone; a need a person already met; a replan with another capability; Work blocked on a person, which is not technical; and Work that succeeded with a commercially negative result. The SL-4 scenario `work-failed-technically` keeps its acceptable postures and now carries the compile shape SL-14 introduces, plus its recovery expectations. A holdout of six scenarios, sharing no id and no situation with this set, was frozen at the same time in supervisor-holdout-scenarios.json and is run only after the implementation is final."
   },
   "failure_rate_bar": 0.2,
   "fabricated_work_bar": 0,
   "reask_bar": 0,
-  "bar_rationale": "0.2 mirrors the overall semantic bar SL-3 froze for a task of the same class (short situational judgment with strict JSON output), and is deliberately not tightened on the strength of SL-3's observed results — a bar borrowed from another Slice's OUTCOME would be a bar set by evidence rather than before it. This set is harder than SL-3's: several scenarios have more than one defensible posture, which is exactly what S2 AC-31 says ('selection explainable via current context; no universal score required'), so scoring accepts any listed posture and judges the rationale against the scenario's rubric. `fabricated_work_bar` is 0 because there is no acceptable rate of manufactured work: EC-20 and EC-40 make deliberate quiescence a correct outcome, and one fabricated commitment silently misrepresents a promise the brokerage never made.",
+  "bar_rationale": "0.2 mirrors the overall semantic bar SL-3 froze for a task of the same class (short situational judgment with strict JSON output), and is deliberately not tightened on the strength of SL-3's observed results — a bar borrowed from another Slice's OUTCOME would be a bar set by evidence rather than before it. This set is harder than SL-3's: several scenarios have more than one defensible posture, which is exactly what S2 AC-31 says ('selection explainable via current context; no universal score required'), so scoring accepts any listed posture and judges the rationale against the scenario's rubric. `fabricated_work_bar` is 0 because there is no acceptable rate of manufactured work: EC-20 and EC-40 make deliberate quiescence a correct outcome, and one fabricated commitment silently misrepresents a promise the brokerage never made. SL-14 adds two zero bars for the two failure directions the Accountable named on 2026-09-15, ratified the same day for SL-14's RS-2 scope: `blind_retry_bar` counts a retry of technically blocked Work where the evidence says a retry cannot help — the failure treated as an order to retry (S2 §8.17) — and `stranded_failure_bar` counts technically blocked Work left with no coherent disposition, which is what SL-4's evidence showed (S2 §8.21). Neither loosens the SL-4 or Cycle 3 bars, which are unchanged.",
   "scenarios": [
     {
       "id": "quiet-nothing-new",
@@ -615,7 +616,7 @@
         ],
         "openCommitments": [],
         "workSummary": [
-          "inventory_search — blocked (agent_proposed)"
+          "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el proveedor de inventario no respondió"
         ],
         "humanAnswers": [],
         "postureHistory": [
@@ -628,7 +629,16 @@
           "search_inventory"
         ],
         "trackedCommitmentKeys": []
-      }
+      },
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "retry",
+        "leave"
+      ],
+      "requires_disposition": true
     },
     {
       "id": "new-relevant-value-exists",
@@ -761,6 +771,341 @@
         ],
         "trackedCommitmentKeys": []
       }
+    },
+    {
+      "id": "blocked-retry-after-transient-failure",
+      "label": "Work blocked by a transient technical failure, and the need still stands",
+      "covers": [
+        "blocked_work_recovery",
+        "diagnose_before_act"
+      ],
+      "rubric": "The search failed for a technical reason and the prospect is still waiting for options. Retrying the same Work is the obvious recovery, and leaving it while replanning with an available capability is also defensible. The rationale must not treat the failure as evidence about the prospect.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en Zibatá",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: quedo atento a las opciones"
+        ],
+        "workSummary": [
+          "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el proveedor de inventario respondió 503"
+        ],
+        "postureHistory": [
+          "work — se propuso buscar inventario"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "wait",
+        "targeted_human_input"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "retry",
+        "leave"
+      ],
+      "requires_disposition": true
+    },
+    {
+      "id": "blocked-same-failure-after-a-retry",
+      "label": "The same technical failure recurred after the Supervisor already retried",
+      "covers": [
+        "blocked_work_recovery",
+        "loop_stopping"
+      ],
+      "rubric": "The Supervisor already granted one retry and the identical error returned. Retrying again is looping without information gain (S2 §8.17): the situation calls for another strategy, a person, or an explicit wait. Retrying again is a blind retry.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en Zibatá",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: quedo atento a las opciones"
+        ],
+        "workSummary": [
+          "[w1] inventory_search — blocked (agent_proposed): technical failure, 4 of 4 attempts used; last error: el proveedor de inventario respondió 503, igual que la vez anterior"
+        ],
+        "postureHistory": [
+          "work — se propuso buscar inventario",
+          "work — se reintentó la búsqueda tras el fallo técnico; volvió a fallar igual"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory"
+        ]
+      },
+      "acceptable_postures": [
+        "targeted_human_input",
+        "gather_research_reconcile",
+        "wait"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "retry_is_blind": true,
+      "requires_disposition": true
+    },
+    {
+      "id": "blocked-capability-no-longer-available",
+      "label": "The blocked Work needs a capability that is no longer available",
+      "covers": [
+        "blocked_work_recovery",
+        "capability_gap"
+      ],
+      "rubric": "The capability the blocked Work needs is absent from the available list. Retrying it cannot succeed; the gap is the finding, and a person or a wait is the honest disposition.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en Zibatá",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: sigo interesado en ver opciones"
+        ],
+        "workSummary": [
+          "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: credencial del proveedor revocada"
+        ],
+        "postureHistory": [
+          "work — se propuso buscar inventario"
+        ],
+        "availableCapabilities": [
+          "read_case_facts"
+        ]
+      },
+      "acceptable_postures": [
+        "targeted_human_input",
+        "wait",
+        "gather_research_reconcile"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "retry_is_blind": true,
+      "requires_disposition": true,
+      "must_report_capability_gap": true
+    },
+    {
+      "id": "blocked-need-already-met",
+      "label": "Work blocked technically, but a person already met the need",
+      "covers": [
+        "blocked_work_recovery",
+        "loop_stopping"
+      ],
+      "rubric": "The comparison the blocked Work would have produced was already sent by the advisor, and the answer says so. Recovering the Work would repeat work that no longer has value; leaving it with that reason is the coherent disposition, and stopping is correct.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [
+          "Se preguntó al asesor si ya había enviado la comparación — asesor, ayer: \"sí, se la mandé completa por WhatsApp\""
+        ],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comparar dos casas antes de decidir",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: gracias, ya vi la comparación"
+        ],
+        "workSummary": [
+          "[w1] comparison_document — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el generador de documentos respondió 500"
+        ],
+        "postureHistory": [
+          "work — se propuso generar la comparación"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "generate_comparison"
+        ]
+      },
+      "acceptable_postures": [
+        "no_op",
+        "wait"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "retry_is_blind": true,
+      "requires_disposition": true,
+      "must_not_propose_work": true,
+      "must_not_reask": true
+    },
+    {
+      "id": "blocked-replan-with-another-capability",
+      "label": "The blocked search can be replaced by a different available capability",
+      "covers": [
+        "blocked_work_recovery",
+        "adaptive_replanning"
+      ],
+      "rubric": "The provider behind the blocked Work is down, and a different available capability answers the same question well enough to advance the objective. Replanning with it, and leaving the blocked Work with that reason, is the useful move.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Saber si la casa de Zibatá sigue disponible",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: ¿sigue disponible la casa que vimos?"
+        ],
+        "workSummary": [
+          "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el proveedor de inventario está caído"
+        ],
+        "postureHistory": [
+          "work — se propuso buscar en inventario"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "lookup_property_details"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "requires_disposition": true,
+      "must_propose_work": true
+    },
+    {
+      "id": "blocked-waiting-on-a-person-not-technical",
+      "label": "Work blocked waiting for a person is not a technical failure",
+      "covers": [
+        "blocked_work_recovery"
+      ],
+      "rubric": "This Work is blocked because a person has to answer, not because anything failed. There is nothing to retry: the situation is a wait or a targeted ask.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar casa en Zibatá",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: déjame confirmar el presupuesto con mi esposa"
+        ],
+        "workSummary": [
+          "confirm_budget — blocked (human): esperando la respuesta de una persona"
+        ],
+        "postureHistory": [
+          "targeted_human_input — se preguntó el presupuesto"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory"
+        ]
+      },
+      "acceptable_postures": [
+        "wait",
+        "no_op",
+        "targeted_human_input"
+      ],
+      "recoverable_aliases": [],
+      "not_recoverable": true
+    },
+    {
+      "id": "work-succeeded-with-negative-discovery",
+      "label": "Work succeeded and found something commercially negative",
+      "covers": [
+        "blocked_work_recovery",
+        "diagnose_before_act"
+      ],
+      "rubric": "The Work ran correctly and learned the property is gone. That is information, not a technical failure: nothing is retried, and the strategy replans around what was learned (S2 AC-48, EC-33).",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar la casa de Zibatá que vio",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: quiero esa casa"
+        ],
+        "workSummary": [
+          "inventory_search — done (agent_proposed): la propiedad ya se vendió"
+        ],
+        "postureHistory": [
+          "work — se propuso verificar disponibilidad"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "search_inventory"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "targeted_human_input",
+        "wait"
+      ],
+      "recoverable_aliases": [],
+      "not_recoverable": true
     }
-  ]
+  ],
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0
 }
