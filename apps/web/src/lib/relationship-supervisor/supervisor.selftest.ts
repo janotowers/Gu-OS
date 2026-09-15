@@ -1863,6 +1863,184 @@ async function main(): Promise<void> {
     }
   });
 
+  // ────────────────────────────────────────────────────────────────────
+  // SL-14 — recovery of technically blocked Work.
+  //
+  // The Work Plane already retries a failed attempt up to `max_attempts` and
+  // then blocks the item. What SL-14 adds is the Supervisor's situational
+  // decision about what that blocked responsibility needs, and it may only act
+  // through the Work Plane's own transition. Nothing here retries by itself.
+  // ────────────────────────────────────────────────────────────────────
+
+  /** A Work Item as the Work Plane leaves it when its attempts run out. */
+  function blockedWorkRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      id: "w-blocked",
+      user_id: ADVISOR,
+      case_id: CASE_ID,
+      work_type: "inventory_search",
+      required_capability: "inventory_search",
+      origin: "agent_proposed",
+      status: "blocked",
+      blocked_reason: "max_attempts_exhausted",
+      attempt_count: 3,
+      max_attempts: 3,
+      version: 4,
+      workflow_definition_version: 1,
+      input_contract: { purpose: "Buscar inventario", proposed_by: "case_supervisor" },
+      ...overrides,
+    };
+  }
+
+  /** The judge's answer when it decides what the blocked Work needs. */
+  function recovering(
+    recovery: NextWorkProposal["recovery"],
+    proposal: Partial<NextWorkProposal> = {}
+  ): NextWorkProposal {
+    return { ...QUIET, recovery, ...proposal };
+  }
+
+  await t("SA-14.1 the judge is shown why and how often blocked Work failed", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    fake.tables.work_item_events.push({
+      id: "e1",
+      work_item_id: "w-blocked",
+      event_type: "attempt_failed",
+      payload: { attempt_number: 3, outcome: "blocked", error: { message: "provider 503" } },
+      created_at: "2026-09-08T11:00:00.000Z",
+    });
+    const judge = stubJudge(recovering([{ work: "w1", action: "leave", reason: "otra vía" }]));
+    await wake(fake.client, judge);
+    const [line] = judge.calls[0].workSummary;
+    assert.match(line, /^\[w1\] inventory_search — blocked \(agent_proposed\)/, "alias, type, status, origin");
+    assert.match(line, /3 of 3 attempts/, "how often it failed");
+    assert.match(line, /provider 503/, "why it failed");
+  });
+
+  await t("SA-14.1 a Case with no blocked Work sees the Work list exactly as before", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow({ id: "w-open", status: "todo", blocked_reason: null }));
+    const judge = stubJudge(QUIET);
+    await wake(fake.client, judge);
+    assert.deepEqual(judge.calls[0].workSummary, ["inventory_search — todo (agent_proposed)"]);
+  });
+
+  await t("SA-14.2 a technical failure alone never re-readies Work", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    await wake(fake.client, stubJudge(QUIET));
+    assert.equal(fake.tables.work_items[0].status, "blocked", "no decision, no recovery");
+    assert.equal(fake.tables.work_items[0].max_attempts, 3, "the Work Plane's own attempt policy is untouched");
+  });
+
+  await t("SA-14.3 a retry re-readies the SAME item through the Work Plane, history intact", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    const judge = stubJudge(
+      recovering([{ work: "w1", action: "retry", reason: "el proveedor ya responde" }])
+    );
+    await wake(fake.client, judge);
+    assert.equal(fake.tables.work_items.length, 1, "no duplicate Work Item");
+    const [item] = fake.tables.work_items;
+    assert.equal(item.status, "ready");
+    assert.equal(item.blocked_reason, null);
+    assert.equal(item.attempt_count, 3, "the attempt history stays");
+    assert.equal(item.max_attempts, 4, "one more window, as the Work Plane grants it");
+    const ready = fake.tables.work_item_events.filter((e) => e.event_type === "ready");
+    assert.equal(ready.length, 1);
+    assert.equal((ready[0].payload as { source?: string }).source, "case_supervisor_retry");
+    assert.equal(ready[0].actor, "agent", "attributed to the Supervisor, not to an operator");
+  });
+
+  await t("SA-14.3 the Supervisor cannot retry the same item without limit", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow({ attempt_count: 4, max_attempts: 4 }));
+    fake.tables.work_item_events.push({
+      id: "e-prev",
+      work_item_id: "w-blocked",
+      event_type: "ready",
+      actor: "agent",
+      payload: { source: "case_supervisor_retry" },
+      created_at: "2026-09-08T10:00:00.000Z",
+    });
+    const judge = stubJudge(recovering([{ work: "w1", action: "retry", reason: "una vez más" }]));
+    const result = await wake(fake.client, judge);
+    assert.equal(fake.tables.work_items[0].status, "blocked", "a second Supervisor retry is refused");
+    const record = reconsiderations(fake).at(-1);
+    assert.ok(
+      JSON.stringify(record?.recovery_applied ?? []).includes("refused"),
+      "and the refusal is on the record, not silent"
+    );
+    assert.equal(result.status, "reconsidered");
+  });
+
+  await t("SA-14.5 recovery never touches Work it does not own", async () => {
+    for (const row of [
+      blockedWorkRow({ origin: "human" }),
+      blockedWorkRow({ origin: "definition_template" }),
+      blockedWorkRow({ blocked_reason: "waiting_on_person" }),
+      blockedWorkRow({ status: "done", blocked_reason: null }),
+      blockedWorkRow({ required_capability: "send_prospect_message" }),
+    ]) {
+      const fake = harness();
+      fake.tables.work_items.push(row);
+      const judge = stubJudge(recovering([{ work: "w1", action: "retry", reason: "reintentar" }]));
+      await wake(fake.client, judge);
+      assert.notEqual(
+        fake.tables.work_items[0].status,
+        "ready",
+        `must not re-ready ${JSON.stringify({ origin: row.origin, reason: row.blocked_reason, status: row.status, cap: row.required_capability })}`
+      );
+    }
+  });
+
+  await t("SA-14.4 a replan proposes new Work; the duplicate guard still refuses the same type", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    const judge = stubJudge(
+      recovering([{ work: "w1", action: "leave", reason: "otra fuente responde" }], {
+        posture: "work",
+        proposed_work: [
+          { work_type: "lookup_property_details", purpose: "Responder por otra vía", durable: true },
+          { work_type: "inventory_search", purpose: "Repetir la búsqueda", durable: true },
+        ],
+      })
+    );
+    await wake(fake.client, judge);
+    const types = fake.tables.work_items.map((w) => w.work_type);
+    assert.deepEqual(types.sort(), ["inventory_search", "lookup_property_details"], "no second inventory_search");
+    assert.equal(fake.tables.work_items[0].status, "blocked", "the blocked item is left as it is");
+  });
+
+  await t("SA-14.7 and SA-14.8 the decision is on the record, with a wake path", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    const judge = stubJudge(
+      recovering([{ work: "w1", action: "leave", reason: "el asesor ya lo resolvió" }])
+    );
+    const result = await wake(fake.client, judge);
+    assert.equal(result.status, "reconsidered");
+    const record = reconsiderations(fake).at(-1);
+    assert.ok(record, "a reconsideration was recorded");
+    const applied = JSON.stringify(record?.recovery_applied ?? []);
+    assert.match(applied, /leave/);
+    assert.match(applied, /el asesor ya lo resolvió/, "the reason is reconstructable from durable state");
+    assert.ok(record?.next_action_at, "responsibility keeps a wake path");
+  });
+
+  await t("SA-14.9 Work that is not technically blocked is never offered for recovery", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow({ status: "done", blocked_reason: null }));
+    const judge = stubJudge(QUIET);
+    await wake(fake.client, judge);
+    assert.deepEqual(
+      judge.calls[0].workSummary,
+      ["inventory_search — done (agent_proposed)"],
+      "a finished Work Item carries no alias and no failure"
+    );
+  });
+
   console.log(`\nrelationship-supervisor selftest: ${passed} checks passed`);
 }
 
