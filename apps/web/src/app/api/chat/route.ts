@@ -523,6 +523,7 @@ export async function POST(request: Request) {
               (profile?.agent_system_prompt as string) ??
               "Eres un asistente útil.",
             db,
+            actorDb: supabase,
             enabledTools: (toolSettings ?? []).map(
               (t: Record<string, unknown>) => ({
                 id: t.id as string,
@@ -729,6 +730,7 @@ export async function POST(request: Request) {
                       (profile?.agent_system_prompt as string) ??
                       "Eres un asistente útil.",
                     db,
+                    actorDb: supabase,
                     enabledTools: (toolSettings ?? []).map(
                       (t: Record<string, unknown>) => ({
                         id: t.id as string,
@@ -1327,6 +1329,7 @@ export async function POST(request: Request) {
       systemPrompt:
         (profile?.agent_system_prompt as string) ?? "Eres un asistente útil.",
       db,
+      actorDb: supabase,
       enabledTools: (toolSettings ?? []).map((t: Record<string, unknown>) => ({
         id: t.id as string,
         user_id: t.user_id as string,

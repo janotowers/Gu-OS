@@ -15,6 +15,7 @@ import type {
   AttentionClause,
   MustSurfacePredicate,
   PortfolioPosture,
+  PortfolioRankingStatus,
   RuntimeAuthority,
 } from "@agents/types";
 import type { PortfolioRefusal } from "./actions";
@@ -82,7 +83,7 @@ export const PREDICATE_COPY: Record<MustSurfacePredicate, string> = {
 export const SECTION_COPY: Record<PortfolioSection, { title: string; note: string }> = {
   needs_attention: {
     title: "Necesita atención",
-    note: "Obligaciones gobernadas: siguen visibles aunque las pospongas u ocultes.",
+    note: "Las obligaciones gobernadas siguen visibles aunque las pospongas u ocultes; lo que Gu sugiere por contexto sí puedes posponerlo u ocultarlo.",
   },
   gu_handling: {
     title: "Gu lo maneja",
@@ -122,6 +123,31 @@ export function authorityCopy(authority: RuntimeAuthority | null): { label: stri
   }
   return { label: "Sin autoridad de runtime", detail: "Este Caso no tiene autoridad de runtime asignada." };
 }
+
+/**
+ * How the Needs Attention order was produced, for the viewer (R1 SL-12,
+ * SA-12.7). Anything but `ranked` is SL-7's deterministic order, and says so.
+ */
+export const RANKING_STATUS_COPY: Record<PortfolioRankingStatus, string> = {
+  ranked:
+    "Ordenado por Gu según cuánto importa ahora la intervención de una persona. Lo marcado «contextual» es una sugerencia de Gu, no una obligación: puedes posponerlo u ocultarlo.",
+  disabled: "Orden determinista: el ranking contextual está apagado para esta Organización.",
+  no_candidates: "Orden determinista: no hay Casos abiertos que ordenar.",
+  model_unavailable: "Orden determinista: el ranking contextual no está disponible en este entorno.",
+  model_error: "Orden determinista: el ranking contextual falló en esta carga.",
+  timeout: "Orden determinista: el ranking contextual tardó demasiado en esta carga.",
+  invalid_output: "Orden determinista: la respuesta del ranking contextual no fue válida y se descartó.",
+};
+
+/** A discretionary attention item — never a governed obligation (SL-12, SA-12.4). */
+export const CONTEXTUAL_COPY = {
+  badge: "Atención contextual",
+  note: "sugerida por Gu · no es una obligación · puedes posponerla u ocultarla",
+  why: "Por qué",
+  whatGuNeeds: "Qué necesita Gu",
+  whyNow: "Por qué ahora",
+  rank: (rank: number) => `Prioridad ${rank}`,
+} as const;
 
 export const REFUSAL_COPY: Record<PortfolioRefusal, string> = {
   no_active_membership: "No tienes una membresía activa en esta Organización.",

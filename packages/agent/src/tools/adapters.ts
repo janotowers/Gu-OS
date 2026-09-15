@@ -61,6 +61,10 @@ import {
   buildLegacyGatewayTools,
   type LegacyGatewayDeps,
 } from "./legacy-gateway-adapters";
+import {
+  buildWorkPortfolioTools,
+  type WorkPortfolioToolDeps,
+} from "./work-portfolio-adapters";
 import { defaultSkillsRoot } from "../skills/runtime";
 import type { ToolContext } from "./tool-context";
 import { createTrackedToolCall } from "./tool-call-audit";
@@ -2082,6 +2086,16 @@ export function buildLangChainTools(ctx: ToolContext) {
     )
   );
 
+  // ── Work Portfolio read (R1 SL-12 / TD-9 v2) ───────────────────────
+  // Read-only, and only under the person's own session (`ctx.actorDb`).
+  tools.push(
+    ...buildWorkPortfolioTools(
+      ctx,
+      toolWiringDeps?.workPortfolio ?? null,
+      (toolId) => isToolAvailable(toolId, ctx)
+    )
+  );
+
   return tools;
 }
 
@@ -2104,6 +2118,11 @@ export interface BuildLangChainToolsDeps {
    * the gateway answers `not_configured` instead of failing a turn.
    */
   legacyGateway?: LegacyGatewayDeps;
+  /**
+   * R1 SL-12 Work Portfolio read. Optional: unwired, the tool answers
+   * `not_configured` instead of failing a turn.
+   */
+  workPortfolio?: WorkPortfolioToolDeps;
 }
 
 let toolWiringDeps: BuildLangChainToolsDeps | null = null;

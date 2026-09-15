@@ -151,6 +151,13 @@ export interface PortfolioCaseSnapshot {
   closure: PortfolioFact | null;
   /** Current `opportunity.objective`, for labeling only. */
   objective: PortfolioFact | null;
+  /**
+   * Every current case-level fact, newest value per key (R1 SL-12). Read by the
+   * contextual ranking pass as evidence it may cite; the must-surface rules and
+   * the posture derivation never read it. Optional so SL-7's typed fixtures
+   * stay valid; the live assembly always fills it.
+   */
+  case_facts?: PortfolioFact[];
   /** Oldest first. */
   reconsiderations: PortfolioReconsideration[];
   work: PortfolioWork[];
@@ -328,6 +335,7 @@ export function buildCaseSnapshots(input: {
       case: opCase,
       closure: caseLevel.get(OPPORTUNITY_CLOSURE_FACT_KEY) ?? null,
       objective: caseLevel.get("opportunity.objective") ?? null,
+      case_facts: [...caseLevel.values()],
       reconsiderations: reconsiderationsOf(events.get(row.id) ?? []),
       work: (work.get(row.id) ?? []).map(toWork),
       commitments,

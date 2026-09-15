@@ -111,6 +111,12 @@ export interface AgentInput {
   sessionId: string;
   systemPrompt: string;
   db: DbClient;
+  /**
+   * The acting user's own session client, when the channel has one (the web
+   * chat). Passed to tools that must read under the person's own authorization
+   * — R1 SL-12's Work Portfolio tool — which refuse without it.
+   */
+  actorDb?: DbClient;
   enabledTools: UserToolSetting[];
   enabledSkills?: UserSkillSetting[];
   integrations: UserIntegration[];
@@ -1559,6 +1565,7 @@ export async function runAgent(input: AgentInput): Promise<AgentOutput> {
   );
   const lcTools = buildLangChainTools({
     db,
+    actorDb: input.actorDb,
     userId,
     sessionId,
     turnId,
