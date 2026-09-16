@@ -264,7 +264,19 @@ function loadProvenFrozen(): { ids: Set<string>; source: string | null; ref: str
   return { ids: verdict.ids, source: auditPath, ref: verdict.ref };
 }
 
-const provenFrozen = loadProvenFrozen();
+/**
+ * Read once, on first use, and never before the set it must attest is known.
+ *
+ * Not a module-level constant: `setDigest` is computed further down, and an
+ * eager read would fail outright — which it did, loudly, the first time the
+ * rule was exercised with an audit. The audit is admissible only against the
+ * measured set, so it cannot be resolved earlier than the set is.
+ */
+let provenFrozenMemo: ReturnType<typeof loadProvenFrozen> | null = null;
+function proven(): ReturnType<typeof loadProvenFrozen> {
+  provenFrozenMemo ??= loadProvenFrozen();
+  return provenFrozenMemo;
+}
 
 /**
  * May a breach on this scenario be attributed away from SL-14?
@@ -279,7 +291,7 @@ export function mayAttribute(scenario: Scenario, provenIds: ReadonlySet<string>)
 }
 
 function attributableToPreSl14(scenario: Scenario): boolean {
-  return mayAttribute(scenario, provenFrozen.ids);
+  return mayAttribute(scenario, proven().ids);
 }
 
 /**
@@ -963,10 +975,10 @@ async function main(): Promise<void> {
   // the same number. The first says what the judge did; the second says what
   // SL-14 answers for.
   const gatingRuns = runs.filter((r) => r.closureGating).length;
-  if (provenFrozen.source) {
+  if (proven().source) {
     console.log(
       `closure-gating:   ${gatingRuns} of ${runCount} — the contract correction of 2026-09-16.` +
-        ` ${provenFrozen.ids.size} scenario(s) proven byte-identical to ${provenFrozen.ref ?? "the pre-SL-14 judge"}`
+        ` ${proven().ids.size} scenario(s) proven byte-identical to ${proven().ref ?? "the pre-SL-14 judge"}`
     );
   } else {
     console.log(
@@ -1022,12 +1034,12 @@ async function main(): Promise<void> {
           runsHoldingAllBars: heldRuns,
           // The contract correction of 2026-09-16, carried in the artifact so a
           // reader never has to be told which rule produced the verdict.
-          closureRule: provenFrozen.source
+          closureRule: proven().source
             ? {
                 what: "Every ratified bar VALUE is unchanged, and `runsHoldingAllBars` keeps its original meaning. A breach gates closure UNLESS the scenario carries no SL-14 acceptance expectation, has no technically blocked Work, and its prompt is PROVEN byte-identical to the judge frozen before SL-14 — in which case it is recorded as the pre-existing SL-4-era Supervisor-quality carry-forward finding. Recorded as a human-governed contract correction, NOT as an accepted deviation.",
-                identityAudit: provenFrozen.source,
-                baselineRef: provenFrozen.ref,
-                provenByteIdentical: [...provenFrozen.ids].sort(),
+                identityAudit: proven().source,
+                baselineRef: proven().ref,
+                provenByteIdentical: [...proven().ids].sort(),
                 sl14OwnedScenarios: evalSet.scenarios
                   .filter((s) => isSl14Owned(s))
                   .map((s) => s.id),
