@@ -987,15 +987,30 @@ export async function approveReviewedItem(
 }
 
 /**
- * El operador reencola un item `blocked` → `ready` (evento `ready`, actor
- * `user`). Resetea `blocked_reason`; NO toca `attempt_count` — si el bloqueo
- * fue por max_attempts, el operador está otorgando explícitamente una nueva
+ * Reencola un item `blocked` → `ready` (evento `ready`). Resetea
+ * `blocked_reason`; NO toca `attempt_count` — si el bloqueo fue por
+ * max_attempts, quien reencola está otorgando explícitamente una nueva
  * ventana y el historial de intentos queda íntegro (se amplía max_attempts
  * hasta attempt_count+1 para que el próximo claim sea legal).
+ *
+ * Por defecto el actor es el operador (`user` / `operator_retry_blocked`).
+ * Desde R1 SL-14 el Case Supervisor puede otorgar esa misma ventana con
+ * `actor: "agent"` y su propio `source`: la transición y sus garantías son
+ * idénticas, y el evento dice quién la otorgó.
  */
 export async function retryBlockedItem(
   db: DbClient,
-  params: { userId: string; itemId: string }
+  params: {
+    userId: string;
+    itemId: string;
+    /**
+     * Who granted the window. Defaults to the operator, which is who called
+     * this before R1 SL-14; the Case Supervisor passes `agent` with its own
+     * source, so the event says which of them re-readied the Work.
+     */
+    actor?: "user" | "agent";
+    source?: string;
+  }
 ): Promise<WorkItem | null> {
   const item = await getWorkItemById(db, params.userId, params.itemId);
   if (!item || item.status !== "blocked") return null;
@@ -1019,8 +1034,8 @@ export async function retryBlockedItem(
     workItemId: item.id,
     userId: params.userId,
     eventType: "ready",
-    actor: "user",
-    payload: { source: "operator_retry_blocked" },
+    actor: params.actor ?? "user",
+    payload: { source: params.source ?? "operator_retry_blocked" },
   });
   return rows[0];
 }

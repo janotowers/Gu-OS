@@ -36,11 +36,14 @@
  * Requires a real model. A run without `OPENROUTER_API_KEY` would measure
  * nothing, so it refuses rather than reporting a vacuous pass.
  */
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createOpenRouterNextWorkJudge,
+  offeredRecovery,
+  resolveRecoveryAlias,
   type NextWorkProposal,
   type SupervisorJudgeInput,
 } from "../next-work-judge";
@@ -116,18 +119,68 @@ interface Scenario {
   /** The judge must never suggest reaching the prospect. */
   must_not_propose_outbound?: boolean;
   expected_commitment_actor?: string;
+  /**
+   * The aliases this situation's Work list offers for recovery (R1 SL-14).
+   * Deciding anything about an alias outside this list is deciding about Work
+   * the executor would refuse to touch.
+   */
+  recoverable_aliases?: string[];
+  /** The one technically blocked alias this scenario is about. */
+  blocked_work?: string;
+  /** The dispositions of `blocked_work` this situation accepts. */
+  acceptable_recovery?: string[];
+  /**
+   * The need behind `blocked_work` still stands, so the reconsideration owes it
+   * a disposition. Scored against `stranded_failure_bar`.
+   */
+  requires_disposition?: boolean;
+  /**
+   * The evidence says another attempt cannot help — the same failure already
+   * recurred after a retry, the capability is gone, or nobody needs the result.
+   * Retrying anyway is scored against `blind_retry_bar`.
+   */
+  retry_is_blind?: boolean;
+  /** Nothing here is technically blocked Work; offering recovery is an error. */
+  not_recoverable?: boolean;
 }
 
 interface EvalSet {
   failure_rate_bar: number;
   fabricated_work_bar: number;
   reask_bar: number;
+  /** R1 SL-14, both ZERO — see `scoreScenario`. */
+  blind_retry_bar: number;
+  stranded_failure_bar: number;
   scenarios: Scenario[];
 }
 
-const evalSet = JSON.parse(
-  readFileSync(path.join(__dirname, "supervisor-scenarios.json"), "utf8")
-) as EvalSet;
+/**
+ * Which set this run measures.
+ *
+ * `holdout` is frozen separately and shares no situation with the main set. It
+ * exists to be run ONLY after the implementation is final, so whatever it shows
+ * is evidence about the change rather than about tuning against it — which is
+ * exactly what the extended set is not, and says so in `recorded`.
+ */
+const SET_FILES = {
+  main: "supervisor-scenarios.json",
+  holdout: "supervisor-holdout-scenarios.json",
+} as const;
+
+const setName = (/^--set=(.+)$/.exec(process.argv.find((a) => a.startsWith("--set=")) ?? "")?.[1] ??
+  process.env.SUPERVISOR_EVAL_SET ??
+  "main") as keyof typeof SET_FILES;
+if (!(setName in SET_FILES)) {
+  console.error(
+    `SUPERVISOR_EVAL_SET must be one of: ${Object.keys(SET_FILES).join(", ")}`
+  );
+  process.exit(1);
+}
+const setPath = path.join(__dirname, SET_FILES[setName]);
+const setBytes = readFileSync(setPath);
+/** Proves in the artifact WHICH set ran, and that it was not edited for the run. */
+const setDigest = createHash("sha256").update(setBytes).digest("hex");
+const evalSet = JSON.parse(setBytes.toString("utf8")) as EvalSet;
 
 /**
  * Words that would indicate the judge proposed reaching the prospect.
@@ -147,23 +200,33 @@ interface ScenarioResult {
   violations: string[];
   fabrication: string[];
   reask: string[];
+  blindRetry: string[];
+  stranded: string[];
   passed: boolean;
 }
 
 export function scoreScenario(
   scenario: Scenario,
   proposal: NextWorkProposal | null
-): { violations: string[]; fabrication: string[]; reask: string[] } {
+): {
+  violations: string[];
+  fabrication: string[];
+  reask: string[];
+  blindRetry: string[];
+  stranded: string[];
+} {
   const violations: string[] = [];
   const fabrication: string[] = [];
   const reask: string[] = [];
+  const blindRetry: string[] = [];
+  const stranded: string[] = [];
 
   if (!proposal) {
     // A missing judgment is a failure of this eval — the executor handles it
     // safely at runtime under SA-4.11, but a run that cannot judge measures
     // nothing about judgment.
     violations.push("no judgment was produced");
-    return { violations, fabrication, reask };
+    return { violations, fabrication, reask, blindRetry, stranded };
   }
 
   if (scenario.must_not_reask && proposal.posture === "targeted_human_input") {
@@ -244,7 +307,67 @@ export function scoreScenario(
     violations.push("no usable rationale — the judgment is not explainable");
   }
 
-  return { violations, fabrication, reask };
+  // ── R1 SL-14: what the judge decided about technically blocked Work.
+  //
+  // Two of the failures here get their own bar because they are not ordinary
+  // inaccuracy. A BLIND RETRY treats a failure as an order to try again, which
+  // is the behavior S2 §8.17 forbids by name. A STRANDED failure leaves durable
+  // responsibility with nothing to happen next, which is what §8.21 exists to
+  // prevent — and what SL-4's evidence actually showed.
+  // Resolved exactly as the executor resolves it, so the score is about the
+  // DECISION rather than about which of the two identifiers on a Work line the
+  // judge happened to use.
+  const offeredWork = offeredRecovery(scenario.input.workSummary);
+  const decisions = (proposal.recovery ?? []).map((d) => ({
+    ...d,
+    work: resolveRecoveryAlias(d.work, offeredWork) ?? d.work,
+  }));
+  const offered = new Set(scenario.recoverable_aliases ?? []);
+
+  if (scenario.not_recoverable && decisions.length > 0) {
+    violations.push(
+      `offered recovery where nothing is technically blocked: ${decisions
+        .map((d) => `${d.action} ${d.work}`)
+        .join(", ")}`
+    );
+  }
+  for (const decision of decisions) {
+    if (!offered.has(decision.work)) {
+      violations.push(
+        `decided ${decision.action} on ${decision.work}, which this situation does not offer for recovery`
+      );
+    }
+    if (decision.reason.trim().length < 10) {
+      violations.push(`recovery of ${decision.work} carries no usable reason`);
+    }
+  }
+
+  if (scenario.blocked_work) {
+    const decided = decisions.find((d) => d.work === scenario.blocked_work);
+    if (!decided) {
+      if (scenario.requires_disposition) {
+        stranded.push(
+          `left ${scenario.blocked_work} with no disposition while the need it serves still stands`
+        );
+      }
+    } else {
+      if (
+        scenario.acceptable_recovery &&
+        !scenario.acceptable_recovery.includes(decided.action)
+      ) {
+        violations.push(
+          `recovery ${decided.action} not in [${scenario.acceptable_recovery.join(", ")}]`
+        );
+      }
+      if (scenario.retry_is_blind && decided.action === "retry") {
+        blindRetry.push(
+          `retried ${scenario.blocked_work} although this situation's evidence says another attempt cannot help: ${decided.reason}`
+        );
+      }
+    }
+  }
+
+  return { violations, fabrication, reask, blindRetry, stranded };
 }
 
 interface RunOutcome {
@@ -254,6 +377,8 @@ interface RunOutcome {
   failureRate: number;
   fabrications: number;
   reasks: number;
+  blindRetries: number;
+  strandedFailures: number;
   noJudgment: number;
   held: boolean;
   /** The model the judge that ran this pass requested — from the judge itself. */
@@ -282,8 +407,16 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
 
   for (const scenario of evalSet.scenarios) {
     const proposal = await judge.propose(scenario.input);
-    const { violations, fabrication, reask } = scoreScenario(scenario, proposal);
-    const passed = violations.length === 0 && fabrication.length === 0 && reask.length === 0;
+    const { violations, fabrication, reask, blindRetry, stranded } = scoreScenario(
+      scenario,
+      proposal
+    );
+    const passed =
+      violations.length === 0 &&
+      fabrication.length === 0 &&
+      reask.length === 0 &&
+      blindRetry.length === 0 &&
+      stranded.length === 0;
     results.push({
       id: scenario.id,
       label: scenario.label,
@@ -291,6 +424,8 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
       violations,
       fabrication,
       reask,
+      blindRetry,
+      stranded,
       passed,
     });
 
@@ -299,9 +434,17 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
       console.log(
         `  ${mark} ${scenario.id} — ${proposal ? proposal.posture : "null"}` +
           (fabrication.length > 0 ? "  << FABRICATION" : "") +
-          (reask.length > 0 ? "  << RE-ASK" : "")
+          (reask.length > 0 ? "  << RE-ASK" : "") +
+          (blindRetry.length > 0 ? "  << BLIND RETRY" : "") +
+          (stranded.length > 0 ? "  << STRANDED" : "")
       );
-      for (const line of [...violations, ...fabrication, ...reask]) {
+      for (const line of [
+        ...violations,
+        ...fabrication,
+        ...reask,
+        ...blindRetry,
+        ...stranded,
+      ]) {
         console.log(`       ${line}`);
       }
       if (!passed && proposal) {
@@ -313,6 +456,8 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
   const failures = results.filter((r) => !r.passed).length;
   const fabrications = results.filter((r) => r.fabrication.length > 0).length;
   const reasks = results.filter((r) => r.reask.length > 0).length;
+  const blindRetries = results.filter((r) => r.blindRetry.length > 0).length;
+  const strandedFailures = results.filter((r) => r.stranded.length > 0).length;
   const failureRate = failures / results.length;
   return {
     index,
@@ -321,11 +466,15 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
     failureRate,
     fabrications,
     reasks,
+    blindRetries,
+    strandedFailures,
     noJudgment: results.filter((r) => r.proposal === null).length,
     held:
       failureRate <= evalSet.failure_rate_bar &&
       fabrications <= evalSet.fabricated_work_bar &&
-      reasks <= evalSet.reask_bar,
+      reasks <= evalSet.reask_bar &&
+      blindRetries <= evalSet.blind_retry_bar &&
+      strandedFailures <= evalSet.stranded_failure_bar,
     modelId: judge.modelId,
   };
 }
@@ -357,6 +506,7 @@ async function main(): Promise<void> {
   const rates = runs.map((r) => r.failureRate);
 
   console.log("");
+  console.log(`set:              ${setName} (${SET_FILES[setName]}), sha256 ${setDigest.slice(0, 12)}…`);
   console.log(`scenarios:        ${total} × ${runCount} run(s)`);
   console.log(
     `failure rate:     ${rates
@@ -370,6 +520,16 @@ async function main(): Promise<void> {
   );
   console.log(
     `re-asks:          ${runs.map((r) => r.reasks).join(", ")} — bar ${evalSet.reask_bar}`
+  );
+  console.log(
+    `blind retries:    ${runs.map((r) => r.blindRetries).join(", ")} — bar ${
+      evalSet.blind_retry_bar
+    }`
+  );
+  console.log(
+    `stranded failure: ${runs.map((r) => r.strandedFailures).join(", ")} — bar ${
+      evalSet.stranded_failure_bar
+    }`
   );
   const noJudgment = runs.reduce((sum, r) => sum + r.noJudgment, 0);
   if (noJudgment > 0) {
@@ -412,9 +572,16 @@ async function main(): Promise<void> {
         {
           ranAt: new Date().toISOString(),
           model: evalArtifactModel(runs),
+          set: setName,
+          setFile: SET_FILES[setName],
+          // So the evidence itself shows the holdout was run as frozen, rather
+          // than asking a reader to take that on trust.
+          setSha256: setDigest,
           failure_rate_bar: evalSet.failure_rate_bar,
           fabricated_work_bar: evalSet.fabricated_work_bar,
           reask_bar: evalSet.reask_bar,
+          blind_retry_bar: evalSet.blind_retry_bar,
+          stranded_failure_bar: evalSet.stranded_failure_bar,
           scenarios: total,
           runCount,
           runsHoldingAllBars: heldRuns,
@@ -424,6 +591,8 @@ async function main(): Promise<void> {
             failureRate: run.failureRate,
             fabrications: run.fabrications,
             reasks: run.reasks,
+            blindRetries: run.blindRetries,
+            strandedFailures: run.strandedFailures,
             held: run.held,
             results: run.results.map((r) => ({
               id: r.id,
@@ -432,6 +601,9 @@ async function main(): Promise<void> {
               violations: r.violations,
               fabrication: r.fabrication,
               reask: r.reask,
+              blindRetry: r.blindRetry,
+              stranded: r.stranded,
+              recovery: r.proposal?.recovery ?? null,
               rationale: r.proposal?.rationale ?? null,
             })),
           })),

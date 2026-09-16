@@ -68,7 +68,10 @@ import {
 import {
   normalizeNextWorkProposal,
   PROPOSABLE_POSTURES,
+  RECOVERY_ACTIONS,
   buildNextWorkPrompt,
+  offeredRecovery,
+  resolveRecoveryAlias,
   type NextWorkJudge,
   type NextWorkProposal,
   type SupervisorJudgeInput,
@@ -281,6 +284,13 @@ async function wake(
     organizationId?: string;
     wakeKey?: string;
     now?: Date;
+    /**
+     * What the Case can actually do, as the real caller always declares it.
+     * Left undeclared by default so every pre-SL-14 test runs on exactly the
+     * request SL-4 made; the recovery tests declare it, because a retry of Work
+     * whose capability nobody declares is a retry into the unknown (SA-14.5).
+     */
+    availableCapabilities?: readonly string[];
   } = {}
 ): Promise<SupervisorResult> {
   return runSupervisorWake({
@@ -288,6 +298,7 @@ async function wake(
     organizationId: opts.organizationId ?? PILOT_ORG,
     userId: ADVISOR,
     caseId: opts.caseId ?? CASE_ID,
+    availableCapabilities: opts.availableCapabilities,
     wake: {
       reason: "scheduled_reconsideration",
       key: opts.wakeKey ?? buildWakeKey.scheduled("2026-09-08T12:00:00.000Z"),
@@ -1861,6 +1872,341 @@ async function main(): Promise<void> {
     ]) {
       assert.ok(covered.has(required), `the set does not cover ${required}`);
     }
+  });
+
+  await t("both SL-14 sets state the new bars, and their aliases match the prompt", () => {
+    // Added with the scorer rather than before it: what it guards is the frozen
+    // DATA — which was frozen first (ef1bc5c) — and the one way this evidence
+    // could quietly stop meaning anything is the scenario's declared aliases
+    // drifting from the aliases its own Work lines actually show. Then the
+    // scorer would be measuring a situation the judge never saw.
+    const files = ["supervisor-scenarios.json", "supervisor-holdout-scenarios.json"];
+    const idsPerFile: Array<Set<string>> = [];
+
+    for (const file of files) {
+      const suite = JSON.parse(
+        readFileSync(path.join(__dirname, "eval", file), "utf8")
+      ) as {
+        blind_retry_bar: number;
+        stranded_failure_bar: number;
+        scenarios: Array<Record<string, unknown>>;
+      };
+      assert.equal(suite.blind_retry_bar, 0, `${file}: a blind retry is never tolerated`);
+      assert.equal(
+        suite.stranded_failure_bar,
+        0,
+        `${file}: technically failed Work is never left without a disposition`
+      );
+
+      const ids = new Set<string>();
+      for (const scenario of suite.scenarios) {
+        const id = scenario.id as string;
+        ids.add(id);
+        const shown = (
+          (scenario.input as { workSummary?: string[] }).workSummary ?? []
+        )
+          .map((line) => /^\[(w\d+)\]/.exec(line)?.[1])
+          .filter((alias): alias is string => alias !== undefined);
+        assert.deepEqual(
+          (scenario.recoverable_aliases as string[]) ?? [],
+          shown,
+          `${id}: the aliases it declares are not the aliases its Work list shows`
+        );
+        if (scenario.blocked_work) {
+          assert.ok(
+            shown.includes(scenario.blocked_work as string),
+            `${id}: names a blocked alias its Work list never shows`
+          );
+          for (const action of (scenario.acceptable_recovery as string[]) ?? []) {
+            assert.ok(
+              (RECOVERY_ACTIONS as readonly string[]).includes(action),
+              `${id}: expects recovery action ${action}, which the judge cannot express`
+            );
+          }
+        }
+        if (scenario.not_recoverable) {
+          assert.equal(shown.length, 0, `${id}: claims nothing is recoverable, yet offers an alias`);
+        }
+      }
+      idsPerFile.push(ids);
+    }
+
+    // The holdout is only independent evidence if it is genuinely separate.
+    for (const id of idsPerFile[1]) {
+      assert.ok(!idsPerFile[0].has(id), `holdout scenario ${id} also exists in the main set`);
+    }
+    assert.ok(idsPerFile[1].size >= 5, "a holdout of at least five situations");
+  });
+
+  // ────────────────────────────────────────────────────────────────────
+  // SL-14 — recovery of technically blocked Work.
+  //
+  // The Work Plane already retries a failed attempt up to `max_attempts` and
+  // then blocks the item. What SL-14 adds is the Supervisor's situational
+  // decision about what that blocked responsibility needs, and it may only act
+  // through the Work Plane's own transition. Nothing here retries by itself.
+  // ────────────────────────────────────────────────────────────────────
+
+  /** A Work Item as the Work Plane leaves it when its attempts run out. */
+  function blockedWorkRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      id: "w-blocked",
+      user_id: ADVISOR,
+      case_id: CASE_ID,
+      work_type: "inventory_search",
+      required_capability: "inventory_search",
+      origin: "agent_proposed",
+      status: "blocked",
+      blocked_reason: "max_attempts_exhausted",
+      attempt_count: 3,
+      max_attempts: 3,
+      version: 4,
+      workflow_definition_version: 1,
+      input_contract: { purpose: "Buscar inventario", proposed_by: "case_supervisor" },
+      ...overrides,
+    };
+  }
+
+  /**
+   * What the Case can do while these tests run. `inventory_search` is the
+   * capability `blockedWorkRow` needs; nothing prospect-facing is ever on it,
+   * which is what makes the effect row in SA-14.5 unrecoverable.
+   */
+  const CAN = ["read_case_facts", "inventory_search", "comparison_document"];
+
+  /** The judge's answer when it decides what the blocked Work needs. */
+  function recovering(
+    recovery: NextWorkProposal["recovery"],
+    proposal: Partial<NextWorkProposal> = {}
+  ): NextWorkProposal {
+    return { ...QUIET, recovery, ...proposal };
+  }
+
+  await t("SA-14.1 the judge is shown why and how often blocked Work failed", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    fake.tables.work_item_events.push({
+      id: "e1",
+      work_item_id: "w-blocked",
+      user_id: ADVISOR,
+      event_type: "attempt_failed",
+      payload_jsonb: {
+        attempt_number: 3,
+        outcome: "blocked",
+        error: { message: "provider 503" },
+      },
+      created_at: "2026-09-08T11:00:00.000Z",
+    });
+    const judge = stubJudge(recovering([{ work: "w1", action: "leave", reason: "otra vía" }]));
+    await wake(fake.client, judge);
+    const [line] = judge.calls[0].workSummary;
+    assert.match(line, /^\[w1\] inventory_search — blocked \(agent_proposed\)/, "alias, type, status, origin");
+    assert.match(line, /3 of 3 attempts/, "how often it failed");
+    assert.match(line, /provider 503/, "why it failed");
+  });
+
+  await t("SA-14.1 a Case with no blocked Work sees the Work list exactly as before", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow({ id: "w-open", status: "todo", blocked_reason: null }));
+    const judge = stubJudge(QUIET);
+    await wake(fake.client, judge);
+    assert.deepEqual(judge.calls[0].workSummary, ["inventory_search — todo (agent_proposed)"]);
+  });
+
+  await t("SA-14.2 a technical failure alone never re-readies Work", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    await wake(fake.client, stubJudge(QUIET));
+    assert.equal(fake.tables.work_items[0].status, "blocked", "no decision, no recovery");
+    assert.equal(fake.tables.work_items[0].max_attempts, 3, "the Work Plane's own attempt policy is untouched");
+  });
+
+  await t("SA-14.3 a retry re-readies the SAME item through the Work Plane, history intact", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    const judge = stubJudge(
+      recovering([{ work: "w1", action: "retry", reason: "el proveedor ya responde" }])
+    );
+    await wake(fake.client, judge, { availableCapabilities: CAN });
+    assert.equal(fake.tables.work_items.length, 1, "no duplicate Work Item");
+    const [item] = fake.tables.work_items;
+    assert.equal(item.status, "ready");
+    assert.equal(item.blocked_reason, null);
+    assert.equal(item.attempt_count, 3, "the attempt history stays");
+    assert.equal(item.max_attempts, 4, "one more window, as the Work Plane grants it");
+    const ready = fake.tables.work_item_events.filter((e) => e.event_type === "ready");
+    assert.equal(ready.length, 1);
+    assert.equal(
+      (ready[0].payload_jsonb as { source?: string }).source,
+      "case_supervisor_retry"
+    );
+    assert.equal(ready[0].actor, "agent", "attributed to the Supervisor, not to an operator");
+  });
+
+  await t("SA-14.3 the Supervisor cannot retry the same item without limit", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow({ attempt_count: 4, max_attempts: 4 }));
+    fake.tables.work_item_events.push({
+      id: "e-prev",
+      work_item_id: "w-blocked",
+      user_id: ADVISOR,
+      event_type: "ready",
+      actor: "agent",
+      payload_jsonb: { source: "case_supervisor_retry" },
+      created_at: "2026-09-08T10:00:00.000Z",
+    });
+    const judge = stubJudge(recovering([{ work: "w1", action: "retry", reason: "una vez más" }]));
+    const result = await wake(fake.client, judge, { availableCapabilities: CAN });
+    assert.equal(fake.tables.work_items[0].status, "blocked", "a second Supervisor retry is refused");
+    const record = reconsiderations(fake).at(-1);
+    assert.ok(
+      JSON.stringify(record?.recovery_applied ?? []).includes("refused"),
+      "and the refusal is on the record, not silent"
+    );
+    assert.equal(result.status, "reconsidered");
+  });
+
+  await t("SA-14.5 recovery never touches Work it does not own", async () => {
+    for (const row of [
+      blockedWorkRow({ origin: "human" }),
+      blockedWorkRow({ origin: "definition_template" }),
+      blockedWorkRow({ blocked_reason: "waiting_on_person" }),
+      blockedWorkRow({ status: "done", blocked_reason: null }),
+      blockedWorkRow({ required_capability: "send_prospect_message" }),
+    ]) {
+      const fake = harness();
+      fake.tables.work_items.push(row);
+      const judge = stubJudge(recovering([{ work: "w1", action: "retry", reason: "reintentar" }]));
+      await wake(fake.client, judge, { availableCapabilities: CAN });
+      assert.notEqual(
+        fake.tables.work_items[0].status,
+        "ready",
+        `must not re-ready ${JSON.stringify({ origin: row.origin, reason: row.blocked_reason, status: row.status, cap: row.required_capability })}`
+      );
+    }
+  });
+
+  await t("SA-14.4 a replan proposes new Work; the duplicate guard still refuses the same type", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    const judge = stubJudge(
+      recovering([{ work: "w1", action: "leave", reason: "otra fuente responde" }], {
+        posture: "work",
+        proposed_work: [
+          { work_type: "lookup_property_details", purpose: "Responder por otra vía", durable: true },
+          { work_type: "inventory_search", purpose: "Repetir la búsqueda", durable: true },
+        ],
+      })
+    );
+    await wake(fake.client, judge);
+    const types = fake.tables.work_items.map((w) => w.work_type);
+    assert.deepEqual(types.sort(), ["inventory_search", "lookup_property_details"], "no second inventory_search");
+    assert.equal(fake.tables.work_items[0].status, "blocked", "the blocked item is left as it is");
+  });
+
+  await t("SA-14.7 and SA-14.8 the decision is on the record, with a wake path", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    const judge = stubJudge(
+      recovering([{ work: "w1", action: "leave", reason: "el asesor ya lo resolvió" }])
+    );
+    const result = await wake(fake.client, judge);
+    assert.equal(result.status, "reconsidered");
+    const record = reconsiderations(fake).at(-1);
+    assert.ok(record, "a reconsideration was recorded");
+    const applied = JSON.stringify(record?.recovery_applied ?? []);
+    assert.match(applied, /leave/);
+    assert.match(applied, /el asesor ya lo resolvió/, "the reason is reconstructable from durable state");
+    assert.ok(record?.next_action_at, "responsibility keeps a wake path");
+  });
+
+  await t("SA-14.5 blocked Work outside this Case is neither shown nor recoverable", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(
+      blockedWorkRow({ id: "w-other-case", case_id: "case-elsewhere" }),
+      blockedWorkRow({ id: "w-other-user", user_id: "user-elsewhere" })
+    );
+    const judge = stubJudge(
+      recovering([
+        { work: "w1", action: "retry", reason: "reintentar" },
+        { work: "inventory_search", action: "retry", reason: "reintentar" },
+      ])
+    );
+    await wake(fake.client, judge, { availableCapabilities: CAN });
+    assert.deepEqual(judge.calls[0].workSummary, [], "neither row is compiled into this Case");
+    for (const item of fake.tables.work_items) {
+      assert.equal(item.status, "blocked", `${item.id} must not be re-readied`);
+    }
+    assert.equal(
+      fake.tables.work_item_events.filter((e) => e.event_type === "ready").length,
+      0,
+      "no Work Plane transition happened at all"
+    );
+  });
+
+  await t("SA-14.5 naming the work type resolves only when it is unambiguous", () => {
+    // Written after the resolver, on the evidence that the judge sometimes
+    // names the type printed on the same Work line. Tolerance is confined to
+    // WHICH Work was meant; every authority guard still runs on the result,
+    // and nothing ambiguous resolves at all.
+    const offered = new Map([
+      ["w1", "inventory_search"],
+      ["w2", "comparison_document"],
+    ]);
+    assert.equal(resolveRecoveryAlias("w1", offered), "w1", "an alias is itself");
+    assert.equal(
+      resolveRecoveryAlias("comparison_document", offered),
+      "w2",
+      "one alias carries that type"
+    );
+    assert.equal(
+      resolveRecoveryAlias(
+        "inventory_search",
+        new Map([
+          ["w1", "inventory_search"],
+          ["w2", "inventory_search"],
+        ])
+      ),
+      null,
+      "two aliases carry it — nothing is resolved"
+    );
+    assert.equal(resolveRecoveryAlias("send_prospect_message", offered), null, "unknown");
+    assert.equal(resolveRecoveryAlias("w9", offered), null, "an alias never offered");
+    assert.deepEqual(
+      [
+        ...offeredRecovery([
+          "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+          "comparison_document — done (agent_proposed)",
+        ]),
+      ],
+      [["w1", "inventory_search"]],
+      "only aliased lines are offered"
+    );
+  });
+
+  await t("SA-14.3 a retry that names the work type still re-readies that one item", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    const judge = stubJudge(
+      recovering([
+        { work: "inventory_search", action: "retry", reason: "el proveedor ya responde" },
+      ])
+    );
+    await wake(fake.client, judge, { availableCapabilities: CAN });
+    assert.equal(fake.tables.work_items[0].status, "ready");
+    assert.equal(fake.tables.work_items[0].attempt_count, 3, "the attempt history stays");
+  });
+
+  await t("SA-14.9 Work that is not technically blocked is never offered for recovery", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow({ status: "done", blocked_reason: null }));
+    const judge = stubJudge(QUIET);
+    await wake(fake.client, judge);
+    assert.deepEqual(
+      judge.calls[0].workSummary,
+      ["inventory_search — done (agent_proposed)"],
+      "a finished Work Item carries no alias and no failure"
+    );
   });
 
   console.log(`\nrelationship-supervisor selftest: ${passed} checks passed`);
