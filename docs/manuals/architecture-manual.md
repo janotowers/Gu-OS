@@ -1034,7 +1034,13 @@ Este subsistema dejó de ser exclusivamente user-scoped, **sin romper nada de lo
 el camino de los casos operativos user-scoped. Ni la admisión que crea Casos Oportunidad
 sombra a partir de `source_events`, ni la resolución duplicado/supersesión, ni el
 **supervisor de Caso** que reconsidera una Oportunidad y registra postura, compromisos y
-Work `agent_proposed` en modo sombra, **las ejecuta hoy ninguna ruta HTTP ni cron**:
+Work `agent_proposed` en modo sombra —y que desde R1 SL-14 puede además **devolver a
+`ready` un Work Item que el plano de trabajo bloqueó por `max_attempts_exhausted`**, por
+la transición `blocked → ready` que ya existía para el operador (`retryBlockedItem`),
+ahora atribuida (`actor: agent`, `source: case_supervisor_retry`): el mismo item, con su
+historial de intentos intacto, una sola ventana adicional y **como máximo un reintento
+del supervisor por item**. No hay motor de reintentos propio, ni transición nueva, ni
+capacidad nueva—, **las ejecuta hoy ninguna ruta HTTP ni cron**:
 viven en `apps/web/src/lib/relationship-admission/`, `relationship-resolution/` y
 `relationship-supervisor/`, y se ejercitan por selftests, evals y verificadores operados
 a mano contra staging. El `lead_opportunity` declara su habilidad raíz por
