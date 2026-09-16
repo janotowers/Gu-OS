@@ -281,6 +281,13 @@ async function wake(
     organizationId?: string;
     wakeKey?: string;
     now?: Date;
+    /**
+     * What the Case can actually do, as the real caller always declares it.
+     * Left undeclared by default so every pre-SL-14 test runs on exactly the
+     * request SL-4 made; the recovery tests declare it, because a retry of Work
+     * whose capability nobody declares is a retry into the unknown (SA-14.5).
+     */
+    availableCapabilities?: readonly string[];
   } = {}
 ): Promise<SupervisorResult> {
   return runSupervisorWake({
@@ -288,6 +295,7 @@ async function wake(
     organizationId: opts.organizationId ?? PILOT_ORG,
     userId: ADVISOR,
     caseId: opts.caseId ?? CASE_ID,
+    availableCapabilities: opts.availableCapabilities,
     wake: {
       reason: "scheduled_reconsideration",
       key: opts.wakeKey ?? buildWakeKey.scheduled("2026-09-08T12:00:00.000Z"),
@@ -1892,6 +1900,13 @@ async function main(): Promise<void> {
     };
   }
 
+  /**
+   * What the Case can do while these tests run. `inventory_search` is the
+   * capability `blockedWorkRow` needs; nothing prospect-facing is ever on it,
+   * which is what makes the effect row in SA-14.5 unrecoverable.
+   */
+  const CAN = ["read_case_facts", "inventory_search", "comparison_document"];
+
   /** The judge's answer when it decides what the blocked Work needs. */
   function recovering(
     recovery: NextWorkProposal["recovery"],
@@ -1906,8 +1921,13 @@ async function main(): Promise<void> {
     fake.tables.work_item_events.push({
       id: "e1",
       work_item_id: "w-blocked",
+      user_id: ADVISOR,
       event_type: "attempt_failed",
-      payload: { attempt_number: 3, outcome: "blocked", error: { message: "provider 503" } },
+      payload_jsonb: {
+        attempt_number: 3,
+        outcome: "blocked",
+        error: { message: "provider 503" },
+      },
       created_at: "2026-09-08T11:00:00.000Z",
     });
     const judge = stubJudge(recovering([{ work: "w1", action: "leave", reason: "otra vía" }]));
@@ -1940,7 +1960,7 @@ async function main(): Promise<void> {
     const judge = stubJudge(
       recovering([{ work: "w1", action: "retry", reason: "el proveedor ya responde" }])
     );
-    await wake(fake.client, judge);
+    await wake(fake.client, judge, { availableCapabilities: CAN });
     assert.equal(fake.tables.work_items.length, 1, "no duplicate Work Item");
     const [item] = fake.tables.work_items;
     assert.equal(item.status, "ready");
@@ -1949,7 +1969,10 @@ async function main(): Promise<void> {
     assert.equal(item.max_attempts, 4, "one more window, as the Work Plane grants it");
     const ready = fake.tables.work_item_events.filter((e) => e.event_type === "ready");
     assert.equal(ready.length, 1);
-    assert.equal((ready[0].payload as { source?: string }).source, "case_supervisor_retry");
+    assert.equal(
+      (ready[0].payload_jsonb as { source?: string }).source,
+      "case_supervisor_retry"
+    );
     assert.equal(ready[0].actor, "agent", "attributed to the Supervisor, not to an operator");
   });
 
@@ -1959,13 +1982,14 @@ async function main(): Promise<void> {
     fake.tables.work_item_events.push({
       id: "e-prev",
       work_item_id: "w-blocked",
+      user_id: ADVISOR,
       event_type: "ready",
       actor: "agent",
-      payload: { source: "case_supervisor_retry" },
+      payload_jsonb: { source: "case_supervisor_retry" },
       created_at: "2026-09-08T10:00:00.000Z",
     });
     const judge = stubJudge(recovering([{ work: "w1", action: "retry", reason: "una vez más" }]));
-    const result = await wake(fake.client, judge);
+    const result = await wake(fake.client, judge, { availableCapabilities: CAN });
     assert.equal(fake.tables.work_items[0].status, "blocked", "a second Supervisor retry is refused");
     const record = reconsiderations(fake).at(-1);
     assert.ok(
@@ -1986,7 +2010,7 @@ async function main(): Promise<void> {
       const fake = harness();
       fake.tables.work_items.push(row);
       const judge = stubJudge(recovering([{ work: "w1", action: "retry", reason: "reintentar" }]));
-      await wake(fake.client, judge);
+      await wake(fake.client, judge, { availableCapabilities: CAN });
       assert.notEqual(
         fake.tables.work_items[0].status,
         "ready",

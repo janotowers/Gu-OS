@@ -251,6 +251,40 @@ export const SUPERVISOR_RECONSIDERED_EVENT_KIND = "supervisor_reconsidered" as c
 export const SUPERVISOR_SETTLED_EVENT_KIND =
   "supervisor_reconsideration_settled" as const;
 
+/**
+ * What the Supervisor may decide about one Work Item the Work Plane blocked
+ * for a technical reason (R1 SL-14).
+ *
+ * Two actions, because only two are the Supervisor's to take through existing
+ * mechanisms: give the Work another window through the Work Plane's own
+ * blocked→ready transition, or leave it as it is and say why. Replanning is
+ * ordinary proposed Work, and nothing here retires a Work Item — the Work
+ * Plane has no such transition.
+ */
+export type SupervisorRecoveryAction = "retry" | "leave";
+
+/** One recovery decision and what the executor actually did with it. */
+export interface SupervisorRecoveryOutcome {
+  /** The alias the compile gave the Work, and the judge named back. */
+  work: string;
+  /** The Work Item, or null when the alias matched no recoverable Work. */
+  work_item_id: string | null;
+  work_type: string | null;
+  action: SupervisorRecoveryAction;
+  /** The judge's reason, in its own words. */
+  reason: string;
+  /**
+   * What happened: the Work Plane re-readied it, it was deliberately left, or
+   * the executor refused — a bound reached, a capability gap the judge itself
+   * named, or an alias that is not offered for recovery at all because the
+   * Work is not the Case's own `agent_proposed`, technically blocked,
+   * non-effecting Work.
+   */
+  applied: "retried" | "left" | "refused";
+  /** Why the executor refused, when it did. */
+  refusal?: string;
+}
+
 /** What one reconsideration produced. Written after the wake is claimed. */
 export interface SupervisorReconsiderationSettlement {
   kind: typeof SUPERVISOR_SETTLED_EVENT_KIND;
@@ -259,6 +293,16 @@ export interface SupervisorReconsiderationSettlement {
   yield_posture: SupervisorYieldPosture;
   proposed_work_ids: readonly string[];
   commitment_subject_ids: readonly string[];
+  /**
+   * What the Work Plane actually did with the recovery this reconsideration
+   * decided (R1 SL-14). The claim carries the decision and its deterministic
+   * disposition; this carries the outcome, exactly as `proposed_work_ids`
+   * does. The two differ only if the Work Plane refused a transition the
+   * guards had allowed, and then the difference is the finding.
+   *
+   * Optional: settlements written before SL-14 have no such field.
+   */
+  recovery_applied?: readonly SupervisorRecoveryOutcome[];
 }
 
 /**
@@ -294,6 +338,14 @@ export interface SupervisorReconsiderationRecord {
   uncertainty: SupervisorUncertaintyKind | null;
   /** `work_items.id` created as `agent_proposed` by this reconsideration. */
   proposed_work_ids: readonly string[];
+  /**
+   * What this reconsideration decided about Work the Work Plane blocked for a
+   * technical reason, and what actually happened (R1 SL-14).
+   *
+   * Optional: records written before SL-14 have no such field, and a reader
+   * must not be told they decided nothing when in fact they were never asked.
+   */
+  recovery_applied?: readonly SupervisorRecoveryOutcome[];
   /** `case_subjects.id` of commitments this reconsideration recorded or changed. */
   commitment_subject_ids: readonly string[];
   /**
