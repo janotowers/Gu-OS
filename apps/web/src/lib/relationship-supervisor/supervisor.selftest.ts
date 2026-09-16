@@ -2120,6 +2120,30 @@ async function main(): Promise<void> {
     assert.ok(record?.next_action_at, "responsibility keeps a wake path");
   });
 
+  await t("SA-14.5 blocked Work outside this Case is neither shown nor recoverable", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(
+      blockedWorkRow({ id: "w-other-case", case_id: "case-elsewhere" }),
+      blockedWorkRow({ id: "w-other-user", user_id: "user-elsewhere" })
+    );
+    const judge = stubJudge(
+      recovering([
+        { work: "w1", action: "retry", reason: "reintentar" },
+        { work: "inventory_search", action: "retry", reason: "reintentar" },
+      ])
+    );
+    await wake(fake.client, judge, { availableCapabilities: CAN });
+    assert.deepEqual(judge.calls[0].workSummary, [], "neither row is compiled into this Case");
+    for (const item of fake.tables.work_items) {
+      assert.equal(item.status, "blocked", `${item.id} must not be re-readied`);
+    }
+    assert.equal(
+      fake.tables.work_item_events.filter((e) => e.event_type === "ready").length,
+      0,
+      "no Work Plane transition happened at all"
+    );
+  });
+
   await t("SA-14.5 naming the work type resolves only when it is unambiguous", () => {
     // Written after the resolver, on the evidence that the judge sometimes
     // names the type printed on the same Work line. Tolerance is confined to
