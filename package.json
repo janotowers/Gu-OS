@@ -52,7 +52,8 @@
     "prebuild": "node scripts/validate-skills.mjs && node scripts/validate-migrations.mjs && node scripts/validate-model-price-catalog.mjs",
     "verify:supervisor": "tsx scripts/verify-supervisor.ts",
     "test:supervisor-evidence": "tsx scripts/lib/supervisor-evidence.selftest.ts",
-    "test:supervisor-verifier": "tsx scripts/verify-supervisor.smoke.selftest.ts"
+    "test:supervisor-verifier": "tsx scripts/verify-supervisor.smoke.selftest.ts",
+    "baseline:supervisor-prompt": "tsx scripts/baseline-supervisor-prompt.ts"
   },
   "devDependencies": {
     "turbo": "^2"

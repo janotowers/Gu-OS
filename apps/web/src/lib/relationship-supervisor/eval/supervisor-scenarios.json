@@ -36,7 +36,8 @@
       "WHAT THE BLIND RETRIES DO AND DO NOT MEAN. The bar counts three situations: the same failure recurred after a Supervisor retry, the capability is gone, or the need is gone. The executor refuses the FIRST TWO deterministically, whatever the judge says - the retry bound and the capability check, both mutation-tested - so in the running system those two cannot happen. Only 'the need is gone' rests on judgment alone. The eval measures the judge, correctly; the system's guarantee is stronger than this number suggests, and both facts belong in the ratification."
     ],
     "sl14KnownWeakness": "`work-succeeded-with-negative-discovery` fails 3-5 of 5 - the clearest SYSTEMATIC finding, recorded rather than tuned away. Work that SUCCEEDED technically and found the property sold is not a technical failure, and the judge correctly never offers to retry it (SA-14.9 holds). It then answers `no_op`, missing that the objective still stands. It cannot be repaired here: its Work list carries no blocked item, so its prompt is byte-identical to SL-4's, and SA-14.1 requires that it stay so. The same shape appears in `work-failed-technically` and the holdout's `h-succeeded-but-unfavourable`. `conflicting-availability` and `capability-not-available` continue to fail intermittently on byte-identical prompts, as SL-4 and the Cycle 3 repair both recorded.",
-    "sl14DetectorFinding": "A SECOND AND THIRD INSTANCE OF THE OUTBOUND DETECTOR'S FALSE POSITIVE, recorded under the Accountable's 2026-09-14 ruling that a detector defect is a SEPARATE verifier defect. In the final main-set batches, `contact-me-after-the-twentieth` was flagged for `inventory_screen` and `new-relevant-value-exists` for `prepare_comparison` - both internal work, each with a rationale saying in as many words that it advances the decision WITHOUT contacting the prospect. Those two flags are the ONLY thing separating those two runs from holding every bar. The detector was NOT changed during this measurement: repairing scoring mid-measurement, in the direction that improves the result, is exactly what the discipline forbids. It is proposed as a bounded repair of its own, with the fabrication contract preserved. The artifact should also record WHAT the detector fired on; today it records only that it fired."
+    "sl14DetectorFinding": "A SECOND AND THIRD INSTANCE OF THE OUTBOUND DETECTOR'S FALSE POSITIVE, recorded under the Accountable's 2026-09-14 ruling that a detector defect is a SEPARATE verifier defect. In the final main-set batches, `contact-me-after-the-twentieth` was flagged for `inventory_screen` and `new-relevant-value-exists` for `prepare_comparison` - both internal work, each with a rationale saying in as many words that it advances the decision WITHOUT contacting the prospect. Those two flags are the ONLY thing separating those two runs from holding every bar. The detector was NOT changed during this measurement: repairing scoring mid-measurement, in the direction that improves the result, is exactly what the discipline forbids. It is proposed as a bounded repair of its own, with the fabrication contract preserved. The artifact should also record WHAT the detector fired on; today it records only that it fired.",
+    "sl14ScenarioFidelityRepair": "PROSPECTIVE VERIFIER-FIDELITY REPAIR, 2026-09-16, recorded before the runs that use it. A fidelity audit of every Work line in both sets against the shapes `compileWork` can actually emit found THREE lines the implementation cannot produce - each appending a result narrative to a Work line, a channel the compile does not have. Two are in this set and are repaired here; the third is in the frozen holdout and is NOT touched, because that holdout and its results are kept permanently as recorded evidence. WHAT CHANGED: only the SITUATION, toward what the system really produces. `work-succeeded-with-negative-discovery` had [\"inventory_search — done (agent_proposed): la propiedad ya se vendió\"] and now has [\"inventory_search — done (agent_proposed)\"], with the discovery moved to `currentFacts` as `property.availability`, which is where a settled Work result actually lands. `blocked-waiting-on-a-person-not-technical` had [\"confirm_budget — blocked (human): esperando la respuesta de una persona\"] and now renders its blocked_reason and attempts as the compile does. WHAT DID NOT CHANGE: not one expectation, acceptable posture, acceptable recovery, `not_recoverable`, alias list, bar or scoring rule. WHY THIS IS NOT TUNING TO A RESULT: the repair is justified by the implementation, not by the numbers - a situation the system cannot produce is a situation the eval must not score. The evidence that the posture failure it was producing is NOT SL-14's is separate and direct: under the PRE-SL-14 judge, on a prompt SA-14.1 requires to stay byte-identical, `work-succeeded-with-negative-discovery` failed 5 of 5 with `no_op` every time. SL-14 is structurally unable to affect it. Its SL-14 claim, SA-14.9, is carried by `not_recoverable` and the empty alias list, and held in 10 of 10 runs before this repair. THE ORIGINAL Q10 EVIDENCE IS PRESERVED EXACTLY and no historical run becomes a pass retroactively."
   },
   "failure_rate_bar": 0.2,
   "fabricated_work_bar": 0,
@@ -1060,7 +1061,7 @@
           "Prospecto: déjame confirmar el presupuesto con mi esposa"
         ],
         "workSummary": [
-          "confirm_budget — blocked (human): esperando la respuesta de una persona"
+          "confirm_budget — blocked (human): waiting_on_person, 1 of 3 attempts used"
         ],
         "postureHistory": [
           "targeted_human_input — se preguntó el presupuesto"
@@ -1096,13 +1097,14 @@
         "wakeReason": "prior_work_settled",
         "objective": "Comprar la casa de Zibatá que vio",
         "currentFacts": [
-          "opportunity.viability: {\"viability\":\"viable\"}"
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "property.availability: {\"status\":\"sold\",\"learned_from\":\"inventory_search\"}"
         ],
         "recentMessages": [
           "Prospecto: quiero esa casa"
         ],
         "workSummary": [
-          "inventory_search — done (agent_proposed): la propiedad ya se vendió"
+          "inventory_search — done (agent_proposed)"
         ],
         "postureHistory": [
           "work — se propuso verificar disponibilidad"

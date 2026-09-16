@@ -347,6 +347,7 @@ export function buildNextWorkPrompt(input: SupervisorJudgeInput): string {
       ? [
           "- `proposed_work` MUST contain at least one item for every other posture, UNLESS `recovery` retries something — a retry is itself the action and proposes nothing new.",
           `- \`recovery[].work\` MUST be exactly one of these aliases: ${recoverable.join(", ")}. A work type, a description or anything else is discarded. Include EVERY alias exactly once.`,
+          "- A response whose `posture` is `retry` or `leave` is DISCARDED ENTIRELY. Those are recovery ACTIONS and belong in `recovery[].action`; `posture` is always one of the five listed above. This is the single most common way an answer here is thrown away.",
         ]
       : ["- `proposed_work` MUST contain at least one item for every other posture."]),
     "",

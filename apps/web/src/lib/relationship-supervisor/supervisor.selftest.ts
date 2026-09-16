@@ -39,7 +39,7 @@
  * eval set's job, not this file's.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { insertCaseFact, listCaseFacts, type DbClient } from "@agents/db";
@@ -1955,13 +1955,57 @@ async function main(): Promise<void> {
     }
   });
 
-  await t("both SL-14 sets state the new bars, and their aliases match the prompt", () => {
+  await t("every scored Work line is a shape the compile can actually emit", () => {
+    // A situation the system cannot produce is a situation the eval must not
+    // score. Three such lines existed before 2026-09-16 - each appending a
+    // result narrative to a Work line, a channel `compileWork` does not have -
+    // and one of them was producing a posture failure that SL-14 was
+    // structurally unable to affect. This holds the shapes to the implementation.
+    const ORIGIN = "(agent_proposed|human|definition_template|repair)";
+    const ATTEMPTS = String.raw`\d+ of \d+ attempts used(; last error: .+)?`;
+    const PLAIN = new RegExp(
+      String.raw`^[a-z0-9_]+ — (todo|ready|running|review|done|cancelled) \(${ORIGIN}\)$`
+    );
+    const ALIASED = new RegExp(
+      String.raw`^\[w\d+\] [a-z0-9_]+ — blocked \(${ORIGIN}\): technical failure, ${ATTEMPTS}$`
+    );
+    const BLOCKED_PLAIN = new RegExp(
+      String.raw`^[a-z0-9_]+ — blocked \(${ORIGIN}\): [^,]+, ${ATTEMPTS}$`
+    );
+
+    // The 2026-09-15 holdout is deliberately exempt: it is frozen as recorded
+    // evidence for Q10, carries one such line, and must never be edited. Any
+    // holdout frozen after the repair is held to the same shapes as the main set.
+    const files = readdirSync(path.join(__dirname, "eval"))
+      .filter((f) => f.endsWith("-scenarios.json"))
+      .filter((f) => f !== "supervisor-holdout-scenarios.json");
+    assert.ok(files.includes("supervisor-scenarios.json"), "the main set must be audited");
+
+    for (const file of files) {
+      const set = JSON.parse(
+        readFileSync(path.join(__dirname, "eval", file), "utf8")
+      ) as { scenarios: Array<{ id: string; input: { workSummary?: string[] } }> };
+      for (const scenario of set.scenarios) {
+        for (const line of scenario.input.workSummary ?? []) {
+          assert.ok(
+            PLAIN.test(line) || ALIASED.test(line) || BLOCKED_PLAIN.test(line),
+            `${file} / ${scenario.id}: the compile cannot emit ${JSON.stringify(line)}`
+          );
+        }
+      }
+    }
+  });
+  await t("both SL-14 sets state the new bars, and their aliases match the prompt", () => {
     // Added with the scorer rather than before it: what it guards is the frozen
     // DATA — which was frozen first (ef1bc5c) — and the one way this evidence
     // could quietly stop meaning anything is the scenario's declared aliases
     // drifting from the aliases its own Work lines actually show. Then the
     // scorer would be measuring a situation the judge never saw.
-    const files = ["supervisor-scenarios.json", "supervisor-holdout-scenarios.json"];
+    const files = [
+      "supervisor-scenarios.json",
+      "supervisor-holdout-scenarios.json",
+      "supervisor-holdout-2-scenarios.json",
+    ];
     const idsPerFile: Array<Set<string>> = [];
 
     for (const file of files) {
@@ -2012,11 +2056,20 @@ async function main(): Promise<void> {
       idsPerFile.push(ids);
     }
 
-    // The holdout is only independent evidence if it is genuinely separate.
-    for (const id of idsPerFile[1]) {
-      assert.ok(!idsPerFile[0].has(id), `holdout scenario ${id} also exists in the main set`);
+    // A holdout is only independent evidence if it is genuinely separate — from
+    // the main set AND from the other holdout, since the 2026-09-15 one has been
+    // observed and the 2026-09-16 one exists precisely to be untainted by it.
+    for (let i = 1; i < idsPerFile.length; i += 1) {
+      for (const id of idsPerFile[i]) {
+        for (let j = 0; j < i; j += 1) {
+          assert.ok(
+            !idsPerFile[j].has(id),
+            `${files[i]} scenario ${id} also exists in ${files[j]}`
+          );
+        }
+      }
+      assert.ok(idsPerFile[i].size >= 5, `${files[i]}: a holdout of at least five situations`);
     }
-    assert.ok(idsPerFile[1].size >= 5, "a holdout of at least five situations");
   });
 
   // ────────────────────────────────────────────────────────────────────

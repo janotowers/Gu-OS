@@ -165,6 +165,9 @@ interface EvalSet {
 const SET_FILES = {
   main: "supervisor-scenarios.json",
   holdout: "supervisor-holdout-scenarios.json",
+  // Frozen 2026-09-16, after the 2026-09-15 holdout had been observed. That one
+  // is kept unedited as recorded evidence; this is the independent instrument.
+  holdout2: "supervisor-holdout-2-scenarios.json",
 } as const;
 
 const setName = (/^--set=(.+)$/.exec(process.argv.find((a) => a.startsWith("--set=")) ?? "")?.[1] ??
