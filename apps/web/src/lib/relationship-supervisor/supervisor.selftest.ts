@@ -67,6 +67,7 @@ import {
 } from "./delivery";
 import {
   normalizeNextWorkProposal,
+  takeLastDiscardReason,
   PROPOSABLE_POSTURES,
   RECOVERY_ACTIONS,
   buildNextWorkPrompt,
@@ -2377,6 +2378,44 @@ async function main(): Promise<void> {
         }
       }
     }
+  });
+
+  await t("a discarded judgment carries WHY into the evidence, and never a stale why", () => {
+    // Holdout 4 lost 10 judgments in 100 calls and its artifact could say only
+    // that they were missing. A shape rule, an incoherence, an unparseable
+    // answer and an unreachable model all arrive as the same null and call for
+    // different repairs, so the reason has to reach the artifact.
+    takeLastDiscardReason();
+    assert.equal(
+      normalizeNextWorkProposal({ posture: "retry_work", rationale: "x" }),
+      null,
+      "a recovery action written into posture is not a judgment"
+    );
+    const scored = scoreScenario(
+      {
+        id: "x",
+        label: "-",
+        rubric: "-",
+        acceptable_postures: ["wait"],
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      },
+      null
+    );
+    assert.match(scored.violations[0] ?? "", /^no judgment was produced — .*posture/);
+
+    // TAKEN, not read: the next scenario to discard nothing must not inherit
+    // this one's reason. Absence of a signal is not a signal.
+    const second = scoreScenario(
+      {
+        id: "y",
+        label: "-",
+        rubric: "-",
+        acceptable_postures: ["wait"],
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      },
+      null
+    );
+    assert.deepEqual(second.violations, ["no judgment was produced"]);
   });
 
   await t("holdout 4 is ENTIRELY SL-14-owned, which is the only reason it can test the rule", () => {

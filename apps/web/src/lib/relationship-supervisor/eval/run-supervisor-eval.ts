@@ -44,6 +44,7 @@ import {
   createOpenRouterNextWorkJudge,
   offeredRecovery,
   resolveRecoveryAlias,
+  takeLastDiscardReason,
   type NextWorkProposal,
   type SupervisorJudgeInput,
 } from "../next-work-judge";
@@ -552,7 +553,15 @@ export function scoreScenario(
     // A missing judgment is a failure of this eval — the executor handles it
     // safely at runtime under SA-4.11, but a run that cannot judge measures
     // nothing about judgment.
-    violations.push("no judgment was produced");
+    //
+    // WHY it was discarded is taken from the judge itself, because a count of
+    // missing judgments cannot say which repair it calls for: a shape rule, an
+    // incoherence, an unparseable answer and an unreachable model all arrive
+    // here as the same null.
+    const why = takeLastDiscardReason();
+    violations.push(
+      why === null ? "no judgment was produced" : `no judgment was produced — ${why}`
+    );
     return { violations, fabrication, reask, blindRetry, stranded };
   }
 

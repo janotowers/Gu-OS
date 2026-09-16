@@ -279,7 +279,25 @@ function parseJsonContent(content: unknown): unknown {
  * rules forbid. SL-14's first eval run lost 13 of 125 judgments to one shape
  * rule and the count alone could not say which.
  */
+/**
+ * The reason the LAST discard happened, for a caller that keeps evidence.
+ *
+ * Console output is enough for an operator and useless to an artifact: the
+ * 2026-09-16 holdout lost 10 judgments in 100 calls and the artifact could say
+ * only that they were missing, which is the same ambiguity `discard` exists to
+ * prevent, one level up. TAKEN rather than read, so a stale reason can never be
+ * attributed to a later scenario that discarded nothing.
+ */
+let pendingDiscardReason: string | null = null;
+
+export function takeLastDiscardReason(): string | null {
+  const reason = pendingDiscardReason;
+  pendingDiscardReason = null;
+  return reason;
+}
+
 function discard(reason: string): null {
+  pendingDiscardReason = reason;
   console.warn(`[relationship-supervisor] judgment discarded as incoherent: ${reason}`);
   return null;
 }
