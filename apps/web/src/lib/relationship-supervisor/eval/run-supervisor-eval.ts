@@ -322,6 +322,12 @@ const SET_FILES = {
   // the closure rule's exception is structurally unavailable there and every
   // breach gates closure. THIS is the independent instrument now.
   holdout4: "supervisor-holdout-4-scenarios.json",
+  // Frozen 2026-09-16 in turn, because holdout 4 was then read diagnostically:
+  // it breached the rate bar in 4 of 10 runs, on behavior SL-14 answers for,
+  // and the repair that follows was designed from its failures. Same property —
+  // entirely SL-14-owned — so the closure rule can excuse nothing here either.
+  // THIS is the independent instrument now.
+  holdout5: "supervisor-holdout-5-scenarios.json",
 } as const;
 
 const setName = (/^--set=(.+)$/.exec(process.argv.find((a) => a.startsWith("--set=")) ?? "")?.[1] ??
