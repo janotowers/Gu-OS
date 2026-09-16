@@ -1,0 +1,1044 @@
+{
+  "ranAt": "2026-09-16T19:33:44.594Z",
+  "model": {
+    "source": "the judge that ran each pass (NextWorkJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ],
+    "unattributed": 0
+  },
+  "set": "holdout6",
+  "setFile": "supervisor-holdout-6-scenarios.json",
+  "setSha256": "da65cb19e4e877e4bde7b4f74d5490e7162f2b370d8aeb6bc3769aed42940354",
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "reask_bar": 0,
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0,
+  "scenarios": 10,
+  "runCount": 5,
+  "runsHoldingAllBars": 4,
+  "closureRule": {
+    "what": "Every ratified bar VALUE is unchanged, and `runsHoldingAllBars` keeps its original meaning. A breach gates closure UNLESS the scenario carries no SL-14 acceptance expectation, has no technically blocked Work, and its prompt is PROVEN byte-identical to the judge frozen before SL-14 — in which case it is recorded as the pre-existing SL-4-era Supervisor-quality carry-forward finding. Recorded as a human-governed contract correction, NOT as an accepted deviation.",
+    "identityAudit": "../../docs/product/roadmap-increments/r1-relationship-operations-v1/evidence/sl14-sa141-byte-identity-holdout6-2026-09-16-ccabafa.json",
+    "baselineRef": "2a12441",
+    "provenByteIdentical": [
+      "h6-waiting-on-the-condominium-assembly-not-technical"
+    ],
+    "sl14OwnedScenarios": [
+      "h6-blocked-notary-slot-lookup-failed-once",
+      "h6-blocked-same-water-utility-error-after-the-window-was-spent",
+      "h6-blocked-mortgage-simulator-capability-withdrawn",
+      "h6-blocked-result-the-owner-already-sent-it",
+      "h6-blocked-with-an-equivalent-listed-source",
+      "h6-three-blocked-items-each-owed-something-different",
+      "h6-blocked-after-the-owner-answered-the-question",
+      "h6-blocked-while-contact-is-permitted",
+      "h6-waiting-on-the-condominium-assembly-not-technical",
+      "h6-blocked-and-the-promise-it-serves-falls-due-today"
+    ],
+    "runsGatingClosure": 1
+  },
+  "runs": [
+    {
+      "run": 1,
+      "failures": 2,
+      "failureRate": 0.2,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h6-blocked-notary-slot-lookup-failed-once",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h6-blocked-same-water-utility-error-after-the-window-was-spent",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same water-status lookup already used its retry and failed again, so another attempt would loop; leave it blocked until a person or the external system restores a different path."
+            }
+          ],
+          "rationale": "The prospect asked to confirm that the water is in order, and the water-status lookup failed again with the same system outage."
+        },
+        {
+          "id": "h6-blocked-mortgage-simulator-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry would use the same unavailable simulator after repeated failure; replan through targeted human input instead."
+            }
+          ],
+          "rationale": "The prior simulation failed three times with the bank simulator rejecting the account request."
+        },
+        {
+          "id": "h6-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the needed document is already in hand, so this responsibility no longer needs retrying"
+            }
+          ],
+          "rationale": "The only blocked task was predial receipt fetch, but the receipt has already been received from the owner by message."
+        },
+        {
+          "id": "h6-blocked-with-an-equivalent-listed-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The school_catchment_lookup has already failed repeatedly with the same technical issue, so another retry would loop; reconcile with available neighborhood data instead."
+            }
+          ],
+          "rationale": "The prospect prioritized school importance, and the only blocked work is a failed school-zone lookup that remains relevant to the objective."
+        },
+        {
+          "id": "h6-three-blocked-items-each-owed-something-different",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "retry",
+              "reason": "Es el primer fallo técnico y la capacidad sigue disponible; puede haber sido un timeout transitorio del catastro."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "El portal del condominio ya falló repetidamente y no tiene más retry; dejarlo bloqueado mientras se busca otra vía o se espera una alternativa."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "La verificación de drenaje depende de una capacidad no disponible; debe quedar bloqueada hasta contar con otra vía o apoyo humano."
+            }
+          ],
+          "rationale": "La condición del comprador exige que el terreno esté limpio y los fallos muestran que una tarea quedó sin capacidad y otra sin más retry permitido."
+        },
+        {
+          "id": "h6-blocked-after-the-owner-answered-the-question",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La consulta de estado del arrendamiento ya agotó sus intentos y el dato relevante fue confirmado por el asesor, así que conviene seguir por otra vía."
+            }
+          ],
+          "rationale": "El asesor confirmó que el inquilino se fue en marzo y la casa está vacía y lista para mostrarse."
+        },
+        {
+          "id": "h6-blocked-while-contact-is-permitted",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The comparable-sales index has already failed 3 times with the same technical issue, so retrying would loop; use an alternate path via listing preparation instead."
+            }
+          ],
+          "rationale": "The only useful next step is to reconcile the failed comps input by using available internal capabilities to prepare pricing support."
+        },
+        {
+          "id": "h6-waiting-on-the-condominium-assembly-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "El único avance pendiente relevante es un documento comprometido por un tercero y ya está en curso la espera."
+        },
+        {
+          "id": "h6-blocked-and-the-promise-it-serves-falls-due-today",
+          "posture": "targeted_human_input",
+          "passed": false,
+          "violations": [
+            "re-listed an already-tracked commitment: Deliver the owner the comparison of rents today"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same rental comparables read has already failed repeatedly with the same service error, so another retry would loop; replan or obtain human-provided data instead."
+            }
+          ],
+          "rationale": "The only due promise is the rent comparison today, and the read capability has already failed 3 times on a technical service error."
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 2,
+      "failureRate": 0.2,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h6-blocked-notary-slot-lookup-failed-once",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This same notary agenda lookup has already failed repeatedly; switch to reconciling the case facts or seek a human path rather than retrying the same request."
+            }
+          ],
+          "rationale": "The owner asked for the signing day, and the notary slot lookup has already failed three times, so the next useful step is to reconcile that blocker rather than retry blindly."
+        },
+        {
+          "id": "h6-blocked-same-water-utility-error-after-the-window-was-spent",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan around the unavailable commission-state system; this same technical failure has already recurred, so another retry would loop without new information."
+            }
+          ],
+          "rationale": "The prospect specifically asked whether the water is in order, and the only relevant internal path is to reconcile that fact while w1 remains blocked by a recurring system outage."
+        },
+        {
+          "id": "h6-blocked-mortgage-simulator-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same bank simulator failure has already recurred and this capability is no longer usable for this case, so it should be replaced by a human-chosen alternate path."
+            }
+          ],
+          "rationale": "The only unfinished work failed after 3 attempts, and the prospect’s stated need is to know mortgage capacity before viewing more homes."
+        },
+        {
+          "id": "h6-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the needed receipt has already been received from the owner, so retrying the portal fetch is unnecessary"
+            }
+          ],
+          "rationale": "The owner already sent the predial receipt, so the failed fetch is no longer needed."
+        },
+        {
+          "id": "h6-blocked-with-an-equivalent-listed-source",
+          "posture": "targeted_human_input",
+          "passed": false,
+          "violations": [
+            "posture targeted_human_input not in [work, gather_research_reconcile]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same school-catchment lookup already failed repeatedly with no new condition, so another retry would likely loop; replan via human verification instead."
+            }
+          ],
+          "rationale": "The school-catchment lookup hit a repeated provider failure after 3 attempts, and the prospect said school is what matters most."
+        },
+        {
+          "id": "h6-three-blocked-items-each-owed-something-different",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El catastro ya agotó sus intentos; no hay nueva condición que haga útil otro retry."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "El portal del condominio sigue con el mismo fallo tras el retry ya usado; conviene pedir a un humano otra vía o documento alterno."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "La capacidad de consulta ya no está disponible para esta cuenta; la responsabilidad pasa a un humano o a una fuente alternativa."
+            }
+          ],
+          "rationale": "Las verificaciones de linderos y reglamento fallaron repetidamente, y la factibilidad de drenaje ya no puede consultarse con las capacidades actuales."
+        },
+        {
+          "id": "h6-blocked-after-the-owner-answered-the-question",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El sistema de administración de rentas no respondió en 3 intentos; ya no es necesario para avanzar porque la vacante fue confirmada por el asesor."
+            }
+          ],
+          "rationale": "El asesor confirmó hace 1 día que el inquilino se fue en marzo y la casa está vacía, así que la restricción de ocupación ya no aplica."
+        },
+        {
+          "id": "h6-blocked-while-contact-is-permitted",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with human input or another source because the same technical failure recurred across 3 attempts."
+            }
+          ],
+          "rationale": "Solo hay una pregunta del propietario sobre el precio y el único trabajo útil quedó bloqueado por fallo técnico recurrente."
+        },
+        {
+          "id": "h6-waiting-on-the-condominium-assembly-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La única palanca concreta sigue siendo una entrega externa ya comprometida y no hay nueva información que habilite otra acción útil."
+        },
+        {
+          "id": "h6-blocked-and-the-promise-it-serves-falls-due-today",
+          "posture": "gather_research_reconcile",
+          "passed": false,
+          "violations": [
+            "re-listed an already-tracked commitment: Entregar al propietario la comparacion de rentas hoy"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El agregador de rentas ya agotó 3 intentos con el mismo fallo técnico; conviene cambiar de vía y usar comparables de venta o replanear con información disponible."
+            }
+          ],
+          "rationale": "Hay una obligación pendiente hoy y existe una alternativa interna disponible para avanzar: usar comparables de venta para reconciliação o apoyo de decisión."
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 2,
+      "failureRate": 0.2,
+      "fabrications": 1,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": false,
+      "closureGating": true,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h6-blocked-notary-slot-lookup-failed-once",
+          "posture": "targeted_human_input",
+          "passed": false,
+          "violations": [],
+          "fabrication": [
+            "proposed prospect-facing contact: ask_advisor_to_confirm_signature_date_or_alt_notary_contact :: Obtain the signing date from a human source or authorize an alternate path since the lookup capability is exhausted."
+          ],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The lookup has already failed repeatedly with the same notary non-response, so another retry would loop; a human must decide the next path or provide the date."
+            }
+          ],
+          "rationale": "The only useful next step is to recover the blocked signature-date responsibility, and the available lookup capability has already failed 3 times without new information."
+        },
+        {
+          "id": "h6-blocked-same-water-utility-error-after-the-window-was-spent",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same technical outage recurred after retry, so another attempt would loop; keep this blocked and pursue no alternative until the system is available or a human can verify another way."
+            }
+          ],
+          "rationale": "The prospect’s stated concern is whether water is in order, and w1 has failed repeatedly with the same system outage."
+        },
+        {
+          "id": "h6-blocked-mortgage-simulator-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The bank simulator capability is unavailable for this case and the same technical failure has already recurred after all attempts; a human or alternate path is needed instead."
+            }
+          ],
+          "rationale": "The only unfinished work is w1, which has failed repeatedly for a technical/capability reason, and the objective now depends on a missing external bank-capacity fact."
+        },
+        {
+          "id": "h6-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the receipt was obtained by message, so this responsibility no longer needs retrying"
+            }
+          ],
+          "rationale": "The owner already sent the predial receipt and there is no other actionable gap in the current facts."
+        },
+        {
+          "id": "h6-blocked-with-an-equivalent-listed-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This lookup already failed repeatedly with the same technical issue, so retrying would likely loop; use another path or stop it."
+            }
+          ],
+          "rationale": "The prospect said school matters most, and the school_catchment_lookup work failed three times on a technical provider issue."
+        },
+        {
+          "id": "h6-three-blocked-items-each-owed-something-different",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Reintentar el mismo catastro ya agotó sus 3 intentos; mejor dejarlo bloqueado mientras se usa otra vía o se confirma por humano."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "Ya usó su único retry y el portal sigue caído; la responsabilidad debe pasar a otra vía o a espera explícita."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "La capacidad necesaria ya no está disponible para este caso; debe asumirse por un humano o una vía externa."
+            }
+          ],
+          "rationale": "El prospecto exige que el terreno esté limpio y w3 no puede resolverse con las capacidades disponibles."
+        },
+        {
+          "id": "h6-blocked-after-the-owner-answered-the-question",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The tenancy-status lookup has exhausted attempts and the question is already answered by the advisor, so this responsibility is no longer needed."
+            }
+          ],
+          "rationale": "The advisor confirmed the tenant left in March and the house is empty and ready, which unlocks preparation work."
+        },
+        {
+          "id": "h6-blocked-while-contact-is-permitted",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The comparable-sales index has already failed 3 times with the same technical issue, so another retry would loop; switch to a different path instead."
+            }
+          ],
+          "rationale": "The owner asked what price to list at, and the prior comparable-sales read failed after repeated attempts."
+        },
+        {
+          "id": "h6-waiting-on-the-condominium-assembly-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "El único bloqueo sigue siendo el acta comprometida por un tercero y el seguimiento anterior ya estaba esperando ese hito."
+        },
+        {
+          "id": "h6-blocked-and-the-promise-it-serves-falls-due-today",
+          "posture": "targeted_human_input",
+          "passed": false,
+          "violations": [
+            "re-listed an already-tracked commitment: Entregar al propietario la comparativa de rentas hoy"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Ya agotó 3 intentos y el mismo fallo técnico recurrió; conviene pedir intervención humana o replantear la fuente de datos en lugar de reintentar."
+            }
+          ],
+          "rationale": "La única obligación vigente es entregar hoy la comparativa de rentas, y la lectura de comparables de renta falló 3 de 3 veces."
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 2,
+      "failureRate": 0.2,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h6-blocked-notary-slot-lookup-failed-once",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This same lookup already failed after 3 attempts with no new information, so another retry would loop; if a date remains needed, replan via another path or human escalation."
+            }
+          ],
+          "rationale": "A notary agenda lookup is still the relevant internal step, but the prior lookup failed repeatedly without a new condition."
+        },
+        {
+          "id": "h6-blocked-same-water-utility-error-after-the-window-was-spent",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The water-status check has already used its supervisor retry and failed the same way; leave it blocked and pursue another path with comparable sales context while waiting for a separate resolution path."
+            }
+          ],
+          "rationale": "The prospect asked whether the water is in good standing, and the tracked water-status check failed repeatedly on the same system outage."
+        },
+        {
+          "id": "h6-blocked-mortgage-simulator-capability-withdrawn",
+          "posture": "gather_research_reconcile",
+          "passed": false,
+          "violations": [
+            "expected a capability gap to be named, none was"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El simulador del banco ya agotó sus intentos; la mejor continuación es reconducir con información de mercado usando comparables, no reintentar la misma vía."
+            }
+          ],
+          "rationale": "w1 falló 3 veces por rechazo técnico del simulador y la última señal del prospecto pide conocer monto antes de ver casas."
+        },
+        {
+          "id": "h6-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the responsibility is moot because the receipt was received directly from the owner"
+            }
+          ],
+          "rationale": "The owner already sent the predial receipt, which settles the only outstanding item in the work list."
+        },
+        {
+          "id": "h6-blocked-with-an-equivalent-listed-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This same school-catchment lookup already failed repeatedly with the same provider issue, so retrying would likely loop; use a different path or human input instead."
+            }
+          ],
+          "rationale": "The prospect’s priority is school proximity, and w1 failed 3 times with the school data provider not responding."
+        },
+        {
+          "id": "h6-three-blocked-items-each-owed-something-different",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replantear con otra vía de obtención o un apoyo humano; el catastro municipal agotó tiempos de espera y no hay señal de cambio técnico."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "Dejarlo bloqueado; el portal del condominio ya repitió el mismo fallo y no hay otra capacidad interna disponible."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "La responsabilidad pasa a una vía externa porque la capacidad necesaria ya no está disponible para esta cuenta."
+            }
+          ],
+          "rationale": "El comprador exige que el terreno esté limpio y los trabajos bloqueados ya no pueden resolverse solo con las capacidades disponibles."
+        },
+        {
+          "id": "h6-blocked-after-the-owner-answered-the-question",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El sistema de administración de rentas ya falló tres veces en la misma consulta; conviene dejarlo bloqueado y usar la vía de preparación de venta en vez de repetir la lectura."
+            }
+          ],
+          "rationale": "El asesor confirmó que el inquilino se fue en marzo y la propiedad está vacía y lista para mostrarse."
+        },
+        {
+          "id": "h6-blocked-while-contact-is-permitted",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The comparable-sales read has already failed three times with the same technical issue, so another retry would loop; use listing_preparation or a human path instead."
+            }
+          ],
+          "rationale": "The owner asked what price it would be listed at, and the only useful next step is to reconcile that missing market input using the available comparable-sales capability."
+        },
+        {
+          "id": "h6-waiting-on-the-condominium-assembly-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La única dependencia concreta sigue siendo un documento comprometido por un tercero y no hay nueva información útil para avanzar."
+        },
+        {
+          "id": "h6-blocked-and-the-promise-it-serves-falls-due-today",
+          "posture": "targeted_human_input",
+          "passed": false,
+          "violations": [
+            "re-listed an already-tracked commitment: Entregar al propietario la comparación de rentas hoy"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El fallo técnico ya recurrió 3 veces; repetir la misma lectura sería un bucle sin nueva información, así que conviene replantear con apoyo humano o una ruta alternativa."
+            }
+          ],
+          "rationale": "Hay un compromiso venciendo hoy y el único trabajo relevante está bloqueado por fallo técnico recurrente."
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 0,
+      "failureRate": 0,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h6-blocked-notary-slot-lookup-failed-once",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La consulta de agenda ya falló repetidamente con el mismo problema; conviene cambiar de vía y pedir confirmación humana u otra ruta administrativa."
+            }
+          ],
+          "rationale": "El dueño pidió saber el día de la firma y el caso sigue viable, pero la búsqueda de agenda falló 3 veces por falta de respuesta de la notaría."
+        },
+        {
+          "id": "h6-blocked-same-water-utility-error-after-the-window-was-spent",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La ruta de verificación de agua sigue bloqueada por el sistema estatal caído; conviene replanear con otra fuente o esperar a que el sistema vuelva, no reintentar el mismo acceso."
+            }
+          ],
+          "rationale": "El prospecto pidió confirmar que el agua esté en regla y w1 agotó sus reintentos técnicos con el mismo error."
+        },
+        {
+          "id": "h6-blocked-mortgage-simulator-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same simulator failure has already recurred 3 times, so retrying would loop; a human or external bank path is needed instead."
+            }
+          ],
+          "rationale": "The case is viable, the inbound request is about bank credit capacity, and w1 has exhausted retries with a technical bank rejection."
+        },
+        {
+          "id": "h6-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The receipt is already in hand, so this responsibility no longer needs retrying or further action."
+            }
+          ],
+          "rationale": "The current facts say the predial receipt was received by message, which settles the blocked fetch task."
+        },
+        {
+          "id": "h6-blocked-with-an-equivalent-listed-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This same lookup already failed repeatedly with the same provider outage, so another retry would loop; use another path or human confirmation instead."
+            }
+          ],
+          "rationale": "The prospect said school matters most, and the school_catchment_lookup work failed three times with the data provider not responding."
+        },
+        {
+          "id": "h6-three-blocked-items-each-owed-something-different",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The municipal catastro fetch has already exhausted its attempts; no new condition is present to justify another retry, so preserve it blocked unless a different path is found."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "The condo portal has already failed with the same service error after the allowed retry, so another attempt would loop; let a person or alternate path carry it."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "This responsibility needs drainage feasibility evidence, but that capability is not available in this case, so it must be handled by another path or person."
+            }
+          ],
+          "rationale": "The buyer has said they will not sign until the land is clear, and w3 cannot be completed with the available capabilities while w1 and w2 are already exhausted."
+        },
+        {
+          "id": "h6-blocked-after-the-owner-answered-the-question",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El sistema de administración de rentas falló tras 3 intentos; ya no es necesario para avanzar porque el estado de ocupación fue aclarado por el asesor."
+            }
+          ],
+          "rationale": "El asesor confirmó hace 1 día que el inquilino se fue en marzo y la casa está vacía y lista para mostrarse."
+        },
+        {
+          "id": "h6-blocked-while-contact-is-permitted",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The comparable-sales lookup has already failed repeatedly with the same technical issue, so another retry would loop; use an alternate path instead."
+            }
+          ],
+          "rationale": "The owner asked what price to list at, and the comparable-sales read has failed after repeated attempts."
+        },
+        {
+          "id": "h6-waiting-on-the-condominium-assembly-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "Hay un compromiso ya trackeado de entrega del acta después de la asamblea y no hay nueva información útil ni trabajo interno claramente superior."
+        },
+        {
+          "id": "h6-blocked-and-the-promise-it-serves-falls-due-today",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This same rental comparables retrieval already failed repeatedly with the same technical service error, so another retry would loop; switch to a different path or human decision."
+            }
+          ],
+          "rationale": "The owner asked for an update today and the tracked rent-comparison commitment is due, but the only internal path to produce it has exhausted retries."
+        }
+      ]
+    }
+  ]
+}
