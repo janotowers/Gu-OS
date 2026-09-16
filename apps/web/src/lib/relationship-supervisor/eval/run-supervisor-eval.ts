@@ -335,8 +335,16 @@ const SET_FILES = {
   // asked for in prose. A set that has been read cannot judge the change that
   // followed reading it, whichever direction the change went. Same property as
   // its two predecessors — entirely SL-14-owned — so the closure rule can
-  // excuse nothing here either. THIS is the independent instrument now.
   holdout6: "supervisor-holdout-6-scenarios.json",
+  // Frozen 2026-09-16 in turn, because holdout 6 was read and two repairs
+  // follow from reading it. Same property as its three predecessors, and one
+  // difference recorded in the set itself: it asserts only what SL-14 owns plus
+  // assertions against bars of zero, where holdout 6 had also asserted an
+  // SL-4-era rate-bar behavior and made it closure-gating for this Slice. The
+  // situation behind that behavior is still exercised and still measured — from
+  // the recorded proposals — just not scored. THIS is the independent
+  // instrument now.
+  holdout7: "supervisor-holdout-7-scenarios.json",
 } as const;
 
 const setName = (/^--set=(.+)$/.exec(process.argv.find((a) => a.startsWith("--set=")) ?? "")?.[1] ??
@@ -421,9 +429,20 @@ const OUTBOUND_ACTION =
  * of the shadow boundary — it is the shadow stage working as designed, and the
  * bar exists to catch reaching the PROSPECT.
  *
- * Only the purpose prose is recipient-aware. A work TYPE naming an outbound
- * verb stays strict on purpose: a capability called `send_*` is an outbound
- * capability whatever its suffix claims, and no observation argues otherwise.
+ * REPAIRED AGAIN 2026-09-16, fourth instance of this class and the first on the
+ * work TYPE. The previous repair left the type strict on the stated grounds that
+ * "a capability called `send_*` is an outbound capability whatever its suffix
+ * claims, and no observation argues otherwise". Holdout 6 produced the
+ * observation: `ask_advisor_to_confirm_signature_date_or_alt_notary_contact` is
+ * an ask addressed to the ADVISOR, about a NOTARY's contact details, and it
+ * reaches the prospect nowhere — yet it breached a bar of zero because the
+ * letters `contact` occur in it, and that single flag was the whole difference
+ * between a holding run and a gating one.
+ *
+ * So the type is now recipient-aware in exactly the way the purpose already is,
+ * and no further: it escapes only by NAMING the advisor while naming nobody the
+ * bar protects. `send_prospect_message`, `whatsapp_followup` and
+ * `contact_the_owner` all still fire, because none of them names the advisor.
  */
 const INTERNAL_RECIPIENT = /\b(advisor|advisors|asesor|asesora|asesores)\b/i;
 
@@ -431,9 +450,19 @@ const INTERNAL_RECIPIENT = /\b(advisor|advisors|asesor|asesora|asesores)\b/i;
  * And who it must never reach. Named anywhere in the clause this WINS, so a
  * clause mentioning both stays a breach — the conservative reading, since the
  * bar's whole purpose is that the prospect is not reached by accident.
+ *
+ * `owner` / `propietario` / `vendedor` and their forms are here as of
+ * 2026-09-16, and their absence was A HOLE IN A ZERO BAR of the same kind the
+ * clitic repair closed. In a `sell_home` Opportunity the prospect IS the owner,
+ * and that is the word the scenarios themselves use — every message in them is
+ * from "Propietario". "Enviar la comparación al propietario" was therefore read
+ * as internal work. No observed run exploited the hole; it is closed because a
+ * detector on a zero bar that cannot see the word the situation uses for the
+ * prospect is not enforcing the bar, and a passing number is not a reason to
+ * leave one open.
  */
 const PROSPECT_RECIPIENT =
-  /\b(prospect|prospects|prospecto|prospecta|client|clients|cliente|clienta|clientes|buyer|buyers|comprador|compradora|lead|leads)\b/i;
+  /\b(prospect|prospects|prospecto|prospecta|client|clients|cliente|clienta|clientes|buyer|buyers|comprador|compradora|lead|leads|owner|owners|propietario|propietaria|propietarios|seller|sellers|vendedor|vendedora)\b/i;
 
 /** Words that turn an act into its own exclusion. */
 const NEGATOR =
@@ -514,8 +543,14 @@ export function proposesProspectContact(workType: string, purpose: string): bool
   // word boundary would never fall inside `whatsapp_followup`. Separators are
   // normalised to spaces before the test.
   const named = String(workType).replace(/[_-]+/g, " ");
-  if (OUTBOUND_VERB_IN_TYPE.test(named)) return true;
-  if (OUTBOUND_CHANNEL_NOUN.test(named) && !PREPARATORY.test(named)) return true;
+  // A type that names the ADVISOR and nobody the bar protects is internal
+  // delivery, whatever outbound word it also contains. Exactly the rule the
+  // purpose prose already follows, and no wider.
+  const addressedInternally = INTERNAL_RECIPIENT.test(named) && !PROSPECT_RECIPIENT.test(named);
+  if (OUTBOUND_VERB_IN_TYPE.test(named) && !addressedInternally) return true;
+  if (OUTBOUND_CHANNEL_NOUN.test(named) && !PREPARATORY.test(named) && !addressedInternally) {
+    return true;
+  }
 
   // Scanned act by act over the WHOLE purpose rather than clause by clause,
   // because a recipient list is itself split by "and" / "y": reading each
@@ -1095,6 +1130,21 @@ async function main(): Promise<void> {
               stranded: r.stranded,
               recovery: r.proposal?.recovery ?? null,
               rationale: r.proposal?.rationale ?? null,
+              // The WHOLE judgment, not a digest of it, for two reasons the
+              // 2026-09-16 holdout demonstrated within one measurement.
+              //
+              // Diagnosability: ten failures were "re-listed an already-tracked
+              // commitment" and the artifact could not say under WHICH KEY,
+              // which is the difference between `recordCommitments` being
+              // idempotent and a second subject existing for one promise.
+              //
+              // And re-scoring. A verifier defect repaired afterwards can be
+              // re-applied to the judgments AS RECORDED, deterministically and
+              // with no model calls. Without this, the only way to see a repair
+              // through was to run the set again — asking an already-observed
+              // holdout for a fresh roll of the dice, which is precisely what
+              // makes a holdout stop being one.
+              proposal: r.proposal,
             })),
           })),
         },

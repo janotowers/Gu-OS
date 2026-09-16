@@ -1902,11 +1902,20 @@ async function main(): Promise<void> {
       // A negation in one clause must not excuse a send in another.
       ["internal_review", "Revisar el inventario sin prisa, y enviar al prospecto las opciones"],
       // The recipient repair must not become a loophole. Naming the advisor
-      // does not launder a send the prospect also receives, and the work TYPE
-      // stays strict whatever its suffix claims.
+      // does not launder a send the prospect also receives.
       ["internal_note", "Enviar al prospecto la comparacion que el asesor aprobo"],
       ["internal_note", "Send the shortlist to the advisor and to the client"],
-      ["send_to_advisor", "Dejar la comparacion lista"],
+      // A type naming the advisor is not excused if its PURPOSE reaches the
+      // prospect: the purpose is scanned either way, which is what keeps the
+      // type's new recipient-awareness from being a way through the bar.
+      ["send_to_advisor", "Enviar al prospecto las opciones una vez aprobadas"],
+      // Nor is a type that names the advisor ALONGSIDE someone the bar
+      // protects — including under the word the situations actually use.
+      ["send_advisor_and_owner_update", "Dejar la comparacion lista"],
+      ["contact_the_owner", "Confirmar la fecha"],
+      ["enviar_al_propietario", "Dejar el avance"],
+      ["internal_review", "Enviar la comparacion al propietario hoy"],
+      ["internal_review", "Send the comparison to the seller today"],
       // A send with NO recipient named fails closed. Only an act addressed to
       // the advisor is excused; silence is not an excuse, or the repair would
       // be a way to breach the bar by saying less.
@@ -1946,6 +1955,22 @@ async function main(): Promise<void> {
       // context.
       ["prepare_note", "El prospecto pidio una comparacion, y enviar el resultado al asesor"],
       ["prepare_note", "El prospecto pidio una comparacion, y enviarla al asesor para que la revise"],
+      // OBSERVED on holdout 6 at `ccabafa`, and the FOURTH instance of this
+      // class. An ask addressed to the advisor, about a NOTARY's contact
+      // details, reaching the prospect nowhere — and that one flag was the
+      // whole difference between a holding run and a gating one.
+      [
+        "ask_advisor_to_confirm_signature_date_or_alt_notary_contact",
+        "Obtain the signing date from a human source or authorize an alternate path since the lookup capability is exhausted.",
+      ],
+      // The earlier repair left the work TYPE strict on the stated grounds that
+      // no observation argued for recipient-awareness there, and asserted THIS
+      // case as caught. The observation above is that argument, and the
+      // inconsistency it resolves was already in the file: handing prepared
+      // work to the advisor is the shadow stage working, whether the recipient
+      // is named in the type or in the purpose.
+      ["send_to_advisor", "Dejar la comparacion lista"],
+      ["message_the_advisor", "Resumir lo encontrado"],
     ] as const) {
       assert.equal(
         proposesProspectContact(workType, purpose),
@@ -2420,7 +2445,7 @@ async function main(): Promise<void> {
     assert.deepEqual(second.violations, ["no judgment was produced"]);
   });
 
-  await t("holdouts 4, 5 and 6 are ENTIRELY SL-14-owned, which is why they can test the rule", () => {
+  await t("holdouts 4 to 7 are ENTIRELY SL-14-owned, which is why they can test the rule", () => {
     // Their defining property, asserted rather than described. The corrected
     // closure rule can attribute a breach away from SL-14 only on a scenario
     // carrying no SL-14 expectation; if even one situation in these sets were
@@ -2430,6 +2455,7 @@ async function main(): Promise<void> {
       "supervisor-holdout-4-scenarios.json",
       "supervisor-holdout-5-scenarios.json",
       "supervisor-holdout-6-scenarios.json",
+      "supervisor-holdout-7-scenarios.json",
     ]) {
       const suite = JSON.parse(
         readFileSync(path.join(__dirname, "eval", file), "utf8")
@@ -2732,6 +2758,7 @@ async function main(): Promise<void> {
       "supervisor-holdout-4-scenarios.json",
       "supervisor-holdout-5-scenarios.json",
       "supervisor-holdout-6-scenarios.json",
+      "supervisor-holdout-7-scenarios.json",
     ];
     const idsPerFile: Array<Set<string>> = [];
 
