@@ -80,6 +80,7 @@ import { checkPostureHistoryCoherence, distinctDaysCovered, reconstructSituation
 import { resolveCommitmentDue } from "./commitments";
 import { attributeModels, summarizePostureDistribution } from "./observability";
 import {
+  asksAPerson,
   evalArtifactModel,
   proposesProspectContact,
   scoreScenario,
@@ -1791,6 +1792,86 @@ async function main(): Promise<void> {
       0,
       "only a scenario that says the answer is known can score a re-ask"
     );
+
+    // THE SCORING DEFECT REPAIRED 2026-09-16, end to end through the scorer.
+    // Both of these are real observations from the same-day baseline, produced
+    // by the PRE-SL-14 judge on a prompt SA-14.1 requires to stay
+    // byte-identical: the answer was used, said so in the rationale, and the
+    // work proposed was internal — while the posture said
+    // `targeted_human_input`. That is a mislabelled posture, counted as an
+    // ordinary failure below, and it is not a re-ask.
+    for (const [workType, purpose] of [
+      [
+        "prepare_comparison",
+        "Compile a comparison of currently available 3-bedroom homes in Lomas de Juriquilla against the buyer’s requirements so the advisor can choose an appropriate replacement lead",
+      ],
+      [
+        "build_comparison",
+        "Build a comparison against in-scope 3+ bedroom inventory in Lomas de Juriquilla to identify a replacement option for the advisor to review",
+      ],
+    ] as const) {
+      const mislabelled: NextWorkProposal = {
+        ...WORKING,
+        posture: "targeted_human_input",
+        proposed_work: [{ work_type: workType, purpose, durable: true }],
+      };
+      const scored = scoreScenario(scenario, mislabelled);
+      assert.equal(scored.reask.length, 0, `internal work is not a re-ask: ${workType}`);
+      // The error is still measured — it must not become invisible.
+      assert.equal(
+        scored.violations.length,
+        1,
+        `the mislabelled posture must still be an ordinary failure: ${workType}`
+      );
+    }
+  });
+
+  await t("the re-ask detector asks whether the proposal ASKS A PERSON", () => {
+    // Both halves together, for the reason the outbound detector states: a
+    // detector that stops crying wolf by seeing nothing would be worse than the
+    // one it replaces.
+
+    // CAUGHT — proposals that really do ask a person.
+    for (const [workType, purpose] of [
+      ["confirm_visit_window_with_advisor", "Ask the advisor again"],
+      // Only the WORK TYPE names the act, so the type cannot become decorative.
+      ["ask_advisor_budget", "Necesitamos el dato para avanzar"],
+      // Only the PURPOSE names it.
+      ["advisor_followup", "Preguntar al asesor si el cliente acepta cofinanciado"],
+      ["internal_note", "Solicitar al asesor que confirme la ventana de visita"],
+      ["human_input", "Request clarification from the advisor on the budget"],
+      ["budget_step", "Pedirle al asesor el presupuesto autorizado"],
+      // A negation in one clause must not excuse an ask in another. The second
+      // is the case that requires clauses to be SEPARATED: read as one string,
+      // the leading `sin` precedes the act and would excuse it.
+      ["internal_note", "Revisar lo ya registrado, y preguntar al asesor el presupuesto"],
+      ["internal_note", "Sin contactar a nadie, preguntar al asesor el presupuesto"],
+    ] as const) {
+      assert.equal(asksAPerson(workType, purpose), true, `must catch: ${workType} / ${purpose}`);
+    }
+
+    // NOT CAUGHT — internal work. The first two were observed being flagged.
+    for (const [workType, purpose] of [
+      [
+        "prepare_comparison",
+        "Compile a comparison of available homes so the advisor can choose a replacement lead",
+      ],
+      [
+        "build_comparison",
+        "Build a comparison against in-scope inventory to identify a replacement option for the advisor to review",
+      ],
+      ["inventory_search", "Buscar opciones que encajen con el presupuesto ya confirmado"],
+      ["read_case_facts", "Leer lo que el asesor ya respondio"],
+      ["draft_summary", "Preparar un resumen para el asesor"],
+      ["verify_budget", "Verificar el presupuesto con la informacion ya registrada"],
+      ["advisor_report", "Armar el reporte sin preguntar nada al asesor"],
+    ] as const) {
+      assert.equal(
+        asksAPerson(workType, purpose),
+        false,
+        `must not flag internal work: ${workType} / ${purpose}`
+      );
+    }
   });
 
   await t("the outbound detector asks whether the work CONTACTS the prospect", () => {

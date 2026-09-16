@@ -246,6 +246,57 @@ const NEGATOR =
 /** Clause boundaries, so a negation binds only what it governs. */
 const CLAUSE_SPLIT = /[,;.:()]|\b(y|and|pero|but|aunque|though|mientras|while)\b/i;
 
+/**
+ * Does this proposed work ASK A PERSON for something?
+ *
+ * Only used on scenarios that declare `must_not_reask`, and only to decide
+ * whether a `targeted_human_input` posture actually re-asks the question the
+ * context already answers.
+ */
+// REPAIRED 2026-09-16, as a scoring defect of the same class as the outbound
+// detector and under the same ruling of 2026-09-14. The check was
+// `posture === "targeted_human_input"` and nothing more, so it counted a
+// MISLABELLED POSTURE as a re-ask. Observed twice in the same-day baseline,
+// under the PRE-SL-14 judge on a prompt SA-14.1 requires to stay byte-identical:
+// the judge used the advisor's answer correctly, said so in its rationale, and
+// proposed internal work — "compile a comparison of available homes", "build a
+// comparison to identify a replacement option" — while tagging the posture
+// `targeted_human_input`. Nothing was asked of anyone.
+//
+// That is one error, and it was already counted: the posture is not in the
+// scenario's acceptable set, which is an ordinary failure. Counting it a second
+// time against a bar of ZERO turned an ordinary posture inaccuracy into a
+// breach of a bar written for a different defect entirely.
+//
+// The re-ask contract is unchanged and deliberately NOT weakened: a proposal
+// that really does ask a person again still fires, which is the defect the
+// Cycle 3 repair removed. What changed is that the question asked is the bar's
+// own — does this proposal ASK — instead of what the posture field says.
+/** An asking act in the work type, which names the action. */
+const ASK_ACT_IN_TYPE =
+  /\b(ask|asks|confirm|confirms|request|requests|clarify|clarifies|preguntar|pregunta|consultar|consulta|solicitar|solicita|confirmar|confirma|pedir|pide|aclarar|aclara)\b/i;
+
+/** An asking act in the purpose, which is prose. */
+const ASK_ACT =
+  /\b(ask|asks|asking|confirm|confirms|confirming|request|requests|requesting|clarify|clarifies|clarifying|check with|follow up with|preguntar|pregunte|preguntale|preguntarle|consultar|consultarle|solicitar|solicitarle|confirmar|confirmarle|pedir|pedirle|aclarar|aclararle)\b/i;
+
+export function asksAPerson(workType: string, purpose: string): boolean {
+  // Same normalisation as the outbound detector, and for the same reason: `_`
+  // is a word character, so a boundary would never fall inside
+  // `confirm_visit_window_with_advisor`.
+  const named = String(workType).replace(/[_-]+/g, " ");
+  if (ASK_ACT_IN_TYPE.test(named)) return true;
+  return String(purpose)
+    .split(CLAUSE_SPLIT)
+    .filter((clause): clause is string => typeof clause === "string")
+    .some((clause) => {
+      const act = ASK_ACT.exec(clause);
+      if (!act) return false;
+      // Negated only when the negator GOVERNS the act, i.e. precedes it.
+      return !NEGATOR.test(clause.slice(0, act.index));
+    });
+}
+
 export function proposesProspectContact(workType: string, purpose: string): boolean {
   // Work types are snake_case identifiers, and `_` is a word character, so a
   // word boundary would never fall inside `whatsapp_followup`. Separators are
@@ -301,11 +352,17 @@ export function scoreScenario(
   }
 
   if (scenario.must_not_reask && proposal.posture === "targeted_human_input") {
-    reask.push(
-      `asked a person again although their answer is in the context: ${proposal.proposed_work
-        .map((w) => w.purpose)
-        .join(" | ")}`
-    );
+    // The posture alone is not the defect — the ASK is. A judge that used the
+    // answer and then mislabelled its posture has made one ordinary error,
+    // counted below against `acceptable_postures`, not a re-ask.
+    const asks = proposal.proposed_work.filter((w) => asksAPerson(w.work_type, w.purpose));
+    if (asks.length > 0) {
+      reask.push(
+        `asked a person again although their answer is in the context: ${asks
+          .map((w) => w.purpose)
+          .join(" | ")}`
+      );
+    }
   }
 
   if (!scenario.acceptable_postures.includes(proposal.posture)) {
