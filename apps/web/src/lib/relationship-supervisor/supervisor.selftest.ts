@@ -2510,6 +2510,174 @@ async function main(): Promise<void> {
     );
   });
 
+  await t("the recovery disposition is a BOOLEAN on the wire, and nothing else parses", () => {
+    // The structural repair of 2026-09-16, and the reason it is structural: the
+    // ONLY string enum the model now chooses is `posture`, so there is no
+    // disposition token left to misplace into it. Ten of a hundred calls on the
+    // 2026-09-16 holdout were discarded for writing `leave_blocked` into
+    // `posture`, after three rounds of wording and one rename each reduced and
+    // never removed it.
+    const base = {
+      posture: "gather_research_reconcile",
+      diagnosis: null,
+      rationale: "x",
+      insufficient_evidence: false,
+      capability_gap: null,
+      proposed_work: [{ work_type: "t", purpose: "p", durable: false }],
+      commitments: [],
+      reconsider_in_hours: null,
+    };
+    const parsed = normalizeNextWorkProposal({
+      ...base,
+      recovery: [
+        { work: "w1", retry: true, reason: "el error no ha vuelto" },
+        { work: "w2", retry: false, reason: "replan with proposed_work" },
+      ],
+    });
+    assert.deepEqual(
+      parsed?.recovery?.map((r) => [r.work, r.action]),
+      [
+        ["w1", "retry"],
+        ["w2", "leave"],
+      ],
+      "the boolean maps straight to the domain values the executor sees"
+    );
+
+    // The old wire vocabulary must NOT quietly keep working: a half-reverted
+    // prompt naming it again would otherwise pass this suite while the judge
+    // wrote a string the schema once accepted.
+    for (const action of ["retry_work", "leave_blocked", "retry", "leave"]) {
+      assert.equal(
+        normalizeNextWorkProposal({
+          ...base,
+          recovery: [{ work: "w1", action, reason: "r" }],
+        }),
+        null,
+        `a recovery disposition written as the string ${action} is not a judgment`
+      );
+    }
+    // …and neither does a truthy non-boolean, which is how a model "almost"
+    // answers a boolean.
+    assert.equal(
+      normalizeNextWorkProposal({
+        ...base,
+        recovery: [{ work: "w1", retry: "true", reason: "r" }],
+      }),
+      null,
+      "a string is not a boolean"
+    );
+
+    // The prompt must name the shape it actually parses, and must no longer
+    // spend the answer's vocabulary on tokens that look like postures.
+    const blocked = {
+      wakeReason: "prior_work_settled",
+      objective: "o",
+      objectiveCategory: null,
+      daysSinceLastInbound: 1,
+      outboundAvailable: false,
+      currentFacts: [],
+      recentMessages: [],
+      openCommitments: [],
+      trackedCommitmentKeys: [],
+      humanAnswers: [],
+      postureHistory: [],
+      availableCapabilities: ["inventory_search"],
+      workSummary: [
+        "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+      ],
+    } satisfies SupervisorJudgeInput;
+    const prompt = buildNextWorkPrompt(blocked);
+    assert.match(prompt, /"retry":boolean/);
+    assert.ok(
+      !/retry_work|leave_blocked/.test(prompt),
+      "the tokens the model used to misplace are gone from the prompt entirely"
+    );
+  });
+
+  await t("SA-14.5 a withdrawn capability is stated to the judge, and named as a gap", () => {
+    // The second half of the 2026-09-16 repair. In 7 of 100 calls on holdout 4
+    // the judge dispositioned every alias coherently and said in prose that no
+    // internal capability remained, while leaving `capability_gap` null — so
+    // the finding the Case has to carry was never recorded. The executor
+    // already refuses these retries; the judge was being asked to infer the
+    // bound from failure prose.
+    const blocked = {
+      wakeReason: "prior_work_settled",
+      objective: "o",
+      objectiveCategory: null,
+      daysSinceLastInbound: 1,
+      outboundAvailable: false,
+      currentFacts: [],
+      recentMessages: [],
+      openCommitments: [],
+      trackedCommitmentKeys: [],
+      humanAnswers: [],
+      postureHistory: [],
+      availableCapabilities: ["inventory_search"],
+      workSummary: [
+        "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+        "[w2] appraisal_order — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+      ],
+    } satisfies SupervisorJudgeInput;
+
+    // Derived from the Work list when the caller does not resolve it: w2's work
+    // type is absent from the capabilities list, w1's is not.
+    const derived = buildNextWorkPrompt(blocked);
+    assert.match(derived, /w2 NEEDS A CAPABILITY THAT IS NO LONGER AVAILABLE/);
+    assert.ok(!/w1 NEEDS A CAPABILITY/.test(derived), "only the withdrawn one is constrained");
+    assert.match(derived, /name the missing capability in `capability_gap`/);
+
+    // An explicit set from the caller wins, because `supervise.ts` resolves it
+    // from `required_capability` — the field the executor itself refuses on.
+    assert.ok(
+      /w1 NEEDS A CAPABILITY/.test(
+        buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: ["w1"] })
+      ) &&
+        !/w2 NEEDS A CAPABILITY/.test(
+          buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: ["w1"] })
+        ),
+      "the caller's resolved set replaces the derivation rather than adding to it"
+    );
+    assert.ok(
+      !/NEEDS A CAPABILITY/.test(buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: [] })),
+      "a caller that resolves the set to empty overrides the derivation, and says nothing"
+    );
+    assert.ok(
+      !/NEEDS A CAPABILITY/.test(
+        buildNextWorkPrompt({
+          ...blocked,
+          availableCapabilities: ["inventory_search", "appraisal_order"],
+        })
+      ),
+      "and nothing is gone when every alias's capability is declared"
+    );
+
+    // An alias the Work list never showed is a constraint about nothing.
+    assert.equal(
+      buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: ["w9"] }),
+      buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: [] }),
+      "a constraint on an undisplayed alias changes nothing"
+    );
+
+    // Declaring NO capabilities marks everything gone, in the same direction
+    // the executor fails: an undeclared capability is not a known one.
+    assert.match(
+      buildNextWorkPrompt({ ...blocked, availableCapabilities: [] }),
+      /w1, w2 NEEDS A CAPABILITY THAT IS NO LONGER AVAILABLE/
+    );
+
+    // SA-14.1 again: nothing blocked ⇒ the prompt SL-4's eval measured.
+    const nothingBlocked = {
+      ...blocked,
+      workSummary: ["appraisal_order — done (agent_proposed)"],
+    } satisfies SupervisorJudgeInput;
+    assert.equal(
+      buildNextWorkPrompt({ ...nothingBlocked, capabilityGoneAliases: ["w1"] }),
+      buildNextWorkPrompt(nothingBlocked),
+      "SA-14.1: nothing blocked ⇒ byte-identical, regardless of this field"
+    );
+  });
+
   await t("a scenario's declared spent bounds are aliases its own Work list shows", () => {
     // The drift this prevents: a set claiming a constraint on an alias the judge
     // never saw would be scoring a situation the prompt never expressed.

@@ -581,6 +581,18 @@ export async function runSupervisorWake(
         retryExhaustedAliases: [...compiledWork.recoverable]
           .filter(([, entry]) => entry.supervisorRetries >= SUPERVISOR_RETRY_LIMIT)
           .map(([alias]) => alias),
+        // …and which of them need a capability this Case no longer declares,
+        // read from the SAME field `planRecovery` refuses on below, so the
+        // judge is never offered a retry the executor would reject and the
+        // reason it gives stays truthful (SA-14.5).
+        capabilityGoneAliases: [...compiledWork.recoverable]
+          .filter(
+            ([, entry]) =>
+              !(request.availableCapabilities ?? []).includes(
+                entry.item.required_capability ?? ""
+              )
+          )
+          .map(([alias]) => alias),
       })
   );
 
