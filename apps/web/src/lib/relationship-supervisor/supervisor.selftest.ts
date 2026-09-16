@@ -2106,6 +2106,46 @@ async function main(): Promise<void> {
     }
   });
 
+  await t("the prompt names ONLY dispositions the schema accepts", () => {
+    // The rename separated the wire vocabulary from the postures precisely
+    // because `retry` and `leave` read like postures and the model wrote them
+    // into `posture`. But the line that INTRODUCES the two dispositions kept
+    // the old words, so the most prominent instruction taught a vocabulary the
+    // schema rejects — an answer following it literally is discarded whole.
+    //
+    // A deterministic check, not a longer comment: the prompt may not name a
+    // disposition the parser would refuse.
+    const prompt = buildNextWorkPrompt({
+      wakeReason: "prior_work_settled",
+      objective: "Comprar casa",
+      objectiveCategory: "buy_home",
+      currentFacts: [],
+      recentMessages: [],
+      openCommitments: [],
+      trackedCommitmentKeys: [],
+      humanAnswers: [],
+      postureHistory: [],
+      daysSinceLastInbound: 2,
+      outboundAvailable: false,
+      availableCapabilities: ["inventory_search"],
+      workSummary: [
+        "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+      ],
+      retryExhaustedAliases: [],
+    });
+    for (const stale of ["`retry`", "`leave`"]) {
+      assert.ok(
+        !prompt.includes(stale),
+        `the prompt still offers ${stale}, which \`NextWorkProposalSchema\` rejects`
+      );
+    }
+    // And it does name both of the ones it accepts, so the check cannot pass by
+    // the prompt saying nothing about dispositions at all.
+    for (const wire of ["`retry_work`", "`leave_blocked`"]) {
+      assert.ok(prompt.includes(wire), `the prompt must offer ${wire}`);
+    }
+  });
+
   await t("SA-14.3 a spent retry bound is stated to the judge as unavailable, and only then", () => {
     // The structural repair of 2026-09-16. `planRecovery` already refuses a
     // second Supervisor retry; this stops the prompt from OFFERING one, which
