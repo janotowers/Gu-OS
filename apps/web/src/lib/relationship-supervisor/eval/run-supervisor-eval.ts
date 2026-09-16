@@ -168,6 +168,12 @@ const SET_FILES = {
   // Frozen 2026-09-16, after the 2026-09-15 holdout had been observed. That one
   // is kept unedited as recorded evidence; this is the independent instrument.
   holdout2: "supervisor-holdout-2-scenarios.json",
+  // Frozen 2026-09-16 in turn, because `holdout2` was then read while diagnosing
+  // the posture/recovery vocabulary collision and the structural rename
+  // followed. Both earlier holdouts are kept with their results; an observed
+  // holdout is evidence of what it measured, never independent evidence about a
+  // change made after reading it. THIS is the independent instrument now.
+  holdout3: "supervisor-holdout-3-scenarios.json",
 } as const;
 
 const setName = (/^--set=(.+)$/.exec(process.argv.find((a) => a.startsWith("--set=")) ?? "")?.[1] ??

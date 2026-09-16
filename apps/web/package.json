@@ -48,6 +48,7 @@
     "test:supervisor": "tsx src/lib/relationship-supervisor/supervisor.selftest.ts",
     "eval:supervisor": "tsx src/lib/relationship-supervisor/eval/run-supervisor-eval.ts",
     "eval:supervisor:holdout": "tsx src/lib/relationship-supervisor/eval/run-supervisor-eval.ts --set=holdout",
+    "eval:supervisor:holdout3": "tsx src/lib/relationship-supervisor/eval/run-supervisor-eval.ts --set=holdout3",
     "eval:portfolio-ranking": "tsx src/lib/work-portfolio/ranking/eval/run-ranking-eval.ts",
     "test:work-portfolio": "tsx src/lib/work-portfolio/work-portfolio.selftest.ts && tsx src/lib/work-portfolio/ranking/ranking.selftest.ts"
   },

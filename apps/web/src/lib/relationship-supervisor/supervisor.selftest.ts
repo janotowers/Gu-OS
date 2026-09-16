@@ -1870,7 +1870,8 @@ async function main(): Promise<void> {
       "only a scenario that forbids contact scores it"
     );
   });
-  await t("the eval set is well formed and its bar is stated", () => {
+
+  await t("the eval set is well formed and its bar is stated", () => {
     const raw = readFileSync(
       path.join(__dirname, "eval", "supervisor-scenarios.json"),
       "utf8"
@@ -1995,7 +1996,8 @@ async function main(): Promise<void> {
       }
     }
   });
-  await t("both SL-14 sets state the new bars, and their aliases match the prompt", () => {
+
+  await t("every SL-14 set states the new bars, and their aliases match the prompt", () => {
     // Added with the scorer rather than before it: what it guards is the frozen
     // DATA — which was frozen first (ef1bc5c) — and the one way this evidence
     // could quietly stop meaning anything is the scenario's declared aliases
@@ -2005,6 +2007,7 @@ async function main(): Promise<void> {
       "supervisor-scenarios.json",
       "supervisor-holdout-scenarios.json",
       "supervisor-holdout-2-scenarios.json",
+      "supervisor-holdout-3-scenarios.json",
     ];
     const idsPerFile: Array<Set<string>> = [];
 
@@ -2057,8 +2060,11 @@ async function main(): Promise<void> {
     }
 
     // A holdout is only independent evidence if it is genuinely separate — from
-    // the main set AND from the other holdout, since the 2026-09-15 one has been
-    // observed and the 2026-09-16 one exists precisely to be untainted by it.
+    // the main set AND from every earlier holdout. Each was observed in turn:
+    // the 2026-09-15 one while diagnosing Q10, and holdout 2 while diagnosing
+    // the posture/recovery vocabulary collision. Each successor exists precisely
+    // to be untainted by the ones before it, so the separation is asserted
+    // pairwise rather than only against the main set.
     for (let i = 1; i < idsPerFile.length; i += 1) {
       for (const id of idsPerFile[i]) {
         for (let j = 0; j < i; j += 1) {
