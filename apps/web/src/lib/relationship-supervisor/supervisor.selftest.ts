@@ -2078,6 +2078,93 @@ async function main(): Promise<void> {
     }
   });
 
+  await t("SA-14.3 a spent retry bound is stated to the judge as unavailable, and only then", () => {
+    // The structural repair of 2026-09-16. `planRecovery` already refuses a
+    // second Supervisor retry; this stops the prompt from OFFERING one, which
+    // is availability of the same kind as `outboundAvailable`, not a bound the
+    // model is invited to argue around.
+    const blocked = {
+      wakeReason: "prior_work_settled",
+      objective: "Comprar casa",
+      objectiveCategory: "buy_home",
+      currentFacts: [],
+      recentMessages: [],
+      openCommitments: [],
+      trackedCommitmentKeys: [],
+      humanAnswers: [],
+      postureHistory: [],
+      daysSinceLastInbound: 2,
+      outboundAvailable: false,
+      availableCapabilities: ["inventory_search"],
+      workSummary: [
+        "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+        "[w2] valuation_lookup — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+      ],
+    } satisfies SupervisorJudgeInput;
+
+    const fresh = buildNextWorkPrompt(blocked);
+    assert.ok(
+      !/HAS ALREADY USED its one Supervisor retry/.test(fresh),
+      "an item the Supervisor has never retried must not be told a retry is unavailable"
+    );
+
+    const spent = buildNextWorkPrompt({ ...blocked, retryExhaustedAliases: ["w1"] });
+    assert.ok(
+      /w1 HAS ALREADY USED its one Supervisor retry/.test(spent),
+      "the spent bound must reach the judge"
+    );
+    assert.ok(
+      !/w2 HAS ALREADY USED/.test(spent),
+      "only the exhausted alias is constrained; w2 keeps both dispositions"
+    );
+
+    // An alias the Work list never showed is a constraint about nothing, and
+    // must not appear — the same rule the aliases themselves follow.
+    assert.equal(
+      buildNextWorkPrompt({ ...blocked, retryExhaustedAliases: ["w9"] }),
+      fresh,
+      "a constraint on an undisplayed alias changes nothing"
+    );
+
+    // The guarantee this must not break: a Case with nothing blocked renders
+    // the prompt SL-4's eval measured, whatever this field says.
+    const nothingBlocked = {
+      ...blocked,
+      workSummary: ["inventory_search — done (agent_proposed)"],
+    } satisfies SupervisorJudgeInput;
+    assert.equal(
+      buildNextWorkPrompt({ ...nothingBlocked, retryExhaustedAliases: ["w1"] }),
+      buildNextWorkPrompt(nothingBlocked),
+      "SA-14.1: nothing blocked ⇒ byte-identical, regardless of this field"
+    );
+  });
+
+  await t("a scenario's declared spent bounds are aliases its own Work list shows", () => {
+    // The drift this prevents: a set claiming a constraint on an alias the judge
+    // never saw would be scoring a situation the prompt never expressed.
+    for (const file of readdirSync(path.join(__dirname, "eval")).filter((f) =>
+      f.endsWith("-scenarios.json")
+    )) {
+      const suite = JSON.parse(readFileSync(path.join(__dirname, "eval", file), "utf8")) as {
+        scenarios: Array<{
+          id: string;
+          input: { workSummary?: string[]; retryExhaustedAliases?: string[] };
+        }>;
+      };
+      for (const scenario of suite.scenarios) {
+        const shown = (scenario.input.workSummary ?? [])
+          .map((line) => /^\[(w\d+)\]/.exec(line)?.[1])
+          .filter((alias): alias is string => alias !== undefined);
+        for (const alias of scenario.input.retryExhaustedAliases ?? []) {
+          assert.ok(
+            shown.includes(alias),
+            `${file} / ${scenario.id}: declares ${alias} retry-exhausted, but its Work list never shows it`
+          );
+        }
+      }
+    }
+  });
+
   await t("every SL-14 set states the new bars, and their aliases match the prompt", () => {
     // Added with the scorer rather than before it: what it guards is the frozen
     // DATA — which was frozen first (ef1bc5c) — and the one way this evidence

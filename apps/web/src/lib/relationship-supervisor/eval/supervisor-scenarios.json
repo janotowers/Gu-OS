@@ -869,26 +869,29 @@
           "work — se propuso buscar inventario",
           "work — se reintentó la búsqueda tras el fallo técnico; volvió a fallar igual"
         ],
-        "availableCapabilities": [
-          "read_case_facts",
-          "search_inventory"
-        ]
-      },
-      "acceptable_postures": [
-        "targeted_human_input",
-        "gather_research_reconcile",
-        "wait"
+      "availableCapabilities": [
+        "read_case_facts",
+        "search_inventory"
       ],
-      "recoverable_aliases": [
+      "retryExhaustedAliases": [
         "w1"
-      ],
-      "blocked_work": "w1",
-      "acceptable_recovery": [
-        "leave"
-      ],
-      "retry_is_blind": true,
-      "requires_disposition": true
+      ]
     },
+    "acceptable_postures": [
+      "targeted_human_input",
+      "gather_research_reconcile",
+      "wait"
+    ],
+    "recoverable_aliases": [
+      "w1"
+    ],
+    "blocked_work": "w1",
+    "acceptable_recovery": [
+      "leave"
+    ],
+    "retry_is_blind": true,
+    "requires_disposition": true
+  },
     {
       "id": "blocked-capability-no-longer-available",
       "label": "The blocked Work needs a capability that is no longer available",

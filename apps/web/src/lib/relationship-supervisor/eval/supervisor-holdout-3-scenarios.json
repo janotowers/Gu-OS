@@ -6,6 +6,7 @@
     "designPrinciple": "Each scenario asserts what it exists to prove, and nothing more. Where a situation's posture turns on ordinary next-work judgment that SL-14 is structurally unable to affect - a Case with nothing blocked renders a byte-identical prompt under SA-14.1 - the posture range is the defensible one for the situation and is deliberately NOT narrowed, because narrowing it would score SL-4's behavior as an SL-14 failure. That is the authoring defect found in the main set on 2026-09-16, and it is applied here from the start, as it was in holdout 2.",
     "coverage": "The five recovery situations holdout 2 also covers, in situations that share nothing with it, plus three this instrument adds: THREE blocked items at once rather than two, so alias completeness is tested past the point where naming them all is easy; a blocked item beside a question a person HAS ALREADY ANSWERED, so the re-ask bar is measurable on a holdout for the first time; and a nothing-blocked control that asserts both fabrication conditions - no manufactured work and no invented commitment - rather than only the first.",
     "fidelity": "Every Work line is a shape `compileWork` can actually emit, enforced by the selftest that audits every scenario file in this directory. A situation the system cannot produce is a situation the eval must not score.",
+    "reFrozenSameDayForFidelity": "RE-FROZEN 2026-09-16, STILL BEFORE THIS SET HAD BEEN RUN EVEN ONCE, and recorded rather than done quietly. A structural repair made after this set was first written passes `retryExhaustedAliases` to the judge - the aliases whose one Supervisor retry is already spent, which the executor refuses to retry regardless. A blocked item that HAS been retried by the Supervisor and carries no such marker is therefore a situation the system can no longer produce, so `h3-blocked-same-portal-error-returned` now declares it, exactly as the compile would. ONLY THE SITUATION CHANGED: not one expectation, acceptable posture, acceptable recovery, bar or scoring rule. WHAT THIS COSTS, stated plainly: for that one scenario the blind-retry bar now measures whether the judge respects a stated constraint rather than whether it infers the recurrence from prose. The two earlier holdouts are NOT edited - they are recorded evidence - so their equivalent scenarios still test the inference, and that is noted here rather than presented as an improvement. No result of this set informed this edit, because it had produced none.",
     "gap": "Wholly synthetic, like every other set here. No production lead, message, contact or property is reproduced. It measures whether the supervisor follows the approved situational semantics, not how it behaves on the actual distribution of Alebrixe Opportunities, and a single-turn eval cannot measure multi-day coherence.",
     "bars": "The same five bars as the main set, at the same ratified values. They are the Accountable's ratified bars for SL-14 / RS-2 scope and nothing here moves one.",
     "howThisSetMayBeUSED": "Once. If its result is read and an implementation change follows, this set is observed too, and a further independent holdout must be frozen before that change - the same rule that produced it."
@@ -103,6 +104,9 @@
           "read_case_facts",
           "permit_status_lookup",
           "comparable_sales_read"
+        ],
+        "retryExhaustedAliases": [
+          "w1"
         ]
       },
       "acceptable_postures": [

@@ -574,6 +574,13 @@ export async function runSupervisorWake(
         // recorded, and the deterministic assertion is the one that binds.
         outboundAvailable: false,
         availableCapabilities: request.availableCapabilities ?? [],
+        // …and which of those aliases the retry bound has already spent, so the
+        // judge is not offered an action `planRecovery` below would refuse.
+        // Availability, resolved here from durable Work Plane events, never a
+        // bound the model is invited to reason around (SA-14.3).
+        retryExhaustedAliases: [...compiledWork.recoverable]
+          .filter(([, entry]) => entry.supervisorRetries >= SUPERVISOR_RETRY_LIMIT)
+          .map(([alias]) => alias),
       })
   );
 

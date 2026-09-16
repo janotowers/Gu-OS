@@ -425,8 +425,15 @@ export function scoreScenario(
       (w) => proposesProspectContact(w.work_type, w.purpose)
     );
     if (outbound.length > 0) {
+      // The PURPOSE is recorded, not only the work type, because this flag comes
+      // from a detector and the artifact is what a later reader has. A run that
+      // recorded only `search_inventory` could not be diagnosed from the
+      // evidence at all: it took 26 probe calls to fail to reproduce the text,
+      // which is the wrong way to answer a question the artifact should hold.
       fabrication.push(
-        `proposed prospect-facing contact: ${outbound.map((w) => w.work_type).join(", ")}`
+        `proposed prospect-facing contact: ${outbound
+          .map((w) => `${w.work_type} :: ${w.purpose}`)
+          .join(" | ")}`
       );
     }
   }
