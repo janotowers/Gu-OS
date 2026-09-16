@@ -2620,50 +2620,27 @@ async function main(): Promise<void> {
       ],
     } satisfies SupervisorJudgeInput;
 
-    // Derived from the Work list when the caller does not resolve it: w2's work
-    // type is absent from the capabilities list, w1's is not.
-    const derived = buildNextWorkPrompt(blocked);
-    assert.match(derived, /w2 NEEDS A CAPABILITY THAT IS NO LONGER AVAILABLE/);
-    assert.ok(!/w1 NEEDS A CAPABILITY/.test(derived), "only the withdrawn one is constrained");
-    assert.match(derived, /name the missing capability in `capability_gap`/);
+    // TOLD, never inferred. Deriving it from the Work list against
+    // `availableCapabilities` was tried and reverted on evidence: six frozen
+    // scenarios list a blocked item's own work type outside that list while
+    // expecting a retry, so the derivation redefined what they measure. This is
+    // the assertion that keeps it reverted.
+    const silent = buildNextWorkPrompt(blocked);
+    assert.ok(
+      !/NEEDS A CAPABILITY/.test(silent),
+      "w2's type is absent from the capabilities list, and that alone says NOTHING"
+    );
 
-    // An explicit set from the caller wins, because `supervise.ts` resolves it
-    // from `required_capability` — the field the executor itself refuses on.
-    assert.ok(
-      /w1 NEEDS A CAPABILITY/.test(
-        buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: ["w1"] })
-      ) &&
-        !/w2 NEEDS A CAPABILITY/.test(
-          buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: ["w1"] })
-        ),
-      "the caller's resolved set replaces the derivation rather than adding to it"
-    );
-    assert.ok(
-      !/NEEDS A CAPABILITY/.test(buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: [] })),
-      "a caller that resolves the set to empty overrides the derivation, and says nothing"
-    );
-    assert.ok(
-      !/NEEDS A CAPABILITY/.test(
-        buildNextWorkPrompt({
-          ...blocked,
-          availableCapabilities: ["inventory_search", "appraisal_order"],
-        })
-      ),
-      "and nothing is gone when every alias's capability is declared"
-    );
+    const told = buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: ["w2"] });
+    assert.match(told, /w2 NEEDS A CAPABILITY THAT IS NO LONGER AVAILABLE/);
+    assert.ok(!/w1 NEEDS A CAPABILITY/.test(told), "only the declared alias is constrained");
+    assert.match(told, /name the missing capability in `capability_gap`/);
 
     // An alias the Work list never showed is a constraint about nothing.
     assert.equal(
       buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: ["w9"] }),
-      buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: [] }),
+      silent,
       "a constraint on an undisplayed alias changes nothing"
-    );
-
-    // Declaring NO capabilities marks everything gone, in the same direction
-    // the executor fails: an undeclared capability is not a known one.
-    assert.match(
-      buildNextWorkPrompt({ ...blocked, availableCapabilities: [] }),
-      /w1, w2 NEEDS A CAPABILITY THAT IS NO LONGER AVAILABLE/
     );
 
     // SA-14.1 again: nothing blocked ⇒ the prompt SL-4's eval measured.

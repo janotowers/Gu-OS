@@ -412,28 +412,6 @@ function recoverableAliases(workSummary: readonly string[]): string[] {
     .filter((alias): alias is string => alias !== undefined);
 }
 
-/**
- * The aliases whose Work needs a capability the Case no longer declares.
- *
- * The fallback for a caller that does not resolve it from durable state. The
- * aliases themselves are already read off these same lines, and an aliased line
- * exists only for `agent_proposed` Work, whose `required_capability` IS its
- * `work_type` at the one place this Slice creates such Work — so the two
- * derivations agree, and `supervise.ts` passes the exact one regardless.
- *
- * Conservative in the same direction the executor is: an undeclared capability
- * is not a known one, so declaring nothing marks everything gone, which is
- * precisely what a retry would then be refused for.
- */
-function capabilityGoneFromWorkList(input: SupervisorJudgeInput): string[] {
-  const available = new Set(input.availableCapabilities);
-  return input.workSummary
-    .map((line) => /^\[(w\d+)\] ([a-z0-9_]+) —/.exec(String(line)))
-    .filter((match): match is RegExpExecArray => match !== null)
-    .filter((match) => !available.has(match[2] ?? ""))
-    .map((match) => match[1] as string);
-}
-
 export function buildNextWorkPrompt(input: SupervisorJudgeInput): string {
   const recoverable = recoverableAliases(input.workSummary);
   // Narrowed to aliases the Work list actually showed, for the same reason the
@@ -442,9 +420,16 @@ export function buildNextWorkPrompt(input: SupervisorJudgeInput): string {
   const retryExhausted = (input.retryExhaustedAliases ?? []).filter((alias) =>
     recoverable.includes(alias)
   );
-  const capabilityGone = (
-    input.capabilityGoneAliases ?? capabilityGoneFromWorkList(input)
-  ).filter((alias) => recoverable.includes(alias));
+  // Told, never inferred. Deriving it from the Work list against
+  // `availableCapabilities` was tried on 2026-09-16 and REVERTED on evidence:
+  // six already-frozen scenarios list the blocked item's own work type outside
+  // that list while expecting a retry to be acceptable, so the derivation
+  // silently redefined what they measure and made three of them fail
+  // systematically. What a set means is not something an implementation may
+  // reinterpret, whatever the executor would do with the same facts.
+  const capabilityGone = (input.capabilityGoneAliases ?? []).filter((alias) =>
+    recoverable.includes(alias)
+  );
   const shape =
     '{"posture":"no_op|wait|gather_research_reconcile|work|targeted_human_input","diagnosis":string|null,"rationale":string,"insufficient_evidence":boolean,"capability_gap":string|null,"proposed_work":[{"work_type":string,"purpose":string,"durable":boolean}],"commitments":[{"expected_outcome":string,"actor":"gu|advisor|prospect|external","due_at":string|null,"due_stated":boolean,"key":string}],"reconsider_in_hours":number|null' +
     (recoverable.length > 0
