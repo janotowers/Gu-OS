@@ -464,7 +464,13 @@ export function createOpenRouterNextWorkJudge(): NextWorkJudge {
           body: JSON.stringify({
             model,
             temperature: 0,
-            max_tokens: 700,
+            // Raised from 700 with SL-14: `recovery` adds a reason per blocked
+            // item to an answer that already carries a diagnosis, a rationale
+            // and proposed work, and a truncated answer is not a worse
+            // judgment — it is no judgment at all. Observed while measuring an
+            // alternative model, whose longer diagnoses were cut mid-string and
+            // discarded; an ordinary engineering value (Methodology §14.1).
+            max_tokens: 1200,
             response_format: { type: "json_object" },
             usage: { include: true },
             messages: [
@@ -526,8 +532,16 @@ export function createOpenRouterNextWorkJudge(): NextWorkJudge {
         return normalizeNextWorkProposal(
           parseJsonContent(json.choices?.[0]?.message?.content)
         );
-      } catch {
-        return null;
+      } catch (error) {
+        // Not silent, for the reason `discard` exists: a null that says nothing
+        // makes an unparseable answer indistinguishable from an unreachable
+        // model or an incoherent judgment, and they call for different repairs.
+        const raw = json.choices?.[0]?.message?.content;
+        return discard(
+          `${model} returned content this judge could not parse as JSON (${
+            (error as Error).message
+          }); first 200 chars: ${String(raw).slice(0, 200)}`
+        );
       }
     },
   };
