@@ -71,6 +71,8 @@ import {
   PROPOSABLE_POSTURES,
   RECOVERY_ACTIONS,
   buildNextWorkPrompt,
+  nextWorkJsonSchema,
+  recoverableAliases,
   offeredRecovery,
   resolveRecoveryAlias,
   type NextWorkJudge,
@@ -2418,7 +2420,7 @@ async function main(): Promise<void> {
     assert.deepEqual(second.violations, ["no judgment was produced"]);
   });
 
-  await t("holdouts 4 and 5 are ENTIRELY SL-14-owned, which is why they can test the rule", () => {
+  await t("holdouts 4, 5 and 6 are ENTIRELY SL-14-owned, which is why they can test the rule", () => {
     // Their defining property, asserted rather than described. The corrected
     // closure rule can attribute a breach away from SL-14 only on a scenario
     // carrying no SL-14 expectation; if even one situation in these sets were
@@ -2427,6 +2429,7 @@ async function main(): Promise<void> {
     for (const file of [
       "supervisor-holdout-4-scenarios.json",
       "supervisor-holdout-5-scenarios.json",
+      "supervisor-holdout-6-scenarios.json",
     ]) {
       const suite = JSON.parse(
         readFileSync(path.join(__dirname, "eval", file), "utf8")
@@ -2510,13 +2513,49 @@ async function main(): Promise<void> {
     );
   });
 
-  await t("the recovery disposition is a BOOLEAN on the wire, and nothing else parses", () => {
-    // The structural repair of 2026-09-16, and the reason it is structural: the
-    // ONLY string enum the model now chooses is `posture`, so there is no
-    // disposition token left to misplace into it. Ten of a hundred calls on the
-    // 2026-09-16 holdout were discarded for writing `leave_blocked` into
-    // `posture`, after three rounds of wording and one rename each reduced and
-    // never removed it.
+  await t("an invalid posture is UNGENERATABLE where recovery is offered", () => {
+    // The structural repair of 2026-09-16, after a boolean disposition was
+    // measured and reverted. The mode was never about the disposition's words:
+    // the model wrote `leave_blocked` into `posture` while that was a value,
+    // and `recovery` — the FIELD NAME — once the boolean left no value to
+    // misplace. What the words have in common is that `posture` is a free
+    // string at generation time, and a strict schema is what makes it not one.
+    const withRecovery = nextWorkJsonSchema(true);
+    const properties = withRecovery.properties as Record<string, { enum?: string[] }>;
+    assert.deepEqual(properties.posture.enum, [...PROPOSABLE_POSTURES]);
+    assert.ok(
+      !properties.posture.enum?.some((p) => /retry|leave|recovery/.test(p)),
+      "no posture the sampler may emit can be mistaken for a disposition"
+    );
+    assert.deepEqual(properties.recovery ? "present" : "absent", "present");
+    assert.equal(withRecovery.additionalProperties, false);
+    // Strict structured output requires EVERY property to be required, so a
+    // schema that lists one and omits it from `required` is rejected outright
+    // by the provider — every judgment lost, not one.
+    assert.deepEqual(
+      [...(withRecovery.required as string[])].sort(),
+      Object.keys(properties).sort(),
+      "every property is required, as strict mode demands"
+    );
+
+    // …and nothing is constrained where SL-14 changed nothing (SA-14.1): the
+    // recovery block is absent, and the caller sends no schema at all.
+    assert.equal(
+      (nextWorkJsonSchema(false).properties as Record<string, unknown>).recovery,
+      undefined
+    );
+    assert.deepEqual(recoverableAliases(["inventory_search — done (agent_proposed)"]), []);
+    assert.deepEqual(
+      recoverableAliases([
+        "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+      ]),
+      ["w1"],
+      "the schema is chosen from the same reading of the Work list as the prompt"
+    );
+
+    // The parser is NOT relaxed by the constraint. It still refuses everything
+    // it refused before, so a provider that ignores the schema changes no
+    // verdict — which is the only reason adding it is safe.
     const base = {
       posture: "gather_research_reconcile",
       diagnosis: null,
@@ -2530,8 +2569,8 @@ async function main(): Promise<void> {
     const parsed = normalizeNextWorkProposal({
       ...base,
       recovery: [
-        { work: "w1", retry: true, reason: "el error no ha vuelto" },
-        { work: "w2", retry: false, reason: "replan with proposed_work" },
+        { work: "w1", action: "retry_work", reason: "el error no ha vuelto" },
+        { work: "w2", action: "leave_blocked", reason: "replan with proposed_work" },
       ],
     });
     assert.deepEqual(
@@ -2540,35 +2579,33 @@ async function main(): Promise<void> {
         ["w1", "retry"],
         ["w2", "leave"],
       ],
-      "the boolean maps straight to the domain values the executor sees"
+      "the wire values map straight to the domain values the executor sees"
     );
 
-    // The old wire vocabulary must NOT quietly keep working: a half-reverted
-    // prompt naming it again would otherwise pass this suite while the judge
-    // wrote a string the schema once accepted.
-    for (const action of ["retry_work", "leave_blocked", "retry", "leave"]) {
+    // The domain vocabulary is NOT the wire vocabulary, and the boolean the
+    // revert removed is not accepted either — a half-reverted prompt naming
+    // one of these would otherwise pass this suite while the judge wrote a
+    // string or a flag the parser refuses.
+    for (const action of ["retry", "leave", "true", "false"]) {
       assert.equal(
         normalizeNextWorkProposal({
           ...base,
           recovery: [{ work: "w1", action, reason: "r" }],
         }),
         null,
-        `a recovery disposition written as the string ${action} is not a judgment`
+        `a recovery disposition written as ${action} is not a judgment`
       );
     }
-    // …and neither does a truthy non-boolean, which is how a model "almost"
-    // answers a boolean.
     assert.equal(
       normalizeNextWorkProposal({
         ...base,
-        recovery: [{ work: "w1", retry: "true", reason: "r" }],
+        recovery: [{ work: "w1", retry: true, reason: "r" }],
       }),
       null,
-      "a string is not a boolean"
+      "the reverted boolean is not silently still accepted"
     );
 
-    // The prompt must name the shape it actually parses, and must no longer
-    // spend the answer's vocabulary on tokens that look like postures.
+    // The prompt must name the shape it actually parses.
     const blocked = {
       wakeReason: "prior_work_settled",
       objective: "o",
@@ -2587,10 +2624,10 @@ async function main(): Promise<void> {
       ],
     } satisfies SupervisorJudgeInput;
     const prompt = buildNextWorkPrompt(blocked);
-    assert.match(prompt, /"retry":boolean/);
+    assert.match(prompt, /"action":"retry_work\|leave_blocked"/);
     assert.ok(
-      !/retry_work|leave_blocked/.test(prompt),
-      "the tokens the model used to misplace are gone from the prompt entirely"
+      !/"retry":boolean/.test(prompt),
+      "the prompt names the shape the parser accepts, not the reverted one"
     );
   });
 
@@ -2694,6 +2731,7 @@ async function main(): Promise<void> {
       "supervisor-holdout-3-scenarios.json",
       "supervisor-holdout-4-scenarios.json",
       "supervisor-holdout-5-scenarios.json",
+      "supervisor-holdout-6-scenarios.json",
     ];
     const idsPerFile: Array<Set<string>> = [];
 

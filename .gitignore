@@ -25,3 +25,8 @@ apps/web/tmp/
 # too, so keep a copy outside the repo.
 gu-os-sl1-reader.*.json
 *.password.txt
+
+# Raw console transcripts of eval batches and smoke runs. The evidence is the
+# JSON artifact under docs/.../evidence/, which is committed; this is the
+# scrollback that produced it.
+.evallogs/

@@ -53,7 +53,8 @@
     "verify:supervisor": "tsx scripts/verify-supervisor.ts",
     "test:supervisor-evidence": "tsx scripts/lib/supervisor-evidence.selftest.ts",
     "test:supervisor-verifier": "tsx scripts/verify-supervisor.smoke.selftest.ts",
-    "baseline:supervisor-prompt": "tsx scripts/baseline-supervisor-prompt.ts"
+    "baseline:supervisor-prompt": "tsx scripts/baseline-supervisor-prompt.ts",
+    "verify:supervisor-prompt-unchanged": "tsx scripts/verify-supervisor-prompt-unchanged.ts"
   },
   "devDependencies": {
     "turbo": "^2"
