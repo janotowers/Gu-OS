@@ -1,0 +1,609 @@
+{
+  "ranAt": "2026-09-16T01:19:44.534Z",
+  "model": {
+    "source": "the judge that ran each pass (NextWorkJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ],
+    "unattributed": 0
+  },
+  "set": "holdout",
+  "setFile": "supervisor-holdout-scenarios.json",
+  "setSha256": "11f05a384679ce42cec8cc1d2f4a8a1c45483fcb7812c294714423de3c596197",
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "reask_bar": 0,
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0,
+  "scenarios": 6,
+  "runCount": 5,
+  "runsHoldingAllBars": 2,
+  "runs": [
+    {
+      "run": 1,
+      "failures": 3,
+      "failureRate": 0.5,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": false,
+      "results": [
+        {
+          "id": "h-blocked-valuation-transient",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry would loop because the provider 502 has already recurred through all attempts; leave this path and rely on the proposed valuation lookup strategy only if a new path becomes available."
+            }
+          ],
+          "rationale": "A viable opportunity is waiting on the home's valuation, and the prior lookup failed technically after three attempts."
+        },
+        {
+          "id": "h-blocked-identical-error-twice",
+          "posture": "work",
+          "passed": false,
+          "violations": [
+            "posture work not in [targeted_human_input, gather_research_reconcile, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with generate_proposal because the same template failure has already recurred after retries, so another retry would loop with no new information."
+            }
+          ],
+          "rationale": "The only useful progress now is to resolve or replace the failed proposal-generation path."
+        },
+        {
+          "id": "h-blocked-capability-removed",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan con confirmación manual porque la integración de calendario ya agotó sus intentos y no puede reintentarse útilmente."
+            }
+          ],
+          "rationale": "El prospecto pidió sábado y el trabajo pendiente de disponibilidad quedó bloqueado por una falla técnica ya agotada."
+        },
+        {
+          "id": "h-blocked-need-overtaken",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h-blocked-replan-cheaper-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El inventario ya agotó sus intentos por una falla técnica recurrente; conviene dejarlo y usar la vía de lookup_property_details en su lugar."
+            }
+          ],
+          "rationale": "Hay una pregunta abierta del prospecto y existe capacidad interna para consultar detalles de la propiedad, mientras que el inventario falló técnicamente."
+        },
+        {
+          "id": "h-succeeded-but-unfavourable",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, targeted_human_input, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La consulta sobre si acepta Infonavit ya quedó resuelta con el hallazgo de que la propiedad no lo acepta."
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 2,
+      "failureRate": 0.3333333333333333,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": false,
+      "results": [
+        {
+          "id": "h-blocked-valuation-transient",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "ya fue reintentado y falló igual tres veces; no hay un cambio de condición que justifique otro retry, así que debe dejarse y esperar otra vía o nueva información"
+            }
+          ],
+          "rationale": "El trabajo w1 ya falló tres veces por 502 y no hay otra capacidad interna útil para avanzar el objetivo ahora."
+        },
+        {
+          "id": "h-blocked-identical-error-twice",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with human intervention because the same technical failure already recurred and another retry would loop."
+            }
+          ],
+          "rationale": "El prospecto pidió la propuesta por escrito y la única obra relevante está fallida tras 4 intentos con el mismo error."
+        },
+        {
+          "id": "h-blocked-capability-removed",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with proposed_work: la integración de calendario está desconectada y ya agotó sus intentos, así que hace falta confirmación humana manual."
+            }
+          ],
+          "rationale": "El prospecto pidió verla el sábado y el trabajo de disponibilidad falló tres veces por desconexión de calendario."
+        },
+        {
+          "id": "h-blocked-need-overtaken",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La comparación quedó sin objeto porque la decisión ya fue tomada; no hace falta reintentar ni replantear."
+            }
+          ],
+          "rationale": "La última entrada dice que el prospecto ya decidió y la oportunidad sigue viable."
+        },
+        {
+          "id": "h-blocked-replan-cheaper-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan con lookup_property_details porque el proveedor de inventario cayó tras agotar intentos y esta ruta interna sigue disponible."
+            }
+          ],
+          "rationale": "El objetivo sigue viable y hay una vía interna disponible para confirmar la aceptación de Infonavit."
+        },
+        {
+          "id": "h-succeeded-but-unfavourable",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, targeted_human_input, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "El trabajo previo de verificar la forma de pago está concluido y no queda evidencia de un siguiente paso útil sin contacto con el prospecto."
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 1,
+      "failureRate": 0.16666666666666666,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h-blocked-valuation-transient",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Ya agotó sus 3 intentos con el mismo fallo técnico; conviene esperar una nueva oportunidad operativa o una vía distinta antes de reintentar."
+            }
+          ],
+          "rationale": "La única vía interna disponible para obtener el valor es w1 y ya falló 3 veces con 502."
+        },
+        {
+          "id": "h-blocked-identical-error-twice",
+          "posture": "work",
+          "passed": false,
+          "violations": [
+            "posture work not in [targeted_human_input, gather_research_reconcile, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "replan with proposed_work because this same proposal generation has already been retried and failed the same way, so another retry would loop"
+            }
+          ],
+          "rationale": "The prospect asked for a written proposal and the case is viable, while w1 has not been completed due to a recurring technical template failure."
+        },
+        {
+          "id": "h-blocked-capability-removed",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La integración de calendario está desconectada y ya agotó sus intentos; debe resolverse por otra vía, como pedir confirmación humana o replanear."
+            }
+          ],
+          "rationale": "El prospecto pidió ver la propiedad el sábado y la verificación de agenda quedó bloqueada por la integración de calendario desconectada."
+        },
+        {
+          "id": "h-blocked-need-overtaken",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The comparison document already failed after three attempts; the decision is now settled, so the responsibility should be left rather than retried."
+            }
+          ],
+          "rationale": "The latest inbound message explicitly commits to the north house, making further comparison unnecessary."
+        },
+        {
+          "id": "h-blocked-replan-cheaper-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replanificar con lookup_property_details porque inventory_search ya agotó sus intentos y el proveedor de inventario está caído."
+            }
+          ],
+          "rationale": "La consulta del inventario falló técnicamente, pero aún puedo verificar detalles de la propiedad con las capacidades disponibles."
+        },
+        {
+          "id": "h-succeeded-but-unfavourable",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "Hay un hecho resuelto y una capacidad interna disponible para buscar alternativas en inventario."
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 1,
+      "failureRate": 0.16666666666666666,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h-blocked-valuation-transient",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La misma búsqueda ya falló repetidamente por 502; conviene replantear con un humano o una ruta alternativa en vez de reintentar."
+            }
+          ],
+          "rationale": "La reconstrucción interna no puede avanzar porque la valuación automática quedó bloqueada por falla técnica recurrente."
+        },
+        {
+          "id": "h-blocked-identical-error-twice",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This same proposal generation has already been retried and failed the same way, so it should be left and approached via the proposed work path rather than looped again."
+            }
+          ],
+          "rationale": "The prospect asked for the proposal in writing, and the only listed work is a blocked proposal document with a repeated technical failure."
+        },
+        {
+          "id": "h-blocked-capability-removed",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [targeted_human_input, wait, gather_research_reconcile]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "replan or wait; another retry would loop because the calendar integration has already failed three times and remains disconnected"
+            }
+          ],
+          "rationale": "The only blocked work is a calendar check that already exhausted its attempts, and prospect-facing contact is unavailable."
+        },
+        {
+          "id": "h-blocked-need-overtaken",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "stop because the comparison is no longer needed"
+            }
+          ],
+          "rationale": "The latest inbound message resolves the choice and there is no remaining decision to advance."
+        },
+        {
+          "id": "h-blocked-replan-cheaper-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El proveedor de inventario ya agotó 3 intentos por falla técnica; conviene tomar la ruta alternativa de lookup_property_details en lugar de reintentar."
+            }
+          ],
+          "rationale": "El objetivo sigue viable y hay una capacidad interna disponible para revisar detalles de la propiedad."
+        },
+        {
+          "id": "h-succeeded-but-unfavourable",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La verificación previa concluyó que la propiedad no acepta Infonavit, y eso es un hecho operativo que afecta la continuación del caso."
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 3,
+      "failureRate": 0.5,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 1,
+      "strandedFailures": 0,
+      "held": false,
+      "results": [
+        {
+          "id": "h-blocked-valuation-transient",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retrying the same valuation lookup would loop because the provider has already failed three times with the same technical error; replan or ask a human instead."
+            }
+          ],
+          "rationale": "The case still needs a sale-price estimate, and the prior work settled on the same blocked valuation lookup with exhausted attempts."
+        },
+        {
+          "id": "h-blocked-identical-error-twice",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [targeted_human_input, gather_research_reconcile, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "replan or wait for a different path because the same proposal-generation attempt already failed repeatedly with the template unresolved"
+            }
+          ],
+          "rationale": "The prospect asked for a written proposal, but the sole work item has exhausted retries on the same technical failure and there is no new path to advance it right now."
+        },
+        {
+          "id": "h-blocked-capability-removed",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with human confirmation because the calendar integration is unavailable and the same technical failure has already recurred."
+            }
+          ],
+          "rationale": "El único trabajo bloqueado requiere una integración de calendario desconectada y no hay otra evidencia nueva para avanzar."
+        },
+        {
+          "id": "h-blocked-need-overtaken",
+          "posture": "work",
+          "passed": false,
+          "violations": [
+            "recovery retry not in [leave]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [
+            "retried w1 although this situation's evidence says another attempt cannot help: Ha pasado tiempo desde el fallo y la causa técnica fue un 500 del generador; un nuevo intento puede producir el documento si el servicio ya se recuperó."
+          ],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "retry",
+              "reason": "Ha pasado tiempo desde el fallo y la causa técnica fue un 500 del generador; un nuevo intento puede producir el documento si el servicio ya se recuperó."
+            }
+          ],
+          "rationale": "El mensaje más reciente cierra la comparación comercial y el único trabajo abierto es un documento que falló técnicamente."
+        },
+        {
+          "id": "h-blocked-replan-cheaper-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El proveedor de inventario cayó y ya agotó sus 3 intentos; la responsabilidad debe replanearse por otra vía interna o resolverse con un humano si la consulta de detalle no aclara el dato."
+            }
+          ],
+          "rationale": "El objetivo sigue viable, hay una pregunta factual no resuelta y existe una capacidad interna para revisar datos de la propiedad."
+        },
+        {
+          "id": "h-succeeded-but-unfavourable",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, targeted_human_input, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "A prior check already resolved the payment-method question, leaving no new internal work that would advance this objective right now."
+        }
+      ]
+    }
+  ]
+}
