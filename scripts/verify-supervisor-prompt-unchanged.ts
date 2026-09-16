@@ -33,6 +33,7 @@ const SETS = [
   "supervisor-holdout-5-scenarios.json",
   "supervisor-holdout-6-scenarios.json",
   "supervisor-holdout-7-scenarios.json",
+  "supervisor-holdout-8-scenarios.json",
 ];
 
 async function main(): Promise<void> {

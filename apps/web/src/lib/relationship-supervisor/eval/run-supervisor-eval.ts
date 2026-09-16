@@ -432,6 +432,18 @@ const SET_FILES = {
   // the recorded proposals — just not scored. THIS is the independent
   // instrument now.
   holdout7: "supervisor-holdout-7-scenarios.json",
+  // Frozen 2026-09-16 in turn, and for a different reason from every holdout
+  // before it: holdout 7 exposed no defect and no implementation change follows
+  // it. What changed is the CLOSURE RULE — attribution moved from the scenario
+  // to the assertion (§8 Q12) — and that correction was written after seeing
+  // the one holdout-7 run it would have changed. A rule may not be first
+  // exercised on the instrument whose result produced it. Still entirely
+  // SL-14-owned, with one difference stated in the set itself: two situations
+  // carry Work blocked on a PERSON, so they render no recovery prose and their
+  // prompts are byte-identical — which is where the corrected rule is actually
+  // exercised rather than merely unavailable. THIS is the independent
+  // instrument now.
+  holdout8: "supervisor-holdout-8-scenarios.json",
 } as const;
 
 const setName = (/^--set=(.+)$/.exec(process.argv.find((a) => a.startsWith("--set=")) ?? "")?.[1] ??

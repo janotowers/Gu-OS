@@ -2668,6 +2668,7 @@ async function main(): Promise<void> {
       "supervisor-holdout-5-scenarios.json",
       "supervisor-holdout-6-scenarios.json",
       "supervisor-holdout-7-scenarios.json",
+      "supervisor-holdout-8-scenarios.json",
     ]) {
       const suite = JSON.parse(
         readFileSync(path.join(__dirname, "eval", file), "utf8")
@@ -2971,6 +2972,7 @@ async function main(): Promise<void> {
       "supervisor-holdout-5-scenarios.json",
       "supervisor-holdout-6-scenarios.json",
       "supervisor-holdout-7-scenarios.json",
+      "supervisor-holdout-8-scenarios.json",
     ];
     const idsPerFile: Array<Set<string>> = [];
 
