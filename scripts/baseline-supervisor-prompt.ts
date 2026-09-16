@@ -167,9 +167,25 @@ function report(label: string, runs: BlockRun[]): Record<string, number> {
   return perScenario;
 }
 
+/**
+ * ATTRIBUTION WITHOUT MODEL CALLS.
+ *
+ * The prose claim "SA-14.1 freezes this prompt, so SL-14 cannot own that
+ * failure" is checkable, and a claim that can be checked should not be
+ * asserted. `BASELINE_IDENTITY_ONLY=1` audits EVERY scenario in the current
+ * set whose Work list has nothing blocked — not only the ones new to it — by
+ * building its prompt with the judge as frozen at `BASE` and with the judge as
+ * it is now, and reporting any that differ.
+ *
+ * It costs nothing and answers a different question from the measured baseline:
+ * whether SL-14 could POSSIBLY own a failure, rather than how often the older
+ * judge produced one.
+ */
+const IDENTITY_ONLY = process.env.BASELINE_IDENTITY_ONLY === "1";
+
 async function main(): Promise<void> {
   loadEnvLocal();
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!IDENTITY_ONLY && !process.env.OPENROUTER_API_KEY) {
     console.error("baseline requires OPENROUTER_API_KEY — a run without it measures nothing.");
     process.exit(1);
   }
@@ -194,6 +210,55 @@ async function main(): Promise<void> {
     createOpenRouterNextWorkJudge: () => { modelId: string | null; propose: (i: unknown) => Promise<unknown> };
     buildNextWorkPrompt: (input: never) => string;
   };
+
+  if (IDENTITY_ONLY) {
+    const frozen = currentSet.scenarios.filter((s) => hasNothingBlocked(s as never));
+    const differing: string[] = [];
+    for (const sc of frozen) {
+      const input = (sc as { input: never }).input;
+      if (baseline.buildNextWorkPrompt(input) !== buildCurrentPrompt(input)) {
+        differing.push(String(sc.id));
+      }
+    }
+    console.log(
+      `SA-14.1 byte-identity audit against the judge frozen at ${BASE}, no model calls.\n` +
+        `  ${frozen.length} of ${currentSet.scenarios.length} scenario(s) have nothing blocked,` +
+        ` so SA-14.1 requires their prompts to be unchanged:\n    ${frozen
+          .map((s) => String(s.id))
+          .join(", ")}`
+    );
+    const out = process.env.BASELINE_JSON;
+    if (out) {
+      writeFileSync(
+        out,
+        JSON.stringify(
+          {
+            ranAt: new Date().toISOString(),
+            what: `SA-14.1 byte-identity audit. For every current scenario whose Work list has nothing blocked, the prompt built by the judge frozen at ${BASE} and by the judge as it is now. A scenario listed as identical is one SL-14 is STRUCTURALLY UNABLE to have affected, whatever it scores.`,
+            notWhat:
+              "This is not a measurement and holds no bar. It says what SL-14 could possibly own, not how often anything failed.",
+            baselineRef: BASE,
+            baselineJudgeSha256: digest(baseJudgeSource),
+            currentSetSha256: digest(currentSetBytes.toString("utf8")),
+            frozenByteIdentical: frozen
+              .map((s) => String(s.id))
+              .filter((id) => !differing.includes(id)),
+            differing,
+          },
+          null,
+          2
+        ) + "\n",
+        "utf8"
+      );
+      console.log(`  artifact: ${out}`);
+    }
+    if (differing.length > 0) {
+      console.error(`\nFAILED — SA-14.1 breached for: ${differing.join(", ")}`);
+      process.exit(1);
+    }
+    console.log("\nAll of them are BYTE-IDENTICAL. SL-14 cannot own a failure on any of these prompts.");
+    return;
+  }
 
   // Block B's membership, and the byte-identity that makes it legitimate.
   const baseIds = new Set(baseSet.scenarios.map((s) => String(s.id)));
