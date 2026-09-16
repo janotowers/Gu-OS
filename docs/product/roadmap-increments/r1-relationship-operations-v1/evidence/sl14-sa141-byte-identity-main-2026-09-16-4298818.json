@@ -1,0 +1,32 @@
+{
+  "ranAt": "2026-09-16T20:41:25.366Z",
+  "what": "SA-14.1 byte-identity audit of apps/web/src/lib/relationship-supervisor/eval/supervisor-scenarios.json. For every scenario in it whose Work list has nothing blocked, the prompt built by the judge frozen at 70f5f1e and by the judge as it is now. A scenario listed as identical is one SL-14 is STRUCTURALLY UNABLE to have affected, whatever it scores.",
+  "notWhat": "This is not a measurement and holds no bar. It says what SL-14 could possibly own, not how often anything failed.",
+  "usedBy": "`run-supervisor-eval.ts` reads this through SUPERVISOR_EVAL_IDENTITY_AUDIT as the ONLY admissible proof for the closure rule of 2026-09-16, and refuses it unless `currentSetSha256` matches the set actually being measured.",
+  "baselineRef": "70f5f1e",
+  "baselineJudgeSha256": "38e6c8e0ee1704136ebd205ddd74aab16e2f03a62e2cc103ea1f9ac92fd54bc1",
+  "auditedSet": "apps/web/src/lib/relationship-supervisor/eval/supervisor-scenarios.json",
+  "currentSetSha256": "8a936096b00e67472ebd76fae0f683724f81864217e9f89bf87a66cf02704249",
+  "frozenByteIdentical": [
+    "quiet-nothing-new",
+    "silence-thirty-days",
+    "unverified-budget-blocks-match",
+    "conflicting-availability",
+    "repeated-search-no-gain",
+    "capability-not-available",
+    "commitment-made-by-advisor",
+    "vague-intention-is-not-a-commitment",
+    "commitment-already-tracked",
+    "contact-me-after-the-twentieth",
+    "attention-already-consumed",
+    "materially-new-objective",
+    "evidence-too-thin-to-judge",
+    "commitment-due-today",
+    "new-relevant-value-exists",
+    "answered-visit-window",
+    "answer-changes-the-plan",
+    "blocked-waiting-on-a-person-not-technical",
+    "work-succeeded-with-negative-discovery"
+  ],
+  "differing": []
+}

@@ -24,6 +24,7 @@
 import assert from "node:assert/strict";
 import {
   allPassed,
+  digestIdentifiersIn,
   distinctUtcDays,
   evaluateHostedRecoveryEvidence,
   evaluateHostedSupervisorEvidence,
@@ -616,6 +617,36 @@ function main(): void {
   t("a null model is reported as a deterministic decision, not hidden", () => {
     const checks = evaluateHostedRecoveryEvidence(recovery());
     assert.ok(checks.at(-1)?.detail?.includes("deterministic"));
+  });
+
+  // The 2026-09-16 SL-14 hosted run put a literal `work_item_id` into its
+  // evidence file, because this detail stringifies a payload read back from the
+  // database and the id rides INSIDE it. Nothing was exposed — the row is
+  // synthetic — and the invariant the runner states is that an evidence file
+  // carries digests, so a real row would have leaked the same way.
+  t("no row identifier reaches a check detail, even from inside a payload", () => {
+    const input = recovery();
+    const id = "960447c7-3a57-415f-b7ef-c8eda0d6fb68";
+    input.recoveryApplied = [
+      { work_item_id: id, applied: "left", reason: "attempts spent", work: "w1" },
+    ];
+    for (const c of evaluateHostedRecoveryEvidence(input)) {
+      assert.ok(!c.detail?.includes(id), `${c.label} leaked a row identifier`);
+    }
+  });
+
+  t("digesting identifiers keeps the rest of a detail readable", () => {
+    const out = digestIdentifiersIn(
+      '{"work":"w1","id":"960447c7-3a57-415f-b7ef-c8eda0d6fb68","applied":"left"}'
+    );
+    assert.ok(out.includes('"work":"w1"'));
+    assert.ok(out.includes('"applied":"left"'));
+    assert.ok(out.includes("sha256:"));
+    assert.ok(!out.includes("960447c7"));
+  });
+
+  t("a detail with no identifier is returned unchanged", () => {
+    assert.equal(digestIdentifiersIn("3 attempt failure(s)"), "3 attempt failure(s)");
   });
 
   console.log(`\nsupervisor-evidence selftest: ${passed} checks passed`);

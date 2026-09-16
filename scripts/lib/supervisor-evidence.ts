@@ -23,11 +23,36 @@
 // history is coherent and ordered"; "the reconsideration ran" does not prove
 // "it is reconstructable from durable state alone".
 
+import { createHash } from "node:crypto";
+
 export interface HostedCheck {
   assertion: string;
   label: string;
   ok: boolean;
   detail?: string;
+}
+
+/**
+ * Digests every row identifier in a detail string before it reaches the
+ * evidence file.
+ *
+ * The runner redacts every id it prints, and says why: the artifact is meant to
+ * be attachable to a PR. A detail built by `JSON.stringify`-ing a payload read
+ * back from the database defeats that silently, because the id is inside the
+ * payload rather than passed as an argument — which is exactly how the SL-14
+ * run of 2026-09-16 put a literal `work_item_id` into its evidence. The rows in
+ * question are synthetic, so nothing was exposed; the invariant is the point,
+ * and the next run against real-shaped rows would do the same thing.
+ *
+ * Deliberately shape-based rather than key-based. A list of id-bearing field
+ * names would need editing every time a payload gains one, and the failure mode
+ * of forgetting is a leak.
+ */
+export function digestIdentifiersIn(detail: string): string {
+  return detail.replace(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+    (uuid) => `sha256:${createHash("sha256").update(uuid).digest("hex").slice(0, 16)}`
+  );
 }
 
 /** One reconsideration as the hosted timeline holds it. */
@@ -636,7 +661,7 @@ export function evaluateHostedRecoveryEvidence(
       recoveryApplied.some(
         (r) => r.work_item_id === item.id && r.applied === "retried" && Boolean(r.reason)
       ),
-      JSON.stringify(recoveryApplied)
+      digestIdentifiersIn(JSON.stringify(recoveryApplied))
     ),
     check(
       "SA-14.11",
