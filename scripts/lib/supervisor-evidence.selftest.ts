@@ -25,9 +25,11 @@ import assert from "node:assert/strict";
 import {
   allPassed,
   distinctUtcDays,
+  evaluateHostedRecoveryEvidence,
   evaluateHostedSupervisorEvidence,
   settlementOf,
   type HostedCheck,
+  type HostedRecoveryInputs,
   type HostedSupervisorInputs,
 } from "./supervisor-evidence";
 
@@ -492,6 +494,128 @@ function main(): void {
     input.settlements = [];
     const checks = evaluateHostedSupervisorEvidence(input);
     assert.ok(!allPassed(checks));
+  });
+
+  // ------------------------------------------------------------------
+  console.log("\nSA-14.11 — the hosted recovery, each claim falsified");
+
+  const recovery = (): HostedRecoveryInputs => ({
+    item: {
+      id: "w-1",
+      case_id: CASE,
+      work_type: "prepare_comparison",
+      origin: "agent_proposed",
+      status: "ready",
+      blocked_reason: null,
+      attempt_count: 3,
+      max_attempts: 4,
+    },
+    // One `attempt_failed` per failed attempt, as the Work Plane writes them:
+    // that count IS what the evaluator reads the pre-recovery history from.
+    events: [
+      { event_type: "attempt_failed", actor: "system", payload: { attempt_number: 1 } },
+      { event_type: "attempt_failed", actor: "system", payload: { attempt_number: 2 } },
+      { event_type: "attempt_failed", actor: "system", payload: { attempt_number: 3 } },
+      {
+        event_type: "blocked",
+        actor: "system",
+        payload: { blocked_reason: "max_attempts_exhausted" },
+      },
+      { event_type: "ready", actor: "agent", payload: { source: "case_supervisor_retry" } },
+    ],
+    caseWork: [
+      {
+        id: "w-1",
+        case_id: CASE,
+        work_type: "prepare_comparison",
+        origin: "agent_proposed",
+        status: "ready",
+      },
+    ],
+    recoveryApplied: [
+      { work_item_id: "w-1", applied: "retried", reason: "la causa fue del proveedor" },
+    ],
+    modelId: null,
+  });
+
+  t("a complete recovery passes every SA-14.11 claim", () => {
+    assert.ok(allPassed(evaluateHostedRecoveryEvidence(recovery())));
+  });
+
+  t("a run that never seeded blocked Work reports not-run, never a pass", () => {
+    const checks = evaluateHostedRecoveryEvidence(null);
+    assert.ok(!allPassed(checks));
+    assert.equal(checks[0].detail, "not run");
+  });
+
+  t("an item that was never blocked by exhausted attempts fails", () => {
+    const input = recovery();
+    input.events = input.events.filter((e) => e.event_type !== "blocked");
+    assert.ok(!allPassed(evaluateHostedRecoveryEvidence(input)));
+  });
+
+  t("blocked for a NON-technical reason is not a recovery this Slice made", () => {
+    const input = recovery();
+    input.events = input.events.map((e) =>
+      e.event_type === "blocked"
+        ? { ...e, payload: { blocked_reason: "waiting_on_person" } }
+        : e
+    );
+    assert.ok(!allPassed(evaluateHostedRecoveryEvidence(input)));
+  });
+
+  t("the history is read the same whatever order the rows arrive in", () => {
+    const forward = evaluateHostedRecoveryEvidence(recovery());
+    const input = recovery();
+    input.events = [...input.events].reverse();
+    assert.deepEqual(
+      evaluateHostedRecoveryEvidence(input).map((c) => c.ok),
+      forward.map((c) => c.ok)
+    );
+    assert.ok(allPassed(forward));
+  });
+
+  t("a retry attributed to an operator fails", () => {
+    const input = recovery();
+    input.events = input.events.map((e) =>
+      e.event_type === "ready" ? { ...e, actor: "user" } : e
+    );
+    assert.ok(!allPassed(evaluateHostedRecoveryEvidence(input)));
+  });
+
+  t("a reset attempt history fails, even though the item is ready", () => {
+    const input = recovery();
+    input.item = { ...input.item, attempt_count: 0 };
+    assert.ok(!allPassed(evaluateHostedRecoveryEvidence(input)));
+  });
+
+  t("a widened ceiling beyond one more window fails", () => {
+    const input = recovery();
+    input.item = { ...input.item, max_attempts: 9 };
+    assert.ok(!allPassed(evaluateHostedRecoveryEvidence(input)));
+  });
+
+  t("a duplicate Work Item of the same type fails", () => {
+    const input = recovery();
+    input.caseWork = [...input.caseWork, { ...input.caseWork[0], id: "w-2" }];
+    assert.ok(!allPassed(evaluateHostedRecoveryEvidence(input)));
+  });
+
+  t("a recovery the reconsideration does not record fails", () => {
+    const input = recovery();
+    input.recoveryApplied = [];
+    assert.ok(!allPassed(evaluateHostedRecoveryEvidence(input)));
+  });
+
+  t("a recorded recovery with no reason fails", () => {
+    const input = recovery();
+    input.recoveryApplied = [{ work_item_id: "w-1", applied: "retried", reason: "" }];
+    assert.ok(!allPassed(evaluateHostedRecoveryEvidence(input)));
+  });
+
+  t("a null model is reported as a deterministic decision, not hidden", () => {
+    const checks = evaluateHostedRecoveryEvidence(recovery());
+    assert.ok(checks.at(-1)?.detail?.includes("deterministic"));
   });
 
   console.log(`\nsupervisor-evidence selftest: ${passed} checks passed`);

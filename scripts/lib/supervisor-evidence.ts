@@ -94,6 +94,43 @@ export interface HostedWorkRow {
   work_type: string;
   origin: string;
   status: string;
+  /** R1 SL-14. Absent on rows read back by SL-4's own run. */
+  blocked_reason?: string | null;
+  attempt_count?: number;
+  max_attempts?: number;
+}
+
+/**
+ * The Work Plane events for the one Work Item SL-14 recovered (SA-14.11).
+ *
+ * Supplied as rows rather than as a verdict, so the evaluator decides whether
+ * the transition happened, who was attributed, and whether the attempt history
+ * survived — none of which the verifier gets to assert for itself.
+ */
+export interface HostedRecoveryInputs {
+  /** The Work Item as the Work Plane left it after the recovery. */
+  item: HostedWorkRow;
+  /**
+   * Its whole event history, in any order.
+   *
+   * What the state was BEFORE the retry is derived here rather than remembered
+   * by the verifier, and derived from facts that do not depend on the order the
+   * rows come back in: the Work Plane writes one `attempt_failed` per failed
+   * attempt, and writes `blocked` with `max_attempts_exhausted` only when the
+   * attempts are actually spent. An order-sensitive reconstruction read the
+   * history backwards on the first fixture that gave every row one timestamp.
+   */
+  events: ReadonlyArray<{
+    event_type: string;
+    actor: string;
+    payload: Record<string, unknown>;
+  }>;
+  /** Every Work Item of that Case, to prove no copy was created. */
+  caseWork: readonly HostedWorkRow[];
+  /** `recovery_applied` from the reconsideration that decided it. */
+  recoveryApplied: ReadonlyArray<Record<string, unknown>>;
+  /** The model that judged it, or null when a deterministic decision stood in. */
+  modelId: string | null;
 }
 
 /** The Case row, read back to prove the shadow constraint held. */
@@ -531,6 +568,85 @@ export function evaluateHostedSupervisorEvidence(
   );
 
   return checks;
+}
+
+/**
+ * SA-14.11 — did the recovery actually happen, and through the Work Plane?
+ *
+ * Separate from the SL-4 evaluator above because it answers a different Slice's
+ * question about one Work Item, and because a run that never seeded blocked
+ * Work must say "not run" rather than silently pass a check it never made.
+ */
+export function evaluateHostedRecoveryEvidence(
+  input: HostedRecoveryInputs | null
+): HostedCheck[] {
+  if (!input) {
+    return [
+      check("SA-14.11", "a technically blocked Work Item was recovered", false, "not run"),
+    ];
+  }
+  const { item, events, caseWork, recoveryApplied, modelId } = input;
+  const readied = events.filter(
+    (e) =>
+      e.event_type === "ready" &&
+      (e.payload as { source?: unknown }).source === "case_supervisor_retry"
+  );
+  const attemptsBefore = events.filter((e) => e.event_type === "attempt_failed").length;
+  const blockedTechnically = events.some(
+    (e) =>
+      e.event_type === "blocked" &&
+      (e.payload as { blocked_reason?: unknown }).blocked_reason ===
+        "max_attempts_exhausted"
+  );
+
+  return [
+    check(
+      "SA-14.11",
+      "the Work the Supervisor recovered was blocked by the Work Plane's own attempts",
+      blockedTechnically && attemptsBefore > 0,
+      `${attemptsBefore} recorded attempt failure(s);` +
+        ` blocked as max_attempts_exhausted: ${blockedTechnically}`
+    ),
+    check(
+      "SA-14.11",
+      "it was re-readied through blocked -> ready, attributed to the Supervisor",
+      item.status === "ready" &&
+        (item.blocked_reason ?? null) === null &&
+        readied.length === 1 &&
+        readied[0].actor === "agent",
+      `status=${item.status}, ready events by the Supervisor=${readied.length}` +
+        `${readied[0] ? ` (actor ${readied[0].actor})` : ""}`
+    ),
+    check(
+      "SA-14.11",
+      "its attempt history survived, and it gained exactly one more window",
+      item.attempt_count === attemptsBefore && item.max_attempts === attemptsBefore + 1,
+      `attempts ${item.attempt_count}/${item.max_attempts}` +
+        ` against ${attemptsBefore} failure(s) on the record`
+    ),
+    check(
+      "SA-14.11",
+      "no duplicate Work Item was created for it",
+      caseWork.filter((w) => w.work_type === item.work_type).length === 1,
+      `${caseWork.filter((w) => w.work_type === item.work_type).length} item(s) of that type`
+    ),
+    check(
+      "SA-14.11",
+      "the decision is reconstructable from the reconsideration alone",
+      recoveryApplied.some(
+        (r) => r.work_item_id === item.id && r.applied === "retried" && Boolean(r.reason)
+      ),
+      JSON.stringify(recoveryApplied)
+    ),
+    check(
+      "SA-14.11",
+      "the recovering decision says which model made it, or that none did",
+      modelId === null || typeof modelId === "string",
+      modelId === null
+        ? "null — a deterministic decision stood in, as the obligation permits"
+        : modelId
+    ),
+  ];
 }
 
 export function allPassed(checks: readonly HostedCheck[]): boolean {

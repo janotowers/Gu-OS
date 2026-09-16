@@ -45,8 +45,10 @@ import {
   insertOperationalCaseEvent,
   isRelationshipOpsEnabled,
   listCurrentSubjectFactsByKind,
+  listWorkItemEvents,
   listWorkItemsForCase,
   markCaseProcessing,
+  retryBlockedItem,
   updateOperationalCase,
   type DbClient,
 } from "@agents/db";
@@ -56,9 +58,11 @@ import type {
   SupervisorPosture,
   SupervisorReconsiderationRecord,
   SupervisorReconsiderationSettlement,
+  SupervisorRecoveryOutcome,
   SupervisorUncertaintyKind,
   SupervisorWakeReason,
   SupervisorYieldPosture,
+  WorkItem,
 } from "@agents/types";
 import {
   NO_ACTION_POSTURES,
@@ -79,7 +83,11 @@ import {
   type DeliveryEligibility,
 } from "./delivery";
 import { summarizeHumanAnswers } from "./human-answers";
-import type { NextWorkJudge, NextWorkProposal } from "./next-work-judge";
+import {
+  resolveRecoveryAlias,
+  type NextWorkJudge,
+  type NextWorkProposal,
+} from "./next-work-judge";
 
 /** Postgres unique-violation: this wake was already reconsidered. */
 const UNIQUE_VIOLATION = "23505";
@@ -101,6 +109,37 @@ const DEFAULT_RECONSIDER_HOURS = 24;
 /** Bounds on a model-proposed interval. Engineering values, same reasoning. */
 const MIN_RECONSIDER_HOURS = 1;
 const MAX_RECONSIDER_HOURS = 24 * 30;
+
+// ────────────────────────────────────────────────────────────────────────────
+// R1 SL-14 — recovery of technically blocked Work.
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The one blocked reason this Slice treats as a technical failure.
+ *
+ * The Work Plane writes it when an item exhausts its own bounded attempts. Any
+ * other block — waiting on a person, a dependency, anything a later Slice adds
+ * — is a different situation with a different owner, and SL-14 does not
+ * re-ready it (Slice Plan §9, "What counts as a technical failure").
+ */
+const TECHNICAL_BLOCK_REASON = "max_attempts_exhausted";
+
+/** Stamped on the Work Plane `ready` event when the Supervisor grants a window. */
+const SUPERVISOR_RETRY_SOURCE = "case_supervisor_retry";
+
+/**
+ * How many windows the Supervisor may grant ONE blocked item, ever.
+ *
+ * An **ordinary engineering value** under Methodology §14.1, recorded as such
+ * in the Slice Plan: S2 §8.17 sets the principle — change strategy rather than
+ * loop — and leaves the technical limit to the implementation. What the number
+ * guarantees is that a repeated technical failure cannot be retried without
+ * limit; the Work Plane's own `max_attempts` is untouched by it.
+ */
+const SUPERVISOR_RETRY_LIMIT = 1;
+
+/** How much of a failure message reaches the model. Data, and bounded. */
+const FAILURE_EXCERPT_CHARS = 200;
 
 export type SupervisorInertReason =
   | "relationship_ops_disabled"
@@ -475,6 +514,7 @@ export async function runSupervisorWake(
     "commitment"
   );
   const work = await listWorkItemsForCase(db, userId, opCase.id);
+  const compiledWork = await compileWork(db, userId, work);
   const history = await listPostureHistory(db, opCase.id);
   const { objective, category } = readObjective(currentFacts);
 
@@ -510,9 +550,12 @@ export async function runSupervisorWake(
         // work TYPES are what let the judge see that something it is about to
         // propose is already in flight — asking it to avoid duplicating work it
         // could not see was asking for a judgment it had no basis to make.
-        workSummary: work.map(
-          (item) => `${item.work_type} — ${item.status} (${item.origin})`
-        ),
+        //
+        // …and, since SL-14, WHY and how often blocked Work failed. Before it,
+        // the judge was asked what a blocked item needed while being shown only
+        // that it was blocked — a judgment it had no basis to make either
+        // (SA-14.1; SL-4's `work-failed-technically` finding).
+        workSummary: compiledWork.lines,
         // …and what a person ANSWERED, which the line above cannot carry. S2
         // §8.5 replans "after a Tool/human response" and HP-08 resumes work
         // "when the answer arrives"; before the Cycle 3 repair the answer the
@@ -540,6 +583,17 @@ export async function runSupervisorWake(
     judgeModelId: request.judge.modelId,
   });
 
+  // What the recovery decisions may actually do. Resolved here, while nothing
+  // has been written yet, so the claim below can carry the disposition of every
+  // decision the guards settle without a write — which is all of them except a
+  // retry the Work Plane still has to perform.
+  const recoveryPlan = planRecovery({
+    decisions: settled.recovery,
+    recoverable: compiledWork.recoverable,
+    availableCapabilities: request.availableCapabilities ?? [],
+    capabilityGap: proposal?.capability_gap ?? null,
+  });
+
   // ── 7. Claim the wake, BEFORE anything durable exists (SA-4.6).
   const record: SupervisorReconsiderationRecord = {
     kind: SUPERVISOR_RECONSIDERED_EVENT_KIND,
@@ -553,6 +607,7 @@ export async function runSupervisorWake(
     uncertainty: settled.uncertainty,
     proposed_work_ids: [],
     commitment_subject_ids: [],
+    recovery_applied: recoveryPlan,
     next_action_at: new Date(
       now.getTime() + clampHours(settled.reconsiderInHours) * 3_600_000
     ).toISOString(),
@@ -630,11 +685,46 @@ export async function runSupervisorWake(
     workIds = [...created.created, ...created.existing].map((item) => item.id);
   }
 
+  // The one recovery write, and it is the Work Plane's own transition: the same
+  // blocked→ready the operator has always had, attributed to the Supervisor
+  // (SA-14.3). Nothing here creates Work, widens authority, or reaches a
+  // capability — a retry is one more window on Work this Case already owns.
+  const recoveryApplied: SupervisorRecoveryOutcome[] = [];
+  for (const planned of recoveryPlan) {
+    if (planned.applied !== "retried") {
+      recoveryApplied.push(planned);
+      continue;
+    }
+    // The plan already resolved which Work this is; only a planned retry gets
+    // here, and only with an item the guards cleared.
+    const readied = planned.work_item_id
+      ? await retryBlockedItem(db, {
+          userId,
+          itemId: planned.work_item_id,
+          actor: "agent",
+          source: SUPERVISOR_RETRY_SOURCE,
+        })
+      : null;
+    recoveryApplied.push(
+      readied
+        ? planned
+        : {
+            ...planned,
+            applied: "refused",
+            // Under the per-Case lease nothing else should be moving this item,
+            // so this is an anomaly rather than ordinary contention — recorded
+            // as one instead of being retried into.
+            refusal: "the Work Plane did not grant the transition",
+          }
+    );
+  }
+
   // ── 9. Land responsibility, then yield (S2 §8.21).
   const finalRecord: SupervisorReconsiderationRecord = {
     ...record,
     proposed_work_ids: workIds,
     commitment_subject_ids: recordedCommitments.map((c) => c.subjectId),
+    recovery_applied: recoveryApplied,
     yield_posture: deriveYieldPosture({
       posture: settled.posture,
       createdDurableWork: workIds.length > 0,
@@ -661,6 +751,7 @@ export async function runSupervisorWake(
     yield_posture: finalRecord.yield_posture,
     proposed_work_ids: workIds,
     commitment_subject_ids: finalRecord.commitment_subject_ids,
+    recovery_applied: recoveryApplied,
   };
   await insertOperationalCaseEvent(db, {
     caseId: opCase.id,
@@ -679,6 +770,163 @@ export async function runSupervisorWake(
     eligibility,
     commitments: recordedCommitments,
   };
+}
+
+/** One blocked Work Item the Supervisor may act on, and its alias. */
+interface RecoverableWork {
+  alias: string;
+  item: WorkItem;
+  /** How many windows the Supervisor already granted this item. */
+  supervisorRetries: number;
+}
+
+/** The last thing a failing system said, bounded, as data. */
+function failureExcerpt(payload: unknown): string | null {
+  const error = (payload as { error?: unknown } | null)?.error;
+  if (error === null || error === undefined) return null;
+  const text =
+    typeof error === "string"
+      ? error
+      : typeof (error as { message?: unknown }).message === "string"
+        ? ((error as { message: string }).message)
+        : JSON.stringify(error);
+  const collapsed = text.replace(/\s+/g, " ").trim();
+  if (!collapsed) return null;
+  return collapsed.length > FAILURE_EXCERPT_CHARS
+    ? `${collapsed.slice(0, FAILURE_EXCERPT_CHARS)}…`
+    : collapsed;
+}
+
+/**
+ * Compiles the Work list, and decides what may be offered for recovery (SA-14.1).
+ *
+ * Two things at once on purpose: the alias a line carries IS the handle the
+ * judge names back, so what is shown and what may be acted on cannot drift
+ * apart. Work that is not the Case's own technically blocked `agent_proposed`
+ * Work is still shown — with why and how often it failed, which the situation
+ * needs — but carries no alias, so there is no shape in which the model can ask
+ * for it to be re-readied (SA-14.5, SA-14.9).
+ *
+ * A Case with no such Work produces exactly the lines SL-4 produced.
+ */
+async function compileWork(
+  db: DbClient,
+  userId: string,
+  work: readonly WorkItem[]
+): Promise<{ lines: string[]; recoverable: Map<string, RecoverableWork> }> {
+  const lines: string[] = [];
+  const recoverable = new Map<string, RecoverableWork>();
+
+  for (const item of work) {
+    const base = `${item.work_type} — ${item.status} (${item.origin})`;
+    if (item.status !== "blocked") {
+      lines.push(base);
+      continue;
+    }
+
+    const events = await listWorkItemEvents(db, userId, item.id);
+    const lastFailure = events.find((e) => e.event_type === "attempt_failed");
+    const technical = item.blocked_reason === TECHNICAL_BLOCK_REASON;
+    const cause = technical ? "technical failure" : (item.blocked_reason ?? "blocked");
+    const excerpt = failureExcerpt(lastFailure?.payload_jsonb);
+    const detail = [
+      `${cause}, ${item.attempt_count} of ${item.max_attempts} attempts used`,
+      excerpt ? `; last error: ${excerpt}` : "",
+    ].join("");
+
+    if (!technical || item.origin !== "agent_proposed") {
+      lines.push(`${base}: ${detail}`);
+      continue;
+    }
+
+    const alias = `w${recoverable.size + 1}`;
+    recoverable.set(alias, {
+      alias,
+      item,
+      supervisorRetries: events.filter(
+        (e) =>
+          e.event_type === "ready" &&
+          (e.payload_jsonb as { source?: unknown } | null)?.source ===
+            SUPERVISOR_RETRY_SOURCE
+      ).length,
+    });
+    lines.push(`[${alias}] ${base}: ${detail}`);
+  }
+
+  return { lines, recoverable };
+}
+
+/**
+ * Decides what each recovery decision may actually do — before anything is
+ * written, so the claimed reconsideration can carry the disposition (SA-4.6).
+ *
+ * Pure. `leave` and every refusal are final here; a `retry` that survives the
+ * guards is what the executor then performs through the Work Plane.
+ */
+function planRecovery(params: {
+  decisions: NonNullable<NextWorkProposal["recovery"]>;
+  recoverable: ReadonlyMap<string, RecoverableWork>;
+  /** What the caller declares this Case can actually do right now. */
+  availableCapabilities: readonly string[];
+  capabilityGap: string | null;
+}): SupervisorRecoveryOutcome[] {
+  const available = new Set(params.availableCapabilities);
+  const offered = new Map(
+    [...params.recoverable].map(([alias, entry]) => [alias, entry.item.work_type])
+  );
+  return params.decisions.map((decision) => {
+    const alias = resolveRecoveryAlias(decision.work, offered);
+    const entry = alias === null ? undefined : params.recoverable.get(alias);
+    const base = {
+      work: decision.work,
+      work_item_id: entry?.item.id ?? null,
+      work_type: entry?.item.work_type ?? null,
+      action: decision.action,
+      reason: decision.reason,
+    };
+    if (!entry) {
+      return {
+        ...base,
+        applied: "refused" as const,
+        refusal: "no Work offered for recovery carries that alias",
+      };
+    }
+    if (decision.action === "leave") return { ...base, applied: "left" as const };
+    // SA-14.5, in its positive form: a retry may only re-ready Work whose
+    // capability the caller still declares available for internal work. It is
+    // stated this way round deliberately. A list of capabilities this Slice
+    // must not touch would be a list that has to be maintained, and would put
+    // the name of an effect in a module whose premise is that it contains no
+    // effect path (SA-4.8). Declaring nothing therefore recovers nothing, which
+    // is the right way to fail: an undeclared capability is not a known one.
+    // The Work stays visible either way — `leave`, a person, or a replan are
+    // all still reachable, and are usually the right answer here.
+    if (!available.has(entry.item.required_capability ?? "")) {
+      return {
+        ...base,
+        applied: "refused" as const,
+        refusal: "the capability this Work needs is not available to the Case now",
+      };
+    }
+    // The judge named a capability the situation needs and Gu does not have.
+    // Re-readying Work into that same gap is the blind retry SA-14.5 forbids,
+    // and the gap is already the finding the reconsideration carries.
+    if (params.capabilityGap) {
+      return {
+        ...base,
+        applied: "refused" as const,
+        refusal: `a capability gap was reported in the same judgment: ${params.capabilityGap}`,
+      };
+    }
+    if (entry.supervisorRetries >= SUPERVISOR_RETRY_LIMIT) {
+      return {
+        ...base,
+        applied: "refused" as const,
+        refusal: `the Supervisor already granted ${entry.supervisorRetries} retry window(s) for this Work`,
+      };
+    }
+    return { ...base, applied: "retried" as const };
+  });
 }
 
 /**
@@ -701,6 +949,14 @@ function settleProposal(params: {
   uncertainty: SupervisorUncertaintyKind | null;
   proposedWork: NextWorkProposal["proposed_work"];
   commitments: NextWorkProposal["commitments"];
+  /**
+   * What the judge decided about technically blocked Work, carried through
+   * every branch (R1 SL-14). A gap or thin evidence changes what NEW work is
+   * justified; it does not make an already-blocked responsibility disappear,
+   * and dropping the disposition here would strand it for a reason that has
+   * nothing to do with it. What may actually happen is `planRecovery`'s call.
+   */
+  recovery: NonNullable<NextWorkProposal["recovery"]>;
   reconsiderInHours: number | null;
   modelId: string | null;
 } {
@@ -715,10 +971,13 @@ function settleProposal(params: {
       uncertainty: "no_judgment_available",
       proposedWork: [],
       commitments: [],
+      recovery: [],
       reconsiderInHours: null,
       modelId: null,
     };
   }
+
+  const recovery = proposal.recovery ?? [];
 
   // From the judge, never from the environment: see NextWorkJudge.modelId.
   const modelId = params.judgeModelId;
@@ -731,6 +990,7 @@ function settleProposal(params: {
       uncertainty: "capability_gap",
       proposedWork: [],
       commitments: proposal.commitments,
+      recovery,
       reconsiderInHours: proposal.reconsider_in_hours,
       modelId,
     };
@@ -747,6 +1007,7 @@ function settleProposal(params: {
       // the situational judgment was inconclusive. Dropping it here would lose
       // a promise for a reason that has nothing to do with the promise.
       commitments: proposal.commitments,
+      recovery,
       reconsiderInHours: proposal.reconsider_in_hours,
       modelId,
     };
@@ -759,6 +1020,7 @@ function settleProposal(params: {
     uncertainty: null,
     proposedWork: proposal.proposed_work,
     commitments: proposal.commitments,
+    recovery,
     reconsiderInHours: proposal.reconsider_in_hours,
     modelId,
   };

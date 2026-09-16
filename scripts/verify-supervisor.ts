@@ -70,6 +70,7 @@
 //     --organization <uuid> --owner-user <uuid> --run <label> \
 //     --acknowledge-durable-write
 //   npx tsx scripts/verify-supervisor.ts --phase wake   … (once per day)
+//   npx tsx scripts/verify-supervisor.ts --phase recover … (once, R1 SL-14)
 //   npx tsx scripts/verify-supervisor.ts --phase verify … [--json evidence.json]
 
 import { createHash } from "node:crypto";
@@ -77,8 +78,15 @@ import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import {
+  claimNextReady,
+  completeAttempt,
   createOperationalCase,
+  createWorkItemsFromTemplates,
   getActiveMembership,
+  getWorkItemById,
+  listWorkItemEvents,
+  listWorkItemsForCase,
+  propagateReadiness,
   getGlobalOperationalCaseTypeBySlug,
   getOperationalCase,
   getOrganizationById,
@@ -98,9 +106,11 @@ import {
 } from "../apps/web/src/lib/relationship-supervisor";
 import {
   allPassed,
+  evaluateHostedRecoveryEvidence,
   evaluateHostedSupervisorEvidence,
   settlementOf,
   type HostedCheck,
+  type HostedRecoveryInputs,
   type HostedSupervisorInputs,
 } from "./lib/supervisor-evidence";
 import {
@@ -278,12 +288,268 @@ export async function phaseSeed(
     });
 
     console.log(`  seeded  ${scenario.id} -> ${redact(opCase.id)}`);
+
+    // R1 SL-14: one of the two Cases also carries Work the Work Plane blocked
+    // for a technical reason, so the hosted run has something real to recover.
+    if (scenario.id === BLOCKED_SCENARIO_ID) {
+      await seedBlockedWork(ctx, opCase.id, definitionVersion);
+    }
   }
   console.log(
     `\nSeeded ${SCENARIOS.length} controlled Opportunities for run "${ctx.runLabel}".` +
       `\nRun --phase wake once per day for at least ${REQUIRED_DISTINCT_DAYS} distinct UTC days,` +
-      `\nthen --phase verify.`
+      `\nthen --phase recover (once), then --phase verify.`
   );
+}
+
+/**
+ * SA-14.11 step 1: recover the blocked Work by retry, and show it was the Work
+ * Plane's own transition that did it.
+ *
+ * Its own phase rather than part of `wake`, because the two obligations are
+ * different: `wake` is the PRODUCTION judge deciding whatever it decides about
+ * blocked Work (step 2), and this is the mechanism demonstrated deterministically
+ * (step 1). Folding them together would leave neither provable on its own.
+ */
+export async function phaseRecover(
+  ctx: RunContext,
+  judgeOverride?: NextWorkJudge
+): Promise<void> {
+  const cases = await findRunCases(ctx);
+  const target = cases.find((c) => c.scenario === BLOCKED_SCENARIO_ID);
+  if (!target) {
+    throw new Error(`run "${ctx.runLabel}" has no ${BLOCKED_SCENARIO_ID} Case — seed first.`);
+  }
+
+  const before = (await listWorkItemsForCase(ctx.db, ctx.ownerUserId, target.id)).find(
+    (w) => w.work_type === BLOCKED_WORK_TYPE
+  );
+  if (!before) throw new Error("the blocked Work Item is missing from the seeded Case.");
+  console.log(
+    `  before  ${redact(before.id)} status=${before.status} reason=${before.blocked_reason}` +
+      ` attempts=${before.attempt_count}/${before.max_attempts}`
+  );
+
+  const scenario = SCENARIOS.find((s) => s.id === BLOCKED_SCENARIO_ID);
+  const result = await runSupervisorWake({
+    db: ctx.db,
+    organizationId: ctx.organizationId,
+    userId: ctx.ownerUserId,
+    caseId: target.id,
+    wake: { reason: "prior_work_settled", key: `${ctx.runLabel}:sl14-recover` },
+    judge: judgeOverride ?? retryingStubJudge(),
+    recentMessages: scenario?.recentMessages ?? [],
+    availableCapabilities: scenario?.availableCapabilities ?? [],
+  });
+
+  if (result.status !== "reconsidered") {
+    console.log(`  ${result.status.toUpperCase()} -> ${"reason" in result ? result.reason : ""}`);
+    return;
+  }
+  const after = await getWorkItemById(ctx.db, ctx.ownerUserId, before.id);
+  console.log(
+    `  after   ${redact(before.id)} status=${after?.status} reason=${after?.blocked_reason}` +
+      ` attempts=${after?.attempt_count}/${after?.max_attempts}`
+  );
+  console.log(`  recovery: ${JSON.stringify(result.record.recovery_applied ?? [])}`);
+  console.log(`  model_id: ${result.record.model_id ?? "null (deterministic decision)"}`);
+}
+
+// ============================================================================
+// R1 SL-14 — technically blocked Work, and its recovery.
+// ============================================================================
+
+/** The scenario whose Case carries the blocked Work. Its capability is declared. */
+const BLOCKED_SCENARIO_ID = "commitment-bearing-opportunity";
+/** The work type driven to `blocked`; on `availableCapabilities` for that Case. */
+const BLOCKED_WORK_TYPE = "prepare_comparison";
+
+/**
+ * Drives one `agent_proposed` Work Item to `blocked` through the Work Plane's
+ * OWN failure path — claim, fail, claim, fail — until its attempts are spent.
+ *
+ * Nothing is written straight into a blocked state. SA-14.11 asks for Work
+ * blocked as the Work Plane blocks it, with its attempts and its errors real,
+ * because a hand-written row would prove the recovery works on a fixture rather
+ * than on the thing the running system produces.
+ */
+async function seedBlockedWork(
+  ctx: RunContext,
+  caseId: string,
+  workflowDefinitionVersion: number
+): Promise<string | null> {
+  const created = await createWorkItemsFromTemplates(ctx.db, {
+    userId: ctx.ownerUserId,
+    caseId,
+    workflowDefinitionVersion,
+    origin: "agent_proposed",
+    templates: [
+      {
+        work_type: BLOCKED_WORK_TYPE,
+        required_capability: BLOCKED_WORK_TYPE,
+        input_contract: {
+          purpose: "Preparar la comparación prometida al prospecto",
+          proposed_by: "case_supervisor",
+        },
+        idempotency_key: `${ctx.runLabel}:sl14-blocked`,
+      },
+    ],
+  });
+  const item = [...created.created, ...created.existing][0];
+  if (!item) return null;
+
+  for (let attempt = 1; attempt <= item.max_attempts + 1; attempt += 1) {
+    await propagateReadiness(ctx.db, {
+      userId: ctx.ownerUserId,
+      caseId,
+      workItemId: item.id,
+    });
+    const claimed = await claimNextReady(ctx.db, {
+      userId: ctx.ownerUserId,
+      runnerRef: `sl14_verifier:${ctx.runLabel}`,
+      executorKind: "verifier_stub",
+      leaseMs: 60_000,
+      caseId,
+      workItemId: item.id,
+    });
+    if (!claimed) break;
+    const failed = await completeAttempt(ctx.db, {
+      userId: ctx.ownerUserId,
+      attemptId: claimed.attempt.id,
+      outcome: "failed",
+      errorJsonb: {
+        message:
+          "el generador de comparaciones no respondió (simulación controlada del verificador SL-14)",
+        kind: "provider_unavailable",
+      },
+    });
+    // Loud, because a swallowed failure here would leave the item mid-flight and
+    // the recovery phase would then be demonstrating nothing on a Work Item that
+    // was never blocked (AGENTS §7: a step that did not happen is a failure, not
+    // a pending result).
+    if (!failed.ok) {
+      throw new Error(
+        `attempt ${attempt} of the controlled failure sequence did not complete: ${failed.reason}`
+      );
+    }
+  }
+
+  const final = await getWorkItemById(ctx.db, ctx.ownerUserId, item.id);
+  if (final?.status !== "blocked" || final.blocked_reason !== "max_attempts_exhausted") {
+    throw new Error(
+      `the seeded Work Item is ${final?.status ?? "missing"}` +
+        `${final?.blocked_reason ? ` (${final.blocked_reason})` : ""},` +
+        " not blocked by exhausted attempts — nothing to recover."
+    );
+  }
+  console.log(
+    `  blocked ${BLOCKED_WORK_TYPE} -> ${redact(item.id)} status=${final?.status}` +
+      ` reason=${final?.blocked_reason} attempts=${final?.attempt_count}/${final?.max_attempts}`
+  );
+  return item.id;
+}
+
+/**
+ * A judge that recovers by retry and decides nothing else.
+ *
+ * SA-14.11 step 1 demonstrates the MECHANISM — the Work Plane transition, its
+ * attribution and its bound — and says a deterministic decision may stand in,
+ * recorded as such. `modelId` is null, so the reconsideration it produces can
+ * never be mistaken for one a model made.
+ */
+export function retryingStubJudge(): NextWorkJudge {
+  return {
+    modelId: null,
+    async propose(input) {
+      const alias = /^\[(w\d+)\]/.exec(input.workSummary.find((l) => l.startsWith("[")) ?? "");
+      if (!alias) return null;
+      return {
+        posture: "work",
+        diagnosis: "El trabajo comprometido quedó bloqueado por una falla técnica.",
+        rationale:
+          "La falla fue técnica y no se ha reintentado desde entonces; el compromiso con el prospecto sigue en pie.",
+        insufficient_evidence: false,
+        capability_gap: null,
+        proposed_work: [],
+        commitments: [],
+        reconsider_in_hours: 24,
+        recovery: [
+          {
+            work: alias[1],
+            action: "retry",
+            reason:
+              "Ha pasado tiempo desde el último intento y la causa fue del proveedor, no del trabajo.",
+          },
+        ],
+      };
+    },
+  };
+}
+
+/**
+ * Reads back everything SA-14.11 is decided on, or null when this run never
+ * seeded blocked Work — in which case the evaluator reports "not run" rather
+ * than passing a check it never made.
+ *
+ * `before` is reconstructed from the Work Plane's own events rather than
+ * remembered from the recover phase: verify must be able to run on rows alone,
+ * with no memory of the run that produced them (SA-4.5's standard).
+ */
+async function readRecoveryEvidence(
+  ctx: RunContext,
+  caseRows: ReadonlyArray<{ id: string }>
+): Promise<HostedRecoveryInputs | null> {
+  for (const row of caseRows) {
+    const caseWork = await listWorkItemsForCase(ctx.db, ctx.ownerUserId, row.id);
+    const item = caseWork.find((w) => w.work_type === BLOCKED_WORK_TYPE);
+    if (!item) continue;
+
+    const events = await listWorkItemEvents(ctx.db, ctx.ownerUserId, item.id);
+
+    const { data: recRows } = await ctx.db
+      .from("operational_case_events")
+      .select("payload_jsonb")
+      .eq("case_id", row.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const withRecovery = ((recRows ?? []) as Array<{ payload_jsonb: Record<string, unknown> }>)
+      .map((r) => r.payload_jsonb)
+      .find(
+        (p) =>
+          Array.isArray(p?.recovery_applied) &&
+          (p.recovery_applied as unknown[]).length > 0
+      );
+
+    return {
+      item: {
+        id: item.id,
+        case_id: item.case_id,
+        work_type: item.work_type,
+        origin: item.origin,
+        status: item.status,
+        blocked_reason: item.blocked_reason,
+        attempt_count: item.attempt_count,
+        max_attempts: item.max_attempts,
+      },
+      events: events.map((e) => ({
+        event_type: e.event_type,
+        actor: e.actor,
+        payload: e.payload_jsonb ?? {},
+      })),
+      caseWork: caseWork.map((w) => ({
+        id: w.id,
+        case_id: w.case_id,
+        work_type: w.work_type,
+        origin: w.origin,
+        status: w.status,
+      })),
+      recoveryApplied: (withRecovery?.recovery_applied ?? []) as Array<
+        Record<string, unknown>
+      >,
+      modelId: (withRecovery?.model_id ?? null) as string | null,
+    };
+  }
+  return null;
 }
 
 export async function phaseWake(
@@ -467,7 +733,10 @@ export async function phaseVerify(
     },
   };
 
-  const checks = evaluateHostedSupervisorEvidence(inputs);
+  const checks = [
+    ...evaluateHostedSupervisorEvidence(inputs),
+    ...evaluateHostedRecoveryEvidence(await readRecoveryEvidence(ctx, caseRows)),
+  ];
   console.log("");
   for (const c of checks) {
     console.log(
@@ -572,8 +841,8 @@ async function main(): Promise<void> {
         "conditions it claims to observe. Set the flag first, then re-run."
     );
   }
-  if (phase !== "seed" && phase !== "wake" && phase !== "verify") {
-    throw new Error("--phase <seed|wake|verify> is required.");
+  if (phase !== "seed" && phase !== "wake" && phase !== "recover" && phase !== "verify") {
+    throw new Error("--phase <seed|wake|recover|verify> is required.");
   }
   if (!organizationId) throw new Error("--organization <uuid> is required.");
   if (!ownerUserId) {
@@ -746,6 +1015,10 @@ async function main(): Promise<void> {
   }
   if (phase === "wake") {
     await phaseWake(ctx);
+    return;
+  }
+  if (phase === "recover") {
+    await phaseRecover(ctx);
     return;
   }
 
