@@ -203,7 +203,8 @@ export function isSl14Owned(scenario: Scenario): boolean {
     scenario.requires_disposition !== undefined ||
     scenario.retry_is_blind !== undefined ||
     scenario.not_recoverable !== undefined ||
-    scenario.input.retryExhaustedAliases !== undefined
+    scenario.input.retryExhaustedAliases !== undefined ||
+    scenario.input.capabilityGoneAliases !== undefined
   ) {
     return true;
   }
@@ -326,8 +327,16 @@ const SET_FILES = {
   // it breached the rate bar in 4 of 10 runs, on behavior SL-14 answers for,
   // and the repair that follows was designed from its failures. Same property —
   // entirely SL-14-owned — so the closure rule can excuse nothing here either.
-  // THIS is the independent instrument now.
   holdout5: "supervisor-holdout-5-scenarios.json",
+  // Frozen 2026-09-16 in turn. Holdout 5 was measured and read as well, and
+  // what followed was a REVERT of the change it had measured — the boolean
+  // disposition and the derived capability bound both went back — plus a repair
+  // of a different kind: the answer's shape refused at the sampler rather than
+  // asked for in prose. A set that has been read cannot judge the change that
+  // followed reading it, whichever direction the change went. Same property as
+  // its two predecessors — entirely SL-14-owned — so the closure rule can
+  // excuse nothing here either. THIS is the independent instrument now.
+  holdout6: "supervisor-holdout-6-scenarios.json",
 } as const;
 
 const setName = (/^--set=(.+)$/.exec(process.argv.find((a) => a.startsWith("--set=")) ?? "")?.[1] ??
