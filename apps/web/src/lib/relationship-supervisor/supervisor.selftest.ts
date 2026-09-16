@@ -68,6 +68,7 @@ import {
 import {
   normalizeNextWorkProposal,
   PROPOSABLE_POSTURES,
+  RECOVERY_ACTIONS,
   buildNextWorkPrompt,
   type NextWorkJudge,
   type NextWorkProposal,
@@ -1869,6 +1870,70 @@ async function main(): Promise<void> {
     ]) {
       assert.ok(covered.has(required), `the set does not cover ${required}`);
     }
+  });
+
+  await t("both SL-14 sets state the new bars, and their aliases match the prompt", () => {
+    // Added with the scorer rather than before it: what it guards is the frozen
+    // DATA — which was frozen first (ef1bc5c) — and the one way this evidence
+    // could quietly stop meaning anything is the scenario's declared aliases
+    // drifting from the aliases its own Work lines actually show. Then the
+    // scorer would be measuring a situation the judge never saw.
+    const files = ["supervisor-scenarios.json", "supervisor-holdout-scenarios.json"];
+    const idsPerFile: Array<Set<string>> = [];
+
+    for (const file of files) {
+      const suite = JSON.parse(
+        readFileSync(path.join(__dirname, "eval", file), "utf8")
+      ) as {
+        blind_retry_bar: number;
+        stranded_failure_bar: number;
+        scenarios: Array<Record<string, unknown>>;
+      };
+      assert.equal(suite.blind_retry_bar, 0, `${file}: a blind retry is never tolerated`);
+      assert.equal(
+        suite.stranded_failure_bar,
+        0,
+        `${file}: technically failed Work is never left without a disposition`
+      );
+
+      const ids = new Set<string>();
+      for (const scenario of suite.scenarios) {
+        const id = scenario.id as string;
+        ids.add(id);
+        const shown = (
+          (scenario.input as { workSummary?: string[] }).workSummary ?? []
+        )
+          .map((line) => /^\[(w\d+)\]/.exec(line)?.[1])
+          .filter((alias): alias is string => alias !== undefined);
+        assert.deepEqual(
+          (scenario.recoverable_aliases as string[]) ?? [],
+          shown,
+          `${id}: the aliases it declares are not the aliases its Work list shows`
+        );
+        if (scenario.blocked_work) {
+          assert.ok(
+            shown.includes(scenario.blocked_work as string),
+            `${id}: names a blocked alias its Work list never shows`
+          );
+          for (const action of (scenario.acceptable_recovery as string[]) ?? []) {
+            assert.ok(
+              (RECOVERY_ACTIONS as readonly string[]).includes(action),
+              `${id}: expects recovery action ${action}, which the judge cannot express`
+            );
+          }
+        }
+        if (scenario.not_recoverable) {
+          assert.equal(shown.length, 0, `${id}: claims nothing is recoverable, yet offers an alias`);
+        }
+      }
+      idsPerFile.push(ids);
+    }
+
+    // The holdout is only independent evidence if it is genuinely separate.
+    for (const id of idsPerFile[1]) {
+      assert.ok(!idsPerFile[0].has(id), `holdout scenario ${id} also exists in the main set`);
+    }
+    assert.ok(idsPerFile[1].size >= 5, "a holdout of at least five situations");
   });
 
   // ────────────────────────────────────────────────────────────────────
