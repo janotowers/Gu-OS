@@ -106,6 +106,7 @@ import {
 } from "../apps/web/src/lib/relationship-supervisor";
 import {
   allPassed,
+  digestIdentifiersIn,
   evaluateHostedRecoveryEvidence,
   evaluateHostedSupervisorEvidence,
   settlementOf,
@@ -351,7 +352,9 @@ export async function phaseRecover(
     `  after   ${redact(before.id)} status=${after?.status} reason=${after?.blocked_reason}` +
       ` attempts=${after?.attempt_count}/${after?.max_attempts}`
   );
-  console.log(`  recovery: ${JSON.stringify(result.record.recovery_applied ?? [])}`);
+  console.log(
+    `  recovery: ${digestIdentifiersIn(JSON.stringify(result.record.recovery_applied ?? []))}`
+  );
   console.log(`  model_id: ${result.record.model_id ?? "null (deterministic decision)"}`);
 }
 
@@ -694,7 +697,23 @@ export async function phaseVerify(
   if (workError) throw workError;
 
   // SA-4.5 — reconstruct with a fresh reader that has seen none of the above.
-  const replayCaseId = caseIds[0];
+  //
+  // The target must be a Case that has ACTUALLY been reconsidered. Replaying a
+  // Case with no posture history proves nothing about reconstruction and still
+  // gets scored: "names what is being waited on" reads the latest
+  // reconsideration's yield posture, so with no reconsiderations it is null and
+  // the assertion fails for a Case that was never asked to wait on anything.
+  // The SL-14 recovery run of 2026-09-16 hit exactly that — `--phase recover`
+  // reconsiders only the blocked Case, and the first seeded Case is the
+  // quiescent one — and reported a reconstruction failure that was an artifact
+  // of which Case was picked. The sibling count check passed "replay 0 vs rows
+  // 0" at the same time, which is the tell.
+  //
+  // Falls back to the first Case rather than skipping, so a run with no
+  // reconsideration at all still reports what it found instead of quietly
+  // reporting nothing.
+  const reconsideredCaseIds = new Set(reconsiderations.map((r) => r.case_id));
+  const replayCaseId = caseIds.find((id) => reconsideredCaseIds.has(id)) ?? caseIds[0];
   const situation = await reconstructSituation({
     db: ctx.db,
     userId: ctx.ownerUserId,
