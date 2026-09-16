@@ -70,6 +70,8 @@ import {
   PROPOSABLE_POSTURES,
   RECOVERY_ACTIONS,
   buildNextWorkPrompt,
+  offeredRecovery,
+  resolveRecoveryAlias,
   type NextWorkJudge,
   type NextWorkProposal,
   type SupervisorJudgeInput,
@@ -2116,6 +2118,59 @@ async function main(): Promise<void> {
     assert.match(applied, /leave/);
     assert.match(applied, /el asesor ya lo resolvió/, "the reason is reconstructable from durable state");
     assert.ok(record?.next_action_at, "responsibility keeps a wake path");
+  });
+
+  await t("SA-14.5 naming the work type resolves only when it is unambiguous", () => {
+    // Written after the resolver, on the evidence that the judge sometimes
+    // names the type printed on the same Work line. Tolerance is confined to
+    // WHICH Work was meant; every authority guard still runs on the result,
+    // and nothing ambiguous resolves at all.
+    const offered = new Map([
+      ["w1", "inventory_search"],
+      ["w2", "comparison_document"],
+    ]);
+    assert.equal(resolveRecoveryAlias("w1", offered), "w1", "an alias is itself");
+    assert.equal(
+      resolveRecoveryAlias("comparison_document", offered),
+      "w2",
+      "one alias carries that type"
+    );
+    assert.equal(
+      resolveRecoveryAlias(
+        "inventory_search",
+        new Map([
+          ["w1", "inventory_search"],
+          ["w2", "inventory_search"],
+        ])
+      ),
+      null,
+      "two aliases carry it — nothing is resolved"
+    );
+    assert.equal(resolveRecoveryAlias("send_prospect_message", offered), null, "unknown");
+    assert.equal(resolveRecoveryAlias("w9", offered), null, "an alias never offered");
+    assert.deepEqual(
+      [
+        ...offeredRecovery([
+          "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+          "comparison_document — done (agent_proposed)",
+        ]),
+      ],
+      [["w1", "inventory_search"]],
+      "only aliased lines are offered"
+    );
+  });
+
+  await t("SA-14.3 a retry that names the work type still re-readies that one item", async () => {
+    const fake = harness();
+    fake.tables.work_items.push(blockedWorkRow());
+    const judge = stubJudge(
+      recovering([
+        { work: "inventory_search", action: "retry", reason: "el proveedor ya responde" },
+      ])
+    );
+    await wake(fake.client, judge, { availableCapabilities: CAN });
+    assert.equal(fake.tables.work_items[0].status, "ready");
+    assert.equal(fake.tables.work_items[0].attempt_count, 3, "the attempt history stays");
   });
 
   await t("SA-14.9 Work that is not technically blocked is never offered for recovery", async () => {

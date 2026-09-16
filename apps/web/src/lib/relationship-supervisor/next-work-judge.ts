@@ -274,6 +274,41 @@ export function normalizeNextWorkProposal(value: unknown): NextWorkProposal | nu
   return proposal;
 }
 
+/**
+ * Maps what the judge CALLED the blocked Work onto the alias the list offered.
+ *
+ * Strict writer, tolerant reader, and only where tolerance costs nothing: the
+ * alias is accepted as given, and a work type is accepted only when exactly one
+ * offered alias carries it, so nothing ambiguous ever resolves. Every authority
+ * guard still runs on the resolved item — this decides which Work was MEANT,
+ * never whether it may be touched.
+ *
+ * It exists because the Work line shows both the alias and the type, and the
+ * judge sometimes names the type. Reading that as "no decision" would record
+ * responsibility as stranded when the judge did in fact dispose of it, which
+ * misreports the one thing `stranded_failure_bar` measures.
+ */
+export function resolveRecoveryAlias(
+  named: string,
+  offered: ReadonlyMap<string, string>
+): string | null {
+  if (offered.has(named)) return named;
+  const byType = [...offered].filter(([, workType]) => workType === named);
+  return byType.length === 1 ? byType[0][0] : null;
+}
+
+/** The aliases and work types a compiled Work list offers for recovery. */
+export function offeredRecovery(
+  workSummary: readonly string[] | undefined
+): Map<string, string> {
+  const offered = new Map<string, string>();
+  for (const line of workSummary ?? []) {
+    const match = /^\[(w\d+)\]\s+(\S+)\s+—/.exec(line);
+    if (match) offered.set(match[1], match[2]);
+  }
+  return offered;
+}
+
 function section(label: string, lines: readonly string[]): string {
   if (lines.length === 0) return `${label}: (none)`;
   return `${label}:\n${lines.map((l) => `  - ${l}`).join("\n")}`;

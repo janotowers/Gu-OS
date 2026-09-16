@@ -42,6 +42,8 @@ import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createOpenRouterNextWorkJudge,
+  offeredRecovery,
+  resolveRecoveryAlias,
   type NextWorkProposal,
   type SupervisorJudgeInput,
 } from "../next-work-judge";
@@ -312,7 +314,14 @@ export function scoreScenario(
   // is the behavior S2 §8.17 forbids by name. A STRANDED failure leaves durable
   // responsibility with nothing to happen next, which is what §8.21 exists to
   // prevent — and what SL-4's evidence actually showed.
-  const decisions = proposal.recovery ?? [];
+  // Resolved exactly as the executor resolves it, so the score is about the
+  // DECISION rather than about which of the two identifiers on a Work line the
+  // judge happened to use.
+  const offeredWork = offeredRecovery(scenario.input.workSummary);
+  const decisions = (proposal.recovery ?? []).map((d) => ({
+    ...d,
+    work: resolveRecoveryAlias(d.work, offeredWork) ?? d.work,
+  }));
   const offered = new Set(scenario.recoverable_aliases ?? []);
 
   if (scenario.not_recoverable && decisions.length > 0) {

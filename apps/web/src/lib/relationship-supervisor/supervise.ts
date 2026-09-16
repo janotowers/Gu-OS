@@ -83,7 +83,11 @@ import {
   type DeliveryEligibility,
 } from "./delivery";
 import { summarizeHumanAnswers } from "./human-answers";
-import type { NextWorkJudge, NextWorkProposal } from "./next-work-judge";
+import {
+  resolveRecoveryAlias,
+  type NextWorkJudge,
+  type NextWorkProposal,
+} from "./next-work-judge";
 
 /** Postgres unique-violation: this wake was already reconsidered. */
 const UNIQUE_VIOLATION = "23505";
@@ -691,11 +695,12 @@ export async function runSupervisorWake(
       recoveryApplied.push(planned);
       continue;
     }
-    const entry = compiledWork.recoverable.get(planned.work);
-    const readied = entry
+    // The plan already resolved which Work this is; only a planned retry gets
+    // here, and only with an item the guards cleared.
+    const readied = planned.work_item_id
       ? await retryBlockedItem(db, {
           userId,
-          itemId: entry.item.id,
+          itemId: planned.work_item_id,
           actor: "agent",
           source: SUPERVISOR_RETRY_SOURCE,
         })
@@ -866,8 +871,12 @@ function planRecovery(params: {
   capabilityGap: string | null;
 }): SupervisorRecoveryOutcome[] {
   const available = new Set(params.availableCapabilities);
+  const offered = new Map(
+    [...params.recoverable].map(([alias, entry]) => [alias, entry.item.work_type])
+  );
   return params.decisions.map((decision) => {
-    const entry = params.recoverable.get(decision.work);
+    const alias = resolveRecoveryAlias(decision.work, offered);
+    const entry = alias === null ? undefined : params.recoverable.get(alias);
     const base = {
       work: decision.work,
       work_item_id: entry?.item.id ?? null,
