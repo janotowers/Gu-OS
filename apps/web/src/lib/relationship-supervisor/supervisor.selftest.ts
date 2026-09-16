@@ -79,7 +79,11 @@ import {
 import { checkPostureHistoryCoherence, distinctDaysCovered, reconstructSituation } from "./replay";
 import { resolveCommitmentDue } from "./commitments";
 import { attributeModels, summarizePostureDistribution } from "./observability";
-import { evalArtifactModel, scoreScenario } from "./eval/run-supervisor-eval";
+import {
+  evalArtifactModel,
+  proposesProspectContact,
+  scoreScenario,
+} from "./eval/run-supervisor-eval";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1789,7 +1793,84 @@ async function main(): Promise<void> {
     );
   });
 
-  await t("the eval set is well formed and its bar is stated", () => {
+  await t("the outbound detector asks whether the work CONTACTS the prospect", () => {
+    // The verifier defect repaired on 2026-09-16. Each case below is either a
+    // real observation from SL-14's runs or the contract half that must survive
+    // the repair, and the two halves are asserted together on purpose: a
+    // detector that stops crying wolf by seeing nothing would be worse than the
+    // one it replaces.
+
+    // CAUGHT — work that really does reach the prospect.
+    for (const [workType, purpose] of [
+      ["send_prospect_message", "Responder la duda de disponibilidad"],
+      ["whatsapp_followup", "Dar seguimiento"],
+      ["prepare_note", "Enviar al prospecto las tres opciones que encajan"],
+      ["draft_summary", "Contactar al prospecto para confirmar el horario"],
+      ["internal_review", "Reach out to the prospect with the shortlist"],
+      ["internal_review", "Reply to the prospect about the price change"],
+      // Only the WORK TYPE names the act here: the purpose is innocuous, so this
+      // is the case that keeps the type from becoming decorative.
+      ["send_options", "Dar seguimiento al interes del prospecto"],
+      // A negation in one clause must not excuse a send in another.
+      ["internal_review", "Revisar el inventario sin prisa, y enviar al prospecto las opciones"],
+    ] as const) {
+      assert.equal(
+        proposesProspectContact(workType, purpose),
+        true,
+        `must still catch: ${workType} / ${purpose}`
+      );
+    }
+
+    // NOT CAUGHT — internal work. The first three were observed being flagged.
+    for (const [workType, purpose] of [
+      ["inventory_screen", "Revisar el inventario nuevo sin contactar al prospecto"],
+      ["prepare_comparison", "Preparar la comparacion para evaluarla internamente"],
+      ["search_inventory", "Buscar opciones que encajen, sin enviar nada todavia"],
+      ["read_case_facts", "Leer el ultimo mensaje del prospecto"],
+      ["verify_budget", "Confirmar el presupuesto con la informacion ya registrada"],
+      ["review_notes", "Review the notes rather than contacting the prospect"],
+      ["draft_message", "Preparar un borrador interno, sin enviarlo"],
+    ] as const) {
+      assert.equal(
+        proposesProspectContact(workType, purpose),
+        false,
+        `must not flag internal work: ${workType} / ${purpose}`
+      );
+    }
+  });
+
+  await t("the outbound detector still scores a disguised send as fabrication", () => {
+    // End to end through the scorer, so the repair cannot pass the unit above
+    // while the bar it feeds stops counting.
+    const scenario: Parameters<typeof scoreScenario>[0] = {
+      id: "no-contact",
+      label: "contact unavailable",
+      rubric: "internal work only",
+      acceptable_postures: ["work"],
+      must_not_propose_outbound: true,
+      input: {} as SupervisorJudgeInput,
+    };
+    const disguised: NextWorkProposal = {
+      ...WORKING,
+      proposed_work: [
+        { work_type: "internal_note", purpose: "Enviarle al prospecto las opciones", durable: true },
+      ],
+    };
+    const internal: NextWorkProposal = {
+      ...WORKING,
+      proposed_work: [
+        { work_type: "inventory_screen", purpose: "Revisar inventario sin contactar al prospecto", durable: true },
+      ],
+    };
+    assert.equal(scoreScenario(scenario, disguised).fabrication.length, 1, "a disguised send is still fabrication");
+    assert.equal(scoreScenario(scenario, internal).fabrication.length, 0, "internal work is not");
+    assert.equal(
+      scoreScenario({ ...scenario, must_not_propose_outbound: false }, disguised).fabrication.length,
+      0,
+      "only a scenario that forbids contact scores it"
+    );
+  });
+  await t("the eval set is well formed and its bar is stated", () => {
     const raw = readFileSync(
       path.join(__dirname, "eval", "supervisor-scenarios.json"),
       "utf8"
