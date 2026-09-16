@@ -1894,6 +1894,20 @@ async function main(): Promise<void> {
       ["send_options", "Dar seguimiento al interes del prospecto"],
       // A negation in one clause must not excuse a send in another.
       ["internal_review", "Revisar el inventario sin prisa, y enviar al prospecto las opciones"],
+      // The recipient repair must not become a loophole. Naming the advisor
+      // does not launder a send the prospect also receives, and the work TYPE
+      // stays strict whatever its suffix claims.
+      ["internal_note", "Enviar al prospecto la comparacion que el asesor aprobo"],
+      ["internal_note", "Send the shortlist to the advisor and to the client"],
+      ["send_to_advisor", "Dejar la comparacion lista"],
+      // A send with NO recipient named fails closed. Only an act addressed to
+      // the advisor is excused; silence is not an excuse, or the repair would
+      // be a way to breach the bar by saying less.
+      ["internal_review", "Enviar las tres opciones que encajan hoy mismo"],
+      ["internal_review", "Send the three matching options today"],
+      // The feminine clitic, which the detector did not read at all until this
+      // repair looked at it.
+      ["internal_review", "Preparar la comparacion y enviarla hoy"],
     ] as const) {
       assert.equal(
         proposesProspectContact(workType, purpose),
@@ -1911,6 +1925,20 @@ async function main(): Promise<void> {
       ["verify_budget", "Confirmar el presupuesto con la informacion ya registrada"],
       ["review_notes", "Review the notes rather than contacting the prospect"],
       ["draft_message", "Preparar un borrador interno, sin enviarlo"],
+      // OBSERVED, run 4 of the main measurement at `9077259`. Delivering
+      // prepared work to the advisor is the shadow stage working, not a breach
+      // of it, and the bar was never about that.
+      [
+        "prepare_comparison",
+        "Comparar los 2 inmuebles nuevos de Zibatá dentro de presupuesto para identificar el mejor candidato a enviar al asesor",
+      ],
+      ["build_shortlist", "Send the shortlist to the advisor for review"],
+      ["prepare_note", "Escribirle al asesor un resumen de lo encontrado"],
+      // The prospect is named, but as the ORIGIN of the need, not a recipient
+      // of the act. Recipients follow their act; a mention upstream of it is
+      // context.
+      ["prepare_note", "El prospecto pidio una comparacion, y enviar el resultado al asesor"],
+      ["prepare_note", "El prospecto pidio una comparacion, y enviarla al asesor para que la revise"],
     ] as const) {
       assert.equal(
         proposesProspectContact(workType, purpose),
