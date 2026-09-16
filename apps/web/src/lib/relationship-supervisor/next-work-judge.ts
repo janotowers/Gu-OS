@@ -424,46 +424,7 @@ function discard(reason: string): null {
   return null;
 }
 
-/**
- * The tracked commitments a judgment re-listed, dropped and REPORTED.
- *
- * The prompt has always said "NEVER list a commitment that already appears
- * under 'Commitments already tracked', and never reuse one of the tracked keys
- * below", and the 2026-09-16 holdout measured that instruction being ignored in
- * 10 of 100 calls, reaching 9 of 10 runs on one situation where the promise's
- * own Work was technically blocked. An invariant this repo can settle by
- * comparing two strings does not belong in prose: `listTrackedCommitmentKeys`
- * hands the model the exact keys, so sameness here is a FACT, and a guarantee
- * that can be deterministic must be deterministic rather than requested.
- *
- * What it does NOT touch is the case that actually costs something. A re-list
- * under the tracked key was already inert — `recordCommitments` is idempotent
- * on that key and creates nothing — whereas the SAME promise returned under a
- * NEW key is a second subject for one obligation, and no string comparison can
- * recognize it. That one is left entirely visible, unfiltered and scoreable,
- * because it is the durable defect and hiding it behind this filter would be
- * the opposite of a repair.
- *
- * TAKEN rather than read, like the discard reason, so a stale drop is never
- * attributed to a later judgment that dropped nothing.
- */
-let pendingDroppedTrackedCommitments: string[] = [];
-
-export function takeDroppedTrackedCommitments(): string[] {
-  const dropped = pendingDroppedTrackedCommitments;
-  pendingDroppedTrackedCommitments = [];
-  return dropped;
-}
-
-export function normalizeNextWorkProposal(
-  value: unknown,
-  /**
-   * Compared the way `recordCommitments` compares: trimmed and lowercased, so
-   * the filter and the writer cannot disagree about what "the same key" is.
-   */
-  trackedCommitmentKeys: readonly string[] = []
-): NextWorkProposal | null {
-  pendingDroppedTrackedCommitments = [];
+export function normalizeNextWorkProposal(value: unknown): NextWorkProposal | null {
   const parsed = NextWorkProposalSchema.safeParse(value);
   if (!parsed.success) {
     return discard(
@@ -491,22 +452,7 @@ export function normalizeNextWorkProposal(
   if (!quiet && proposal.proposed_work.length === 0 && !retrying) {
     return discard(`${proposal.posture} proposing no work and retrying nothing`);
   }
-
-  const tracked = new Set(
-    trackedCommitmentKeys.map((k) => k.trim().toLowerCase()).filter((k) => k !== "")
-  );
-  if (tracked.size === 0) return proposal;
-  const kept = proposal.commitments.filter(
-    (c) => !tracked.has(c.key.trim().toLowerCase())
-  );
-  if (kept.length === proposal.commitments.length) return proposal;
-  pendingDroppedTrackedCommitments = proposal.commitments
-    .filter((c) => tracked.has(c.key.trim().toLowerCase()))
-    .map((c) => `${c.key.trim().toLowerCase()}: ${c.expected_outcome}`);
-  console.warn(
-    `[relationship-supervisor] dropped ${pendingDroppedTrackedCommitments.length} already-tracked commitment(s): ${pendingDroppedTrackedCommitments.join(" | ")}`
-  );
-  return { ...proposal, commitments: kept };
+  return proposal;
 }
 
 /**
@@ -813,8 +759,7 @@ export function createOpenRouterNextWorkJudge(): NextWorkJudge {
 
       try {
         return normalizeNextWorkProposal(
-          parseJsonContent(json.choices?.[0]?.message?.content),
-          input.trackedCommitmentKeys
+          parseJsonContent(json.choices?.[0]?.message?.content)
         );
       } catch (error) {
         // Not silent, for the reason `discard` exists: a null that says nothing

@@ -32,7 +32,6 @@ export {
   createOpenRouterNextWorkJudge,
   buildNextWorkPrompt,
   normalizeNextWorkProposal,
-  takeDroppedTrackedCommitments,
   NextWorkProposalSchema,
   PROPOSABLE_POSTURES,
   type NextWorkJudge,

@@ -1,0 +1,1253 @@
+{
+  "ranAt": "2026-09-16T20:09:03.485Z",
+  "what": "SL-14's Definition-of-Done same-day baseline. The PRE-SL-14 judge, today, scored by the CURRENT verifier. Attribution evidence only: it establishes who owns a failure, never whether an SL-14 bar held.",
+  "baselineRef": "70f5f1e",
+  "baselineJudgeSha256": "38e6c8e0ee1704136ebd205ddd74aab16e2f03a62e2cc103ea1f9ac92fd54bc1",
+  "baselineSetSha256": "8a936096b00e67472ebd76fae0f683724f81864217e9f89bf87a66cf02704249",
+  "currentSetSha256": "8a936096b00e67472ebd76fae0f683724f81864217e9f89bf87a66cf02704249",
+  "scorer": "current (corrected outbound detector)",
+  "model": {
+    "source": "the judge that ran each pass (NextWorkJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ],
+    "unattributed": 0
+  },
+  "runCount": 5,
+  "blockA": {
+    "what": "the pre-SL-14 judge on the pre-SL-14 scenario set, both as frozen at 70f5f1e",
+    "scenarios": 25,
+    "runs": [
+      {
+        "run": 1,
+        "failures": 4,
+        "failureRate": 0.16,
+        "fabrications": 0,
+        "reasks": 0,
+        "results": [
+          {
+            "id": "quiet-nothing-new",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Recent messages confirm the prospect asked for options and the advisor promised three this week, while the assembly work is already todo."
+          },
+          {
+            "id": "silence-thirty-days",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only evidence is the prospect’s prior \"lo reviso y te digo\" and no new inbound or case facts have changed."
+          },
+          {
+            "id": "unverified-budget-blocks-match",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Hay demanda viable de casa de 3 recámaras, pero el rango de precio solo está inferido y de baja confianza."
+          },
+          {
+            "id": "conflicting-availability",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "I have two contradictory status facts about the same house and no further evidence has been reconciled yet."
+          },
+          {
+            "id": "repeated-search-no-gain",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The available internal search capability has already been exhausted on the stated objective and no new information has arrived."
+          },
+          {
+            "id": "capability-not-available",
+            "posture": "no_op",
+            "passed": false,
+            "violations": [
+              "expected a capability gap to be named, none was"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The case facts already show viability and the legal status remains unknown, while only read_case_facts and read_recent_messages are available."
+          },
+          {
+            "id": "commitment-made-by-advisor",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El prospecto pidió comparar dos casas y el asesor se comprometió a enviar esa comparación el viernes."
+          },
+          {
+            "id": "vague-intention-is-not-a-commitment",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The current evidence only confirms low urgency and no tracked commitments or blocked work."
+          },
+          {
+            "id": "commitment-already-tracked",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The advisor promised a comparison of the two houses and an internal comparison task is available to complete it."
+          },
+          {
+            "id": "contact-me-after-the-twentieth",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Existe un nuevo match en Zibatá y la viabilidad sigue siendo buena, así que revisar ese inventario puede mejorar la próxima decisión."
+          },
+          {
+            "id": "attention-already-consumed",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The record shows only prior advisor messages, 21 days of silence, and no tracked commitments or blocked work to advance."
+          },
+          {
+            "id": "materially-new-objective",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only new evidence is a materially different objective from the prospect, and handling that requires human confirmation."
+          },
+          {
+            "id": "evidence-too-thin-to-judge",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The record contains no objective-specific facts or pending obligations beyond an initial greeting."
+          },
+          {
+            "id": "commitment-due-today",
+            "posture": "wait",
+            "passed": false,
+            "violations": [
+              "posture wait not in [work, gather_research_reconcile]",
+              "expected useful work to be proposed, none was"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Existe el compromiso no resuelto de enviar el análisis de precios y el wake-up es por vencimiento de compromiso."
+          },
+          {
+            "id": "work-failed-technically",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only unresolved work is the blocked inventory search for options in Zibatá, and that result is needed to advance the viable buy-home opportunity."
+          },
+          {
+            "id": "new-relevant-value-exists",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Existen coincidencias nuevas dentro de Zibatá y 5M, y aún no se ha hecho comparación."
+          },
+          {
+            "id": "answered-visit-window",
+            "posture": "wait",
+            "passed": false,
+            "violations": [
+              "posture wait not in [work, gather_research_reconcile]",
+              "expected useful work to be proposed, none was"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El asesor ya dijo que puede asistir; el único avance pendiente es la confirmación del prospecto sobre la visita propuesta."
+          },
+          {
+            "id": "answer-changes-the-plan",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Advisor confirmed the off-market listing sold last week, while the buyer's 3-bedroom Lomas de Juriquilla goal remains viable."
+          },
+          {
+            "id": "blocked-retry-after-transient-failure",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Hay un trabajo bloqueado de búsqueda de inventario y el objetivo sigue viable."
+          },
+          {
+            "id": "blocked-same-failure-after-a-retry",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "La única labor abierta es w1 inventory_search, que ya falló dos veces con el mismo 503."
+          },
+          {
+            "id": "blocked-capability-no-longer-available",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "w1 failed because the provider credential was revoked, and the case only exposes read_case_facts for internal work."
+          },
+          {
+            "id": "blocked-need-already-met",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El objetivo inmediato de comparar casas ya quedó satisfecho por el envío confirmado y no hay trabajo interno útil nuevo."
+          },
+          {
+            "id": "blocked-replan-with-another-capability",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Hay una consulta abierta sobre si la casa sigue disponible y existe una capacidad interna alternativa para verificar detalles de la propiedad."
+          },
+          {
+            "id": "blocked-waiting-on-a-person-not-technical",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The prospect said they need to confirm budget with their spouse, and no new internal evidence changes that waiting state."
+          },
+          {
+            "id": "work-succeeded-with-negative-discovery",
+            "posture": "no_op",
+            "passed": false,
+            "violations": [
+              "posture no_op not in [work, gather_research_reconcile, targeted_human_input, wait]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "La evidencia actual ya resolvió la disponibilidad a vendido y no queda trabajo interno nuevo que cambie esa conclusión."
+          }
+        ],
+        "modelId": "openai/gpt-5.4-mini"
+      },
+      {
+        "run": 2,
+        "failures": 6,
+        "failureRate": 0.24,
+        "fabrications": 0,
+        "reasks": 0,
+        "results": [
+          {
+            "id": "quiet-nothing-new",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The recent exchange is unchanged and the required work is already underway, so there is nothing useful to add on reconsideration."
+          },
+          {
+            "id": "silence-thirty-days",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only recent evidence is a stale 'te lo reviso y te digo' message with no new developments."
+          },
+          {
+            "id": "unverified-budget-blocks-match",
+            "posture": "targeted_human_input",
+            "passed": false,
+            "violations": [
+              "posture targeted_human_input not in [gather_research_reconcile, work]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The prospect wants a 3-bedroom home, but the budget is only a low-confidence inference and the next useful step depends on confirming it."
+          },
+          {
+            "id": "conflicting-availability",
+            "posture": "targeted_human_input",
+            "passed": false,
+            "violations": [
+              "posture targeted_human_input not in [gather_research_reconcile, work]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "I have conflicting availability evidence from the listing and the operational record."
+          },
+          {
+            "id": "repeated-search-no-gain",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Inventory was already searched three times with no match, and no new evidence suggests a different internal action now."
+          },
+          {
+            "id": "capability-not-available",
+            "posture": "no_op",
+            "passed": false,
+            "violations": [
+              "expected a capability gap to be named, none was"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Solo consta que el prospecto quiere vender una casa heredada y que el estado legal es desconocido."
+          },
+          {
+            "id": "commitment-made-by-advisor",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The prospect asked for a comparison and the advisor committed to send it Friday, but no comparison work is yet recorded."
+          },
+          {
+            "id": "vague-intention-is-not-a-commitment",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Solo hay una nota de baja prisa y no existe trabajo interno útil ni compromiso pendiente que resolver."
+          },
+          {
+            "id": "commitment-already-tracked",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The prospect asked to compare two houses and the advisor promised a comparison; the comparison task is already open and can be advanced internally."
+          },
+          {
+            "id": "contact-me-after-the-twentieth",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only actionable change is the new match, but prospect contact is paused and no internal next step is clearly useful without more criteria."
+          },
+          {
+            "id": "attention-already-consumed",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The case remains viable but there is no specific expected response or actionable change since the last reconsideration."
+          },
+          {
+            "id": "materially-new-objective",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The latest message expands the commercial scope beyond the current buy-home objective."
+          },
+          {
+            "id": "evidence-too-thin-to-judge",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The record contains only a greeting, no stated objective, no facts, and no tracked commitments to advance."
+          },
+          {
+            "id": "commitment-due-today",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "A due commitment exists and the available internal capability can fulfill it now."
+          },
+          {
+            "id": "work-failed-technically",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The listed inventory search failed 3 times with the provider not responding, so progress is constrained by an external provider failure."
+          },
+          {
+            "id": "new-relevant-value-exists",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Existen 2 inmuebles nuevos que sí coinciden con la búsqueda y antes no había inventario relevante."
+          },
+          {
+            "id": "answered-visit-window",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The Saturday 11am advisor constraint is settled and the prospect asked for a showing window, so preparing the visit advances the purchase decision."
+          },
+          {
+            "id": "answer-changes-the-plan",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The advisor’s answer settled availability, and the objective remains viable with a 3-bedroom requirement in Lomas de Juriquilla."
+          },
+          {
+            "id": "blocked-retry-after-transient-failure",
+            "posture": "no_op",
+            "passed": false,
+            "violations": [
+              "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Inventory search already failed three times with the same provider 503 and there is no new evidence or alternate internal capability to advance the case."
+          },
+          {
+            "id": "blocked-same-failure-after-a-retry",
+            "posture": "work",
+            "passed": false,
+            "violations": [
+              "posture work not in [targeted_human_input, gather_research_reconcile, wait]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El trabajo w1 agotó sus intentos con el mismo error técnico recurrente, y la única capacidad interna disponible para avanzar sigue siendo la búsqueda de inventario."
+          },
+          {
+            "id": "blocked-capability-no-longer-available",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "La única tarea útil es revisar o restablecer el acceso al proveedor, y eso no está disponible en las capacidades internas."
+          },
+          {
+            "id": "blocked-need-already-met",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El asesor dijo que ya la mandó completa y el prospecto respondió que ya la vio; la responsabilidad pendiente quedó resuelta."
+          },
+          {
+            "id": "blocked-replan-with-another-capability",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El prospecto preguntó si sigue disponible y hay una búsqueda de inventario fallida, pero sí existe capacidad interna para revisar datos del caso y detalles de la propiedad."
+          },
+          {
+            "id": "blocked-waiting-on-a-person-not-technical",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The latest inbound says they need to confirm budget, and the tracked budget confirmation work is blocked waiting on them."
+          },
+          {
+            "id": "work-succeeded-with-negative-discovery",
+            "posture": "no_op",
+            "passed": false,
+            "violations": [
+              "posture no_op not in [work, gather_research_reconcile, targeted_human_input, wait]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Inventory search established the house is sold, which removes the current objective's actionable path."
+          }
+        ],
+        "modelId": "openai/gpt-5.4-mini"
+      },
+      {
+        "run": 3,
+        "failures": 4,
+        "failureRate": 0.16,
+        "fabrications": 0,
+        "reasks": 0,
+        "results": [
+          {
+            "id": "quiet-nothing-new",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only live need is the advisor’s promised three options, and that work is already tracked as todo."
+          },
+          {
+            "id": "silence-thirty-days",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only recent evidence is the unchanged prospect message \"gracias, lo reviso y te digo\" and there is no listed work or new fact to reconcile."
+          },
+          {
+            "id": "unverified-budget-blocks-match",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The opportunity is viable, but the budget remains uncertain and the only available internal capabilities can verify facts against inventory."
+          },
+          {
+            "id": "conflicting-availability",
+            "posture": "targeted_human_input",
+            "passed": false,
+            "violations": [
+              "posture targeted_human_input not in [gather_research_reconcile, work]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The listing says available while the operational record says unavailable, creating a blocking contradiction."
+          },
+          {
+            "id": "repeated-search-no-gain",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only available internal capabilities have already been used repeatedly without new information, so repeating them would be duplicate work."
+          },
+          {
+            "id": "capability-not-available",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Solo consta que el prospecto quiere vender una casa heredada y que el papeleo está incierto."
+          },
+          {
+            "id": "commitment-made-by-advisor",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The case contains a specific pending comparison request and a tracked promise to produce it."
+          },
+          {
+            "id": "vague-intention-is-not-a-commitment",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only evidence is that the prospect said they are not in a hurry and there are no tracked commitments or open work items."
+          },
+          {
+            "id": "commitment-already-tracked",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El prospecto pidió comparar dos casas y el asesor se comprometió a enviar esa comparación; existe trabajo interno todo para prepararla."
+          },
+          {
+            "id": "contact-me-after-the-twentieth",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only actionable evidence is a requested pause until after the 20th, while a new inventory match exists but is not yet enough to justify action without checking fit."
+          },
+          {
+            "id": "attention-already-consumed",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only evidence is three prior advisor follow-ups and 21 days of silence, with no new inbound information or tracked commitments."
+          },
+          {
+            "id": "materially-new-objective",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El mensaje reciente amplía el objetivo a una posible venta aparte, y eso requiere confirmación humana para no mezclar operaciones."
+          },
+          {
+            "id": "evidence-too-thin-to-judge",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The record contains only 'hola' and no stated next step, constraints, or promised work to advance."
+          },
+          {
+            "id": "commitment-due-today",
+            "posture": null,
+            "passed": false,
+            "violations": [
+              "no judgment was produced"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": null
+          },
+          {
+            "id": "work-failed-technically",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only unfinished work is w1 inventory_search, and it failed repeatedly for a technical provider issue while the opportunity remains viable."
+          },
+          {
+            "id": "new-relevant-value-exists",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "La nueva coincidencia de inventario dentro de Zibatá y presupuesto permite comparar opciones relevantes ahora mismo."
+          },
+          {
+            "id": "answered-visit-window",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El asesor ya respondió que puede asistir el sábado a las 11, así que la siguiente utilidad es preparar la visita antes de decidir la compra."
+          },
+          {
+            "id": "answer-changes-the-plan",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The advisor answered that the off-market listing was sold last week, and the objective remains viable with a 3-bedroom requirement."
+          },
+          {
+            "id": "blocked-retry-after-transient-failure",
+            "posture": null,
+            "passed": false,
+            "violations": [
+              "no judgment was produced"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": null
+          },
+          {
+            "id": "blocked-same-failure-after-a-retry",
+            "posture": null,
+            "passed": false,
+            "violations": [
+              "no judgment was produced"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": null
+          },
+          {
+            "id": "blocked-capability-no-longer-available",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El único trabajo pendiente falló técnicamente por credencial revocada y la única capacidad interna disponible no puede realizar la búsqueda."
+          },
+          {
+            "id": "blocked-need-already-met",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The advisor said it was sent and the prospect replied that they already saw the comparison."
+          },
+          {
+            "id": "blocked-replan-with-another-capability",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "La consulta del prospecto sigue sin responderse y hay una capacidad interna disponible para verificar detalles de la propiedad."
+          },
+          {
+            "id": "blocked-waiting-on-a-person-not-technical",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only fresh evidence is that the prospect said they need to confirm budget, and the tracked budget check is already waiting on them."
+          },
+          {
+            "id": "work-succeeded-with-negative-discovery",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Inventory search resolved the key fact and it conflicts with the buyer's stated target."
+          }
+        ],
+        "modelId": "openai/gpt-5.4-mini"
+      },
+      {
+        "run": 4,
+        "failures": 2,
+        "failureRate": 0.08,
+        "fabrications": 0,
+        "reasks": 0,
+        "results": [
+          {
+            "id": "quiet-nothing-new",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only actionable evidence is an existing advisor commitment that is still in progress, with no new information beyond the prospect’s brief acknowledgment."
+          },
+          {
+            "id": "silence-thirty-days",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only current evidence is the prospect’s prior promise to review and no new inbound since then."
+          },
+          {
+            "id": "unverified-budget-blocks-match",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El prospecto pidió tres recámaras y el asesor preguntó el rango; la única cifra disponible es un presupuesto inferido de baja confianza."
+          },
+          {
+            "id": "conflicting-availability",
+            "posture": "targeted_human_input",
+            "passed": false,
+            "violations": [
+              "posture targeted_human_input not in [gather_research_reconcile, work]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "I have conflicting source facts about availability and no way to resolve them automatically with the available capabilities."
+          },
+          {
+            "id": "repeated-search-no-gain",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only available internal capabilities have already been used repeatedly on the same inventory search with the same empty result, and there is no new evidence to justify more work now."
+          },
+          {
+            "id": "capability-not-available",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The available facts do not reveal any actionable internal work beyond reading case data already provided."
+          },
+          {
+            "id": "commitment-made-by-advisor",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El prospecto pidió comparar las dos casas y el asesor se comprometió a enviarla el viernes."
+          },
+          {
+            "id": "vague-intention-is-not-a-commitment",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only evidence is that the prospect said they are not in a hurry and no work items or commitments are currently tracked."
+          },
+          {
+            "id": "commitment-already-tracked",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The tracked commitment is due and the comparison work is already the specific outstanding next step."
+          },
+          {
+            "id": "contact-me-after-the-twentieth",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "A specific re-contact date is pending and the case already has a viable new match, so the useful strategy is to wait for the agreed time rather than act now."
+          },
+          {
+            "id": "attention-already-consumed",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The record shows only prior advisor follow-ups and no new inbound or tracked commitment to advance."
+          },
+          {
+            "id": "materially-new-objective",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The latest message says they also want to sell an apartment, which changes the scope beyond the current buy-home objective."
+          },
+          {
+            "id": "evidence-too-thin-to-judge",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only evidence is an inbound 'hola' with no stated objective, facts, commitments, or work to advance."
+          },
+          {
+            "id": "commitment-due-today",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The advisor promised the price analysis for Tuesday, and that commitment is now due."
+          },
+          {
+            "id": "work-failed-technically",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The last attempt to search inventory failed technically and the prospect is simply awaiting options."
+          },
+          {
+            "id": "new-relevant-value-exists",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Existen nuevos inmuebles que encajan con el criterio principal y eso permite avanzar la selección interna sin contactar al prospecto."
+          },
+          {
+            "id": "answered-visit-window",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El prospecto pidió ver la casa el sábado por la mañana y el asesor ya confirmó que puede asistir a las 11."
+          },
+          {
+            "id": "answer-changes-the-plan",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The prospect liked the Lomas house, but advisor-confirmed availability is no longer the constraint; the remaining actionable gap is finding comparable 3-bedroom options."
+          },
+          {
+            "id": "blocked-retry-after-transient-failure",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The opportunity is viable and the blocked inventory search is still relevant to the prospect's request for options."
+          },
+          {
+            "id": "blocked-same-failure-after-a-retry",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The same inventory search already failed twice with the same technical error, and prospect contact is unavailable while the objective remains viable."
+          },
+          {
+            "id": "blocked-capability-no-longer-available",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El único trabajo pendiente falló por una causa técnica ya agotada y no hay otra capacidad interna para comprobar inventario."
+          },
+          {
+            "id": "blocked-need-already-met",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El asesor confirmó el envío y el prospecto respondió que ya vio la comparación."
+          },
+          {
+            "id": "blocked-replan-with-another-capability",
+            "posture": "targeted_human_input",
+            "passed": false,
+            "violations": [
+              "posture targeted_human_input not in [work, gather_research_reconcile]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Hay un intento previo de inventory_search fallido por caída del proveedor y solo quedan capacidades de lectura/consulta interna sin garantía de estado en tiempo real."
+          },
+          {
+            "id": "blocked-waiting-on-a-person-not-technical",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only fresh evidence is the prospect’s pending budget confirmation, and no actionable internal work is clearly needed now."
+          },
+          {
+            "id": "work-succeeded-with-negative-discovery",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Inventory search shows the property status is sold, so the current objective cannot advance without human confirmation of whether to pivot or close the file."
+          }
+        ],
+        "modelId": "openai/gpt-5.4-mini"
+      },
+      {
+        "run": 5,
+        "failures": 1,
+        "failureRate": 0.04,
+        "fabrications": 0,
+        "reasks": 0,
+        "results": [
+          {
+            "id": "quiet-nothing-new",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "A specific deliverable is already tracked and no new evidence suggests a different next step."
+          },
+          {
+            "id": "silence-thirty-days",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only evidence is a 30-day silence after the prospect said \"gracias, lo reviso y te digo,\" and earlier reconsiderations already found nothing new."
+          },
+          {
+            "id": "unverified-budget-blocks-match",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Hay una necesidad clara de 3 recámaras pero el rango de precio es incierto y contamos con búsqueda de inventario para validar viabilidad."
+          },
+          {
+            "id": "conflicting-availability",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The property is marked available on the listing but unavailable in the operational record, and prior work already checked the listing source."
+          },
+          {
+            "id": "repeated-search-no-gain",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Three prior inventory searches for northern land under 2M returned no match and nothing new has arrived."
+          },
+          {
+            "id": "capability-not-available",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El estado legal de la propiedad sigue desconocido y las capacidades disponibles solo permiten leer hechos y mensajes, no verificar el papeleo."
+          },
+          {
+            "id": "commitment-made-by-advisor",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The open promise and the prospect’s request directly constrain progress on this viable home-buying opportunity."
+          },
+          {
+            "id": "vague-intention-is-not-a-commitment",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only evidence is that the prospect said there is no rush and no commitments or work items are currently tracked."
+          },
+          {
+            "id": "commitment-already-tracked",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "There is a tracked commitment due and an available internal capability to assemble the comparison."
+          },
+          {
+            "id": "contact-me-after-the-twentieth",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only actionable change is a pending contact window and a new match in Zibatá, so the useful strategy is to wait rather than act now."
+          },
+          {
+            "id": "attention-already-consumed",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only evidence is 21 days of silence after prior advisor follow-ups, with no new facts or tracked obligations to advance."
+          },
+          {
+            "id": "materially-new-objective",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "La evidencia muestra un cambio material de objetivo y no existe capacidad interna para confirmar si debe abrirse otro caso."
+          },
+          {
+            "id": "evidence-too-thin-to-judge",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The record contains only one prospect greeting and no stated objective or outstanding promise to advance."
+          },
+          {
+            "id": "commitment-due-today",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "A specific commitment is due and the available internal capability can produce it."
+          },
+          {
+            "id": "work-failed-technically",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only unfinished work is a blocked inventory search with a provider timeout, and the prospect said they are awaiting options."
+          },
+          {
+            "id": "new-relevant-value-exists",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "La nueva coincidencia de inventario crea una oportunidad real de avanzar comparando opciones relevantes para el objetivo del comprador."
+          },
+          {
+            "id": "answered-visit-window",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The prospect proposed a Saturday morning showing and the advisor already answered yes for 11:00, so the next useful step is preparing for that visit."
+          },
+          {
+            "id": "answer-changes-the-plan",
+            "posture": "work",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The advisor confirmed the off-market house sold last week and the buyer still wants a 3-bedroom home in Lomas de Juriquilla."
+          },
+          {
+            "id": "blocked-retry-after-transient-failure",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only unfinished work is w1 inventory_search, and its result depends on the inventory provider rather than the prospect."
+          },
+          {
+            "id": "blocked-same-failure-after-a-retry",
+            "posture": "gather_research_reconcile",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The blocked inventory search is still the relevant path, but the repeated 503 means a retry would loop without new information."
+          },
+          {
+            "id": "blocked-capability-no-longer-available",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "El único trabajo previo útil falló por un problema técnico recurrente y no hay evidencia nueva ni capacidades para avanzar internamente."
+          },
+          {
+            "id": "blocked-need-already-met",
+            "posture": "no_op",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "La evidencia muestra que la única pieza de trabajo ya quedó satisfecha y no hay otro avance útil inmediato."
+          },
+          {
+            "id": "blocked-replan-with-another-capability",
+            "posture": "targeted_human_input",
+            "passed": false,
+            "violations": [
+              "posture targeted_human_input not in [work, gather_research_reconcile]"
+            ],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The prospect asked if the Zibatá house is still available, and the existing search failed technically after 3 attempts."
+          },
+          {
+            "id": "blocked-waiting-on-a-person-not-technical",
+            "posture": "wait",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "The only new evidence is the prospect’s stated need to confirm budget with their spouse, and the related work is already blocked waiting on a person."
+          },
+          {
+            "id": "work-succeeded-with-negative-discovery",
+            "posture": "targeted_human_input",
+            "passed": true,
+            "violations": [],
+            "fabrication": [],
+            "reask": [],
+            "rationale": "Inventory search shows the house status is sold, while the prospect’s interest was in that specific house."
+          }
+        ],
+        "modelId": "openai/gpt-5.4-mini"
+      }
+    ],
+    "perScenarioFailures": {
+      "capability-not-available": 2,
+      "commitment-due-today": 2,
+      "answered-visit-window": 1,
+      "work-succeeded-with-negative-discovery": 2,
+      "unverified-budget-blocks-match": 1,
+      "conflicting-availability": 3,
+      "blocked-retry-after-transient-failure": 2,
+      "blocked-same-failure-after-a-retry": 2,
+      "blocked-replan-with-another-capability": 2
+    }
+  },
+  "blockB": {
+    "what": "the pre-SL-14 judge on scenarios NEW to the current set whose Work list has nothing blocked, so SA-14.1 freezes their prompt",
+    "byteIdentityAsserted": "each scenario's prompt was built with the baseline judge AND the current judge and the two were equal; a scenario whose prompts differed was refused, not reported",
+    "scenarios": [],
+    "refusedForDifferingPrompt": [],
+    "runs": [],
+    "perScenarioFailures": {}
+  }
+}

@@ -44,7 +44,6 @@ import {
   createOpenRouterNextWorkJudge,
   offeredRecovery,
   resolveRecoveryAlias,
-  takeDroppedTrackedCommitments,
   takeLastDiscardReason,
   type NextWorkProposal,
   type SupervisorJudgeInput,
@@ -581,17 +580,6 @@ interface ScenarioResult {
   reask: string[];
   blindRetry: string[];
   stranded: string[];
-  /**
-   * Already-tracked commitments the judge re-listed and the parser dropped.
-   *
-   * NOT scored, and reported anyway. The drop makes the judgment correct, so
-   * scoring it would punish an outcome that is now right; saying nothing would
-   * let a deterministic filter quietly absorb a model weakness the holdout
-   * measured at 10 of 100 calls, and a repair whose own effect is invisible
-   * cannot be audited. The durable case — the same promise under a NEW key —
-   * never reaches here and is scored exactly as before.
-   */
-  droppedTrackedCommitments: string[];
   passed: boolean;
 }
 
@@ -895,9 +883,6 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
 
   for (const scenario of evalSet.scenarios) {
     const proposal = await judge.propose(scenario.input);
-    // Taken immediately, before anything else can produce a judgment, for the
-    // same reason the discard reason is taken: the channel holds ONE answer.
-    const droppedTrackedCommitments = takeDroppedTrackedCommitments();
     const { violations, fabrication, reask, blindRetry, stranded } = scoreScenario(
       scenario,
       proposal
@@ -917,15 +902,8 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
       reask,
       blindRetry,
       stranded,
-      droppedTrackedCommitments,
       passed,
     });
-
-    if (droppedTrackedCommitments.length > 0) {
-      console.log(
-        `  note ${scenario.id} — re-listed ${droppedTrackedCommitments.length} already-tracked commitment(s), dropped: ${droppedTrackedCommitments.join(" | ")}`
-      );
-    }
 
     if (verbose || !passed) {
       const mark = passed ? "ok  " : "FAIL";
@@ -1050,20 +1028,6 @@ async function main(): Promise<void> {
         ` since a missing judgment measures nothing about judgment`
     );
   }
-  // The filter's own effect, reported whether or not it changed a verdict.
-  // A deterministic guarantee that silently absorbs a model weakness makes the
-  // weakness unmeasurable, and this one had been measured at 10 of 100 calls.
-  const dropped = runs.reduce(
-    (sum, r) =>
-      sum + r.results.reduce((n, s) => n + s.droppedTrackedCommitments.length, 0),
-    0
-  );
-  if (dropped > 0) {
-    console.log(
-      `tracked re-lists: ${dropped} across all runs — dropped deterministically by key,` +
-        ` NOT scored; the same promise under a NEW key is not this and is still scored`
-    );
-  }
   console.log(`runs holding:     ${heldRuns} of ${runCount}`);
 
   // Reported apart from `runs holding`, always, so the two can never be read as
@@ -1164,7 +1128,6 @@ async function main(): Promise<void> {
               reask: r.reask,
               blindRetry: r.blindRetry,
               stranded: r.stranded,
-              droppedTrackedCommitments: r.droppedTrackedCommitments,
               recovery: r.proposal?.recovery ?? null,
               rationale: r.proposal?.rationale ?? null,
               // The WHOLE judgment, not a digest of it, for two reasons the
