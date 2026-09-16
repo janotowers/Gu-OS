@@ -67,6 +67,7 @@ import {
 } from "./delivery";
 import {
   normalizeNextWorkProposal,
+  takeDroppedTrackedCommitments,
   takeLastDiscardReason,
   PROPOSABLE_POSTURES,
   RECOVERY_ACTIONS,
@@ -1359,6 +1360,97 @@ async function main(): Promise<void> {
     assert.equal(normalizeNextWorkProposal({ posture: "act" }), null);
     assert.equal(normalizeNextWorkProposal("nonsense"), null);
     assert.ok(normalizeNextWorkProposal(QUIET));
+  });
+
+  await t("an already-tracked commitment is dropped by KEY, and the drop is reported", () => {
+    // The prompt has always forbidden this. The 2026-09-16 holdout measured the
+    // instruction ignored in 10 of 100 calls, 9 of 10 runs on one situation, so
+    // the guarantee moves out of prose: `listTrackedCommitmentKeys` hands the
+    // model the keys, which makes sameness a fact two strings settle.
+    const relisted = {
+      ...QUIET,
+      commitments: [
+        {
+          expected_outcome: "enviar el reporte de zona",
+          actor: "gu",
+          due_at: null,
+          due_stated: false,
+          key: "  Reporte_Zona ",
+        },
+      ],
+    };
+
+    takeDroppedTrackedCommitments();
+    // Trimmed and lowercased on BOTH sides, the way `recordCommitments`
+    // compares, so the filter and the writer cannot disagree about sameness.
+    const filtered = normalizeNextWorkProposal(relisted, ["reporte_zona"]);
+    assert.ok(filtered);
+    assert.equal(filtered.commitments.length, 0);
+    const dropped = takeDroppedTrackedCommitments();
+    assert.equal(dropped.length, 1);
+    assert.ok(/reporte_zona: enviar el reporte de zona/.test(dropped[0]));
+
+    // Both sides, not one. The stored key comes out of `attrs_jsonb` and
+    // nothing guarantees its shape either, so a filter that normalized only
+    // the model's answer would still miss the promise it is meant to catch.
+    const storedOddly = normalizeNextWorkProposal(
+      { ...relisted, commitments: [{ ...relisted.commitments[0], key: "reporte_zona" }] },
+      [" Reporte_Zona "]
+    );
+    assert.ok(storedOddly);
+    assert.equal(storedOddly.commitments.length, 0);
+    assert.equal(takeDroppedTrackedCommitments().length, 1);
+    // TAKEN, so a drop can never be attributed to a later judgment.
+    assert.deepEqual(takeDroppedTrackedCommitments(), []);
+
+    // The case that actually costs something is NOT touched: the same promise
+    // under a new key is a second subject for one obligation, no string
+    // comparison can recognize it, and filtering by key must not appear to.
+    const newKey = normalizeNextWorkProposal(
+      { ...relisted, commitments: [{ ...relisted.commitments[0], key: "reporte_de_zona" }] },
+      ["reporte_zona"]
+    );
+    assert.ok(newKey);
+    assert.equal(newKey.commitments.length, 1);
+    assert.deepEqual(takeDroppedTrackedCommitments(), []);
+
+    // With nothing tracked, nothing is dropped, and the judgment is identical.
+    const untouched = normalizeNextWorkProposal(relisted);
+    assert.ok(untouched);
+    assert.equal(untouched.commitments.length, 1);
+
+    // One tracked and one new in the same judgment keeps the new one.
+    const mixed = normalizeNextWorkProposal(
+      {
+        ...relisted,
+        commitments: [
+          relisted.commitments[0],
+          { ...relisted.commitments[0], key: "acta_asamblea" },
+        ],
+      },
+      ["reporte_zona"]
+    );
+    assert.ok(mixed);
+    assert.deepEqual(
+      mixed.commitments.map((c) => c.key),
+      ["acta_asamblea"]
+    );
+    // DELIBERATELY not taken, so the next call has to clear the channel itself.
+    // A drop surviving into a later judgment would misattribute it, which is
+    // the same failure the discard reason was given a `take` to prevent.
+    assert.ok(normalizeNextWorkProposal(QUIET, ["reporte_zona"]));
+    assert.deepEqual(takeDroppedTrackedCommitments(), []);
+
+    // The filter decides nothing about coherence. A discarded judgment is still
+    // discarded, and it leaves no drop behind for the next scenario to inherit.
+    assert.equal(
+      normalizeNextWorkProposal(
+        { ...relisted, proposed_work: WORKING.proposed_work },
+        ["reporte_zona"]
+      ),
+      null
+    );
+    assert.deepEqual(takeDroppedTrackedCommitments(), []);
   });
 
   await t("the record names the model that judged — from the judge, not the env", async () => {
