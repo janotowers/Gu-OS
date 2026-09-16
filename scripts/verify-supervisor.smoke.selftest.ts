@@ -28,6 +28,7 @@ import type {
   NextWorkProposal,
 } from "../apps/web/src/lib/relationship-supervisor";
 import {
+  phaseRecover,
   phaseSeed,
   phaseVerify,
   phaseWake,
@@ -74,6 +75,7 @@ function harness(): FakeDb {
       case_subjects: [],
       work_items: [],
       work_item_events: [],
+      work_item_attempts: [],
       work_item_dependencies: [],
       workflow_definitions: [
         {
@@ -94,8 +96,24 @@ function harness(): FakeDb {
         confidence: null,
       },
       case_subjects: { label: null, source_ref: null, created_by_user_id: null },
+      // Stamped by the database in production, and by `relabelAsDay` for the
+      // wakes this fixture pretends happened on other days. The recover phase's
+      // own reconsideration is not relabeled — it really is happening now — so
+      // without this default it would reach the evaluator with no instant at all.
+      operational_case_events: { created_at: new Date().toISOString() },
       operational_cases: { runtime_authority: null },
-      work_items: { status: "todo" },
+      // The columns real PostgreSQL fills from its own DEFAULTs, which the
+      // insert therefore never names. Without them the Work Plane's optimistic
+      // version guard compares against undefined and every update conflicts.
+      work_items: {
+        status: "todo",
+        version: 1,
+        attempt_count: 0,
+        blocked_reason: null,
+        current_attempt_id: null,
+        result_jsonb: null,
+      },
+      work_item_attempts: { status: "running", error_jsonb: null, evidence_jsonb: null },
     },
     uniqueIndexes: [
       {
@@ -310,6 +328,38 @@ async function main(): Promise<void> {
     );
   });
 
+  await t("SA-14.11 recover re-readies the blocked item through the Work Plane", async () => {
+    const blockedBefore = fake.tables.work_items.find(
+      (w) => w.work_type === "prepare_comparison"
+    )!;
+    assert.equal(blockedBefore.status, "blocked");
+    assert.equal(blockedBefore.attempt_count, 3);
+
+    // The recover wake is keyed on the run, not the day, so it does not consume
+    // one of the days SA-4.3 counts.
+    for (const row of fake.tables.operational_cases) row.next_action_at = null;
+    await phaseRecover(ctx);
+
+    const after = fake.tables.work_items.find((w) => w.work_type === "prepare_comparison")!;
+    assert.equal(after.id, blockedBefore.id, "the SAME item, not a copy");
+    assert.equal(after.status, "ready");
+    assert.equal(after.blocked_reason, null);
+    assert.equal(after.attempt_count, 3, "the attempt history stays");
+    assert.equal(after.max_attempts, 4, "exactly one more window");
+    const readied = fake.tables.work_item_events.filter(
+      (e) =>
+        e.event_type === "ready" &&
+        (e.payload_jsonb as { source?: string })?.source === "case_supervisor_retry"
+    );
+    assert.equal(readied.length, 1);
+    assert.equal(readied[0].actor, "agent", "attributed to the Supervisor");
+    assert.equal(
+      fake.tables.work_items.filter((w) => w.work_type === "prepare_comparison").length,
+      1,
+      "no duplicate Work Item"
+    );
+  });
+
   await t("verify passes once the history genuinely spans the required days", async () => {
     // Two more days of wakes. The Case row's own wake time is advanced by each
     // reconsideration, so it is reset the way real elapsed time would.
@@ -324,7 +374,10 @@ async function main(): Promise<void> {
       (r) =>
         (r.payload_jsonb as Record<string, unknown>)?.kind === "supervisor_reconsidered"
     );
-    assert.equal(claims.length, SCENARIOS.length * 3, "three days per Case");
+    // Three days per Case, plus the ONE reconsideration the SL-14 recover phase
+    // makes on the Case carrying blocked Work. It is keyed on the run rather
+    // than on a date, so it adds a decision without adding a day.
+    assert.equal(claims.length, SCENARIOS.length * 3 + 1, "three days per Case, plus the recovery");
 
     const ok = await phaseVerify(ctx, undefined);
     assert.equal(ok, true, "the verifier's own evidence assembly must pass a good run");
@@ -357,11 +410,14 @@ async function main(): Promise<void> {
     assert.equal(artifact.legacySourceWrites, 0);
     assert.ok(String(artifact.organization).startsWith("sha256:"));
 
-    // The model is attributed from the rows the run verified.
+    // The model is attributed from the rows the run verified. One row is
+    // deliberately unattributed: the SL-14 recover phase records `model_id`
+    // null because a deterministic decision made it, which SA-14.11 permits and
+    // which the evidence must therefore SHOW rather than round away.
     assert.deepEqual(artifact.model, {
       source: "reconsideration rows (payload.model_id)",
       ids: [SMOKE_MODEL_ID],
-      unattributed: 0,
+      unattributed: 1,
     });
     assert.ok(!raw.includes("decoy/override-never-used"), "the verifier's env never reaches the evidence");
     assert.ok(!raw.includes("default (configuration)"));
@@ -370,9 +426,25 @@ async function main(): Promise<void> {
     const scenarioOf = new Map(
       (artifact.cases as Array<{ id: string; scenario: string }>).map((c) => [c.id, c.scenario])
     );
-    const history = artifact.postureHistory as Array<{ case: string; modelId: string; yieldPosture: string }>;
-    assert.equal(history.length, SCENARIOS.length * 3);
-    for (const entry of history) {
+    const history = artifact.postureHistory as Array<{
+      case: string;
+      modelId: string | null;
+      yieldPosture: string;
+    }>;
+    assert.equal(history.length, SCENARIOS.length * 3 + 1, "three days per Case, plus the recovery");
+
+    // The SL-14 recovery is separated out rather than folded in: it was decided
+    // deterministically, so it carries no model, and its yield posture answers
+    // a different question than a daily reconsideration's.
+    const recovered = history.filter((e) => e.modelId === null);
+    assert.equal(recovered.length, 1, "exactly one deterministic decision");
+    assert.equal(
+      scenarioOf.get(recovered[0].case),
+      "commitment-bearing-opportunity",
+      "and it is the Case that carried the blocked Work"
+    );
+
+    for (const entry of history.filter((e) => e.modelId !== null)) {
       assert.equal(entry.modelId, SMOKE_MODEL_ID);
       assert.equal(
         entry.yieldPosture,
