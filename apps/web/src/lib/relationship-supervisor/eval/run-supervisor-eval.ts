@@ -288,12 +288,99 @@ function proven(): ReturnType<typeof loadProvenFrozen> {
  * expectation alone would excuse an unproven prompt. The `provenIds` argument
  * is explicit so the conjunction is testable without the environment.
  */
+/**
+ * SUPERSEDED by the assertion-level rule below (§8 Q12, 2026-09-16), and kept
+ * rather than deleted.
+ *
+ * It is the rule that actually governed every measurement up to and including
+ * holdout 7, and those artifacts are committed with its text. Deleting it would
+ * leave a recorded verdict with no code a reader could check it against. It is
+ * called by nothing in the current path, which is the point.
+ */
 export function mayAttribute(scenario: Scenario, provenIds: ReadonlySet<string>): boolean {
   return !isSl14Owned(scenario) && provenIds.has(scenario.id);
 }
 
-function attributableToPreSl14(scenario: Scenario): boolean {
-  return mayAttribute(scenario, proven().ids);
+// ============================================================================
+// THE ASSERTION-LEVEL CORRECTION — frozen 2026-09-16, by the Accountable's
+// resolution of §8 Q12, prospectively and before any evidence under it exists.
+//
+// `mayAttribute` above classifies a SCENARIO. Holdout 7 showed why that is the
+// wrong unit: `h7-waiting-on-the-appraiser-visit-not-technical` carries an
+// SL-14 expectation — offer no recovery to Work blocked on a person, which the
+// judge SATISFIED in all ten runs — and, in the same scenario, an SL-4-era
+// expectation that a vague intention is not a commitment, which it breached
+// once. Scenario-level ownership made the whole situation SL-14's and gated a
+// failure of an assertion this Slice is forbidden to change. A scenario can be
+// mixed; an assertion cannot.
+//
+// The correction changes the UNIT and nothing else. No bar value or meaning
+// moves, `held` keeps its meaning, no measured run is rescored, and holdout 7
+// stands exactly as observed — 9 of 10 under the rule that governed it, with
+// its fabrication still recorded as a real SL-4-era judge failure.
+//
+// IT STAYS FAIL-CLOSED, on two conditions that are both necessary:
+//
+//   1. THE PROMPT MUST BE PROVEN UNCHANGED. Byte-identity to the pre-SL-14
+//      judge, mechanically, from the audit named in
+//      `SUPERVISOR_EVAL_IDENTITY_AUDIT` and attested against THIS set by
+//      sha256. This is what makes "SL-14 cannot have caused it" a fact rather
+//      than an argument, and it is why no attribution can hide a regression: a
+//      regression changes behavior, and changed prompts are not byte-identical.
+//   2. THE BREACHED ASSERTION MUST NOT BE ONE SL-14 OWNS. Both bars this Slice
+//      introduced — blind retry and stranded failure — are never attributable,
+//      at all, on any scenario. Neither is any rate-bar violation of a recovery
+//      expectation, which is why `scoreScenario` tags those at the point of the
+//      push.
+//
+// What is attributable, and only with condition 1: the fabrication and re-ask
+// bars, both inherited unchanged from SL-4 and the Cycle 3 repair, and the
+// rate-bar assertions that predate this Slice. On a byte-identical prompt SL-14
+// renders no recovery prose and applies no strict schema, so it has no
+// mechanism to reach them.
+// ============================================================================
+
+/** The bars SL-14 created. A breach of either always gates, everywhere. */
+const SL14_OWNED_BARS = ["blind retry", "stranded failure"] as const;
+
+/**
+ * Per-assertion ownership for one scenario's result.
+ *
+ * Returns every breach that SL-14 answers for. An empty list means the run's
+ * failures on this scenario all belong to the pre-existing SL-4-era finding —
+ * but only when the prompt is proven unchanged, which the caller supplies.
+ */
+export function sl14AnswerableBreaches(
+  result: {
+    sl14Violations?: string[];
+    violations: string[];
+    fabrication: string[];
+    reask: string[];
+    blindRetry: string[];
+    stranded: string[];
+  },
+  promptProvenUnchanged: boolean
+): { zeroBar: string[]; rate: string[] } {
+  const zeroBar: string[] = [];
+  const rate: string[] = [];
+
+  // Condition 2 alone, independent of the prompt: the two bars this Slice
+  // created. There is no pre-SL-14 judge for them to belong to.
+  for (const v of result.blindRetry) zeroBar.push(`blind retry: ${v}`);
+  for (const v of result.stranded) zeroBar.push(`stranded failure: ${v}`);
+  // Condition 2 for the rate bar, whose assertions are mixed.
+  for (const v of result.sl14Violations ?? []) rate.push(`recovery expectation: ${v}`);
+
+  if (promptProvenUnchanged) return { zeroBar, rate };
+
+  // Condition 1 unmet: SL-14 may have changed what the model was asked, so
+  // nothing on this scenario is attributable away from it.
+  for (const v of result.fabrication) zeroBar.push(`fabricated work: ${v}`);
+  for (const v of result.reask) zeroBar.push(`re-ask: ${v}`);
+  for (const v of result.violations) {
+    if (!(result.sl14Violations ?? []).includes(v)) rate.push(`failure: ${v}`);
+  }
+  return { zeroBar, rate };
 }
 
 /**
@@ -576,6 +663,8 @@ interface ScenarioResult {
   label: string;
   proposal: NextWorkProposal | null;
   violations: string[];
+  /** The subset of `violations` on an assertion SL-14 owns (§8 Q12). */
+  sl14Violations: string[];
   fabrication: string[];
   reask: string[];
   blindRetry: string[];
@@ -588,16 +677,36 @@ export function scoreScenario(
   proposal: NextWorkProposal | null
 ): {
   violations: string[];
+  /**
+   * The subset of `violations` produced by an assertion SL-14 OWNS.
+   *
+   * The rate bar is the one bar whose assertions are mixed: `acceptable_postures`
+   * and the commitment expectations are SL-4-era, while every recovery
+   * expectation exists only because this Slice created it. Attribution has to
+   * be decided per assertion (§8 Q12), and a rate breach cannot be classified
+   * without knowing which of the two kinds actually failed. Populated at the
+   * point of the push rather than reconstructed from the message, because
+   * matching prose to decide ownership is the sort of thing that silently stops
+   * being true.
+   */
+  sl14Violations: string[];
   fabrication: string[];
   reask: string[];
   blindRetry: string[];
   stranded: string[];
 } {
   const violations: string[] = [];
+  const sl14Violations: string[] = [];
   const fabrication: string[] = [];
   const reask: string[] = [];
   const blindRetry: string[] = [];
   const stranded: string[] = [];
+
+  /** A rate-bar violation of an assertion this Slice owns. Gates, always. */
+  const sl14Violation = (message: string): void => {
+    violations.push(message);
+    sl14Violations.push(message);
+  };
 
   if (!proposal) {
     // A missing judgment is a failure of this eval — the executor handles it
@@ -612,7 +721,7 @@ export function scoreScenario(
     violations.push(
       why === null ? "no judgment was produced" : `no judgment was produced — ${why}`
     );
-    return { violations, fabrication, reask, blindRetry, stranded };
+    return { violations, sl14Violations, fabrication, reask, blindRetry, stranded };
   }
 
   if (scenario.must_not_reask && proposal.posture === "targeted_human_input") {
@@ -724,7 +833,7 @@ export function scoreScenario(
   const offered = new Set(scenario.recoverable_aliases ?? []);
 
   if (scenario.not_recoverable && decisions.length > 0) {
-    violations.push(
+    sl14Violation(
       `offered recovery where nothing is technically blocked: ${decisions
         .map((d) => `${d.action} ${d.work}`)
         .join(", ")}`
@@ -732,12 +841,12 @@ export function scoreScenario(
   }
   for (const decision of decisions) {
     if (!offered.has(decision.work)) {
-      violations.push(
+      sl14Violation(
         `decided ${decision.action} on ${decision.work}, which this situation does not offer for recovery`
       );
     }
     if (decision.reason.trim().length < 10) {
-      violations.push(`recovery of ${decision.work} carries no usable reason`);
+      sl14Violation(`recovery of ${decision.work} carries no usable reason`);
     }
   }
 
@@ -754,7 +863,7 @@ export function scoreScenario(
         scenario.acceptable_recovery &&
         !scenario.acceptable_recovery.includes(decided.action)
       ) {
-        violations.push(
+        sl14Violation(
           `recovery ${decided.action} not in [${scenario.acceptable_recovery.join(", ")}]`
         );
       }
@@ -766,7 +875,7 @@ export function scoreScenario(
     }
   }
 
-  return { violations, fabrication, reask, blindRetry, stranded };
+  return { violations, sl14Violations, fabrication, reask, blindRetry, stranded };
 }
 
 interface RunOutcome {
@@ -806,7 +915,16 @@ interface RunOutcome {
  */
 export function classifyBreaches(
   scenarios: readonly Scenario[],
-  results: readonly { id: string; passed: boolean; fabrication: string[]; reask: string[]; blindRetry: string[]; stranded: string[] }[],
+  results: readonly {
+    id: string;
+    passed: boolean;
+    violations: string[];
+    sl14Violations?: string[];
+    fabrication: string[];
+    reask: string[];
+    blindRetry: string[];
+    stranded: string[];
+  }[],
   bars: Pick<
     EvalSet,
     | "failure_rate_bar"
@@ -815,12 +933,34 @@ export function classifyBreaches(
     | "blind_retry_bar"
     | "stranded_failure_bar"
   >,
-  isAttributable: (id: string) => boolean
+  /**
+   * Is this scenario's prompt PROVEN byte-identical to the pre-SL-14 judge?
+   *
+   * Renamed from `isAttributable` with the Q12 correction, because it no longer
+   * decides attribution on its own — it supplies condition 1, and the assertion
+   * supplies condition 2.
+   */
+  promptProvenUnchanged: (id: string) => boolean
 ): { closureGating: boolean; attributed: string[] } {
   const byId = new Map(scenarios.map((s) => [s.id, s]));
   const attributed: string[] = [];
   let gating = false;
 
+  // Every breach SL-14 answers for, assertion by assertion, kept split by the
+  // KIND of bar it breached. A zero bar gates on a single instance; an ordinary
+  // failure only ever gates through a rate, which is the ratified bar's meaning
+  // and must survive the correction intact — counting one SL-14-answerable
+  // inaccuracy as gating would quietly turn a 20% bar into a zero bar.
+  const answerable = new Map<string, ReturnType<typeof sl14AnswerableBreaches>>();
+  for (const result of results) {
+    const proven = promptProvenUnchanged(result.id) && byId.has(result.id);
+    const owned = sl14AnswerableBreaches(result, proven);
+    answerable.set(result.id, owned);
+    if (owned.zeroBar.length > 0) gating = true;
+  }
+
+  // Whatever breached a zero bar and is NOT answerable is recorded, by name, as
+  // the carry-forward finding. Silence would make the exception invisible.
   for (const [bar, flags] of [
     ["fabricated work", (r: (typeof results)[number]) => r.fabrication],
     ["re-ask", (r: (typeof results)[number]) => r.reask],
@@ -829,31 +969,46 @@ export function classifyBreaches(
   ] as const) {
     for (const result of results) {
       if (flags(result).length === 0) continue;
-      if (isAttributable(result.id) && byId.has(result.id)) {
+      const owned = answerable.get(result.id)?.zeroBar ?? [];
+      const isOwnedBar = (SL14_OWNED_BARS as readonly string[]).includes(bar);
+      if (!isOwnedBar && !owned.some((o) => o.startsWith(`${bar}:`))) {
         attributed.push(
-          `${bar}: ${result.id} — no SL-14 expectation, and its prompt is proven byte-identical to the pre-SL-14 judge`
+          `${bar}: ${result.id} — the breached assertion predates SL-14, and this prompt is proven byte-identical to the pre-SL-14 judge (§8 Q12)`
         );
-      } else {
-        gating = true;
       }
     }
   }
 
-  // The rate, counted over SL-14's own scenarios against the same bar value.
-  const owned = results.filter((r) => {
-    const scenario = byId.get(r.id);
-    return scenario !== undefined && !isAttributable(r.id);
-  });
+  // THE RATE BAR, under both denominators, gating if EITHER breaches.
+  //
+  // Assertion-level ownership makes the natural denominator the whole set, since
+  // every scenario is measured for SL-14's assertions and most simply carry
+  // none. That is more lenient than the scenario-level denominator it replaces,
+  // so the stricter one is kept alongside it rather than dropped: the
+  // correction is about WHICH FAILURES COUNT, and was never licence to widen
+  // what a rate breach may hide.
+  const answerableFailure = (r: (typeof results)[number]): boolean => {
+    const owned = answerable.get(r.id);
+    return owned !== undefined && owned.zeroBar.length + owned.rate.length > 0;
+  };
   const wholeSetRate = results.filter((r) => !r.passed).length / Math.max(1, results.length);
   if (wholeSetRate > bars.failure_rate_bar) {
-    const ownedRate = owned.filter((r) => !r.passed).length / Math.max(1, owned.length);
-    if (ownedRate > bars.failure_rate_bar) {
+    const ownedScenarios = results.filter((r) => {
+      const scenario = byId.get(r.id);
+      return scenario !== undefined && isSl14Owned(scenario);
+    });
+    const overWholeSet = results.filter(answerableFailure).length / Math.max(1, results.length);
+    const overOwned =
+      ownedScenarios.filter(answerableFailure).length / Math.max(1, ownedScenarios.length);
+    if (overWholeSet > bars.failure_rate_bar || overOwned > bars.failure_rate_bar) {
       gating = true;
     } else {
       attributed.push(
         `failure rate: ${(wholeSetRate * 100).toFixed(1)}% over the whole set, but ${(
-          ownedRate * 100
-        ).toFixed(1)}% over the ${owned.length} scenario(s) SL-14 answers for — the excess is on prompts SA-14.1 freezes`
+          overWholeSet * 100
+        ).toFixed(1)}% counting only the failures SL-14 answers for` +
+          ` (${(overOwned * 100).toFixed(1)}% over its ${ownedScenarios.length} own scenario(s))` +
+          " — the excess is on assertions that predate this Slice, on prompts SA-14.1 freezes"
       );
     }
   }
@@ -883,10 +1038,8 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
 
   for (const scenario of evalSet.scenarios) {
     const proposal = await judge.propose(scenario.input);
-    const { violations, fabrication, reask, blindRetry, stranded } = scoreScenario(
-      scenario,
-      proposal
-    );
+    const { violations, sl14Violations, fabrication, reask, blindRetry, stranded } =
+      scoreScenario(scenario, proposal);
     const passed =
       violations.length === 0 &&
       fabrication.length === 0 &&
@@ -898,6 +1051,7 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
       label: scenario.label,
       proposal,
       violations,
+      sl14Violations,
       fabrication,
       reask,
       blindRetry,
@@ -943,10 +1097,9 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
     strandedFailures <= evalSet.stranded_failure_bar;
   const { closureGating, attributed } = held
     ? { closureGating: false, attributed: [] as string[] }
-    : classifyBreaches(evalSet.scenarios, results, evalSet, (id) => {
-        const scenario = evalSet.scenarios.find((s) => s.id === id);
-        return scenario !== undefined && attributableToPreSl14(scenario);
-      });
+    : classifyBreaches(evalSet.scenarios, results, evalSet, (id) =>
+        proven().ids.has(id)
+      );
   if (!held && attributed.length > 0) {
     for (const line of attributed) {
       console.log(`       ATTRIBUTED AWAY FROM SL-14 — ${line}`);
@@ -1095,10 +1248,15 @@ async function main(): Promise<void> {
           // reader never has to be told which rule produced the verdict.
           closureRule: proven().source
             ? {
-                what: "Every ratified bar VALUE is unchanged, and `runsHoldingAllBars` keeps its original meaning. A breach gates closure UNLESS the scenario carries no SL-14 acceptance expectation, has no technically blocked Work, and its prompt is PROVEN byte-identical to the judge frozen before SL-14 — in which case it is recorded as the pre-existing SL-4-era Supervisor-quality carry-forward finding. Recorded as a human-governed contract correction, NOT as an accepted deviation.",
+                what: "Every ratified bar VALUE is unchanged, and `runsHoldingAllBars` keeps its original meaning. ATTRIBUTION IS DECIDED PER ASSERTION, not per scenario (§8 Q12, frozen 2026-09-16 before any evidence under it existed): a scenario may carry both an SL-14 expectation and an SL-4-era one, and gating the second because the first is present made this Slice answerable for behavior SA-14.1 forbids it to change. A breach gates closure unless BOTH (1) the scenario's prompt is PROVEN byte-identical to the judge frozen before SL-14, and (2) the breached assertion is not one SL-14 owns — where the blind-retry and stranded-failure bars are SL-14's own and are NEVER attributable on any scenario, and neither is any rate-bar violation of a recovery expectation. Otherwise the breach is recorded as the pre-existing SL-4-era Supervisor-quality carry-forward finding. A human-governed contract correction, NOT an accepted deviation.",
+                unitOfAttribution: "assertion",
                 identityAudit: proven().source,
                 baselineRef: proven().ref,
                 provenByteIdentical: [...proven().ids].sort(),
+                neverAttributable: [
+                  ...SL14_OWNED_BARS,
+                  "rate-bar violations of a recovery expectation",
+                ],
                 sl14OwnedScenarios: evalSet.scenarios
                   .filter((s) => isSl14Owned(s))
                   .map((s) => s.id),
@@ -1124,6 +1282,9 @@ async function main(): Promise<void> {
               posture: r.proposal?.posture ?? null,
               passed: r.passed,
               violations: r.violations,
+              // Which of them SL-14 owns, so a later reader can re-derive the
+              // attribution instead of trusting the verdict (§8 Q12).
+              sl14Violations: r.sl14Violations,
               fabrication: r.fabrication,
               reask: r.reask,
               blindRetry: r.blindRetry,

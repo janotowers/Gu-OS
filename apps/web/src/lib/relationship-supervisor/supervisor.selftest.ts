@@ -2150,7 +2150,14 @@ async function main(): Promise<void> {
       blind_retry_bar: 0,
       stranded_failure_bar: 0,
     };
-    const clean = { fabrication: [], reask: [], blindRetry: [], stranded: [] };
+    const clean = {
+      violations: [] as string[],
+      sl14Violations: [] as string[],
+      fabrication: [] as string[],
+      reask: [] as string[],
+      blindRetry: [] as string[],
+      stranded: [] as string[],
+    };
     const frozenScenario = {
       id: "frozen",
       label: "nothing blocked",
@@ -2265,8 +2272,10 @@ async function main(): Promise<void> {
     assert.equal(rateOnly.closureGating, false, "80% of it on prompts SA-14.1 freezes");
     assert.match(rateOnly.attributed.join(" "), /failure rate/);
 
-    // …and the same shape gates closure the moment SL-14's own scenario is the
-    // one failing, even though the whole-set rate is identical.
+    // …and the same shape gates closure the moment the failing assertion is one
+    // SL-14 owns, even though the whole-set rate is identical. Under the Q12
+    // correction the fixture has to say WHICH assertion failed, because that is
+    // now the thing being classified.
     assert.equal(
       classifyBreaches(
         wide,
@@ -2275,13 +2284,216 @@ async function main(): Promise<void> {
           { id: "f2", passed: false, ...clean },
           { id: "f3", passed: false, ...clean },
           { id: "f4", passed: true, ...clean },
-          { id: "owned", passed: false, ...clean },
+          {
+            id: "owned",
+            passed: false,
+            ...clean,
+            violations: ["recovery leave_blocked not in [retry_work]"],
+            sl14Violations: ["recovery leave_blocked not in [retry_work]"],
+          },
         ],
         bars,
         (id) => frozenIds.has(id)
       ).closureGating,
       true,
-      "SL-14's own scenario failing is never attributed away"
+      "a recovery expectation failing is never attributed away"
+    );
+
+    // THE RATE BAR KEEPS ITS VALUE AND ITS MEANING. One SL-14-answerable
+    // ordinary inaccuracy, inside a set whose rate holds, is not a breach of
+    // anything — treating it as gating would turn a ratified 20% bar into a
+    // zero bar by way of a rule that was only allowed to change attribution.
+    assert.equal(
+      classifyBreaches(
+        wide,
+        [
+          { id: "f1", passed: true, ...clean },
+          { id: "f2", passed: true, ...clean },
+          { id: "f3", passed: true, ...clean },
+          { id: "f4", passed: true, ...clean },
+          {
+            id: "owned",
+            passed: false,
+            ...clean,
+            violations: ["recovery leave_blocked not in [retry_work]"],
+            sl14Violations: ["recovery leave_blocked not in [retry_work]"],
+          },
+        ],
+        bars,
+        (id) => frozenIds.has(id)
+      ).closureGating,
+      false,
+      "20% of the set failing on an SL-14 assertion is exactly the bar, not a breach of it"
+    );
+
+    // ── §8 Q12 — ATTRIBUTION IS PER ASSERTION, NOT PER SCENARIO.
+    //
+    // The case that forced the correction, reduced to a fixture:
+    // `h7-waiting-on-the-appraiser-visit-not-technical` carries `not_recoverable`
+    // — an SL-14 expectation the judge SATISFIED — and breached the SL-4-era
+    // rule that a vague intention is not a commitment, on a prompt proven
+    // byte-identical. Scenario-level ownership gated it; assertion-level does
+    // not, and must not, because SA-14.1 forbids this Slice to touch it.
+    const mixedScenario = {
+      id: "mixed",
+      label: "SL-14 expectation and an SL-4-era one, in one situation",
+      rubric: "-",
+      acceptable_postures: ["wait"],
+      not_recoverable: true,
+      must_not_detect_commitment: true,
+      input: { workSummary: ["appraiser_site_visit — blocked (human)"] } as unknown as SupervisorJudgeInput,
+    };
+    assert.ok(isSl14Owned(mixedScenario), "the SCENARIO is SL-14-owned — that is the premise");
+
+    const mixed = classifyBreaches(
+      [mixedScenario, ...padded.slice(0, 4)],
+      [
+        { id: "mixed", passed: false, ...clean, fabrication: ["invented a commitment"] },
+        { id: "p1", passed: true, ...clean },
+        { id: "p2", passed: true, ...clean },
+        { id: "p3", passed: true, ...clean },
+        { id: "frozen", passed: true, ...clean },
+      ],
+      bars,
+      (id) => id === "mixed"
+    );
+    assert.equal(
+      mixed.closureGating,
+      false,
+      "a pre-SL-14 assertion on a proven-unchanged prompt does not gate, even inside an SL-14-owned scenario"
+    );
+    assert.match(mixed.attributed.join("\n"), /fabricated work: mixed .*predates SL-14/);
+
+    // The SAME scenario gates the moment the SL-14 assertion is the one that
+    // breached. This is the pair that makes the unit of attribution real: one
+    // situation, two assertions, opposite verdicts. A single scenario is its
+    // own whole set here, so 100% breaches the rate bar.
+    assert.equal(
+      classifyBreaches(
+        [mixedScenario],
+        [
+          {
+            id: "mixed",
+            passed: false,
+            ...clean,
+            violations: ["offered recovery where nothing is technically blocked"],
+            sl14Violations: ["offered recovery where nothing is technically blocked"],
+          },
+        ],
+        bars,
+        () => true
+      ).closureGating,
+      true,
+      "the SL-14 assertion in the very same scenario still gates"
+    );
+
+    // AND THE SCORER IS WHAT MAKES THAT TRUE. The classification above is only
+    // as good as the tagging it reads, so the tag is pinned at its source: a
+    // recovery expectation failing must arrive already marked as SL-14's.
+    const taggedScore = scoreScenario(
+      {
+        id: "tagging",
+        label: "-",
+        rubric: "-",
+        acceptable_postures: ["wait"],
+        not_recoverable: true,
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      },
+      {
+        posture: "wait",
+        diagnosis: "-",
+        rationale: "una razón suficientemente larga para pasar el mínimo",
+        insufficient_evidence: false,
+        capability_gap: null,
+        proposed_work: [],
+        commitments: [],
+        reconsider_in_hours: 24,
+        recovery: [{ work: "w1", action: "retry", reason: "otra razón larga y suficiente" }],
+      } as unknown as NextWorkProposal
+    );
+    assert.ok(
+      taggedScore.sl14Violations.some((v) => v.includes("offered recovery")),
+      "a recovery expectation failing is tagged SL-14's by the scorer, not inferred later"
+    );
+    assert.ok(
+      taggedScore.sl14Violations.every((v) => taggedScore.violations.includes(v)),
+      "and the tagged subset stays a subset — the rate bar still counts it once"
+    );
+
+    // SL-14'S OWN BARS ARE NEVER ATTRIBUTABLE, on any scenario, however proven.
+    // These two bars exist because this Slice created them, so there is no
+    // pre-SL-14 judge for them to belong to.
+    for (const flag of ["blindRetry", "stranded"] as const) {
+      const verdict = classifyBreaches(
+        [mixedScenario],
+        [{ id: "mixed", passed: false, ...clean, [flag]: ["breached"] }],
+        bars,
+        () => true
+      );
+      assert.equal(
+        verdict.closureGating,
+        true,
+        `${flag} is SL-14's own bar and gates however byte-identical the prompt is`
+      );
+      assert.deepEqual(verdict.attributed, [], "and it is never recorded as attributed");
+    }
+
+    // CONDITION 1 REMAINS NECESSARY. An unproven prompt makes every assertion
+    // on that scenario SL-14's, including the SL-4-era ones, because a changed
+    // prompt is exactly how this Slice could have caused them.
+    assert.equal(
+      classifyBreaches(
+        [mixedScenario],
+        [{ id: "mixed", passed: false, ...clean, fabrication: ["invented a commitment"] }],
+        bars,
+        () => false
+      ).closureGating,
+      true,
+      "without byte-identity, a pre-SL-14 assertion is still SL-14's to answer for"
+    );
+
+    // THE RATE BAR KEEPS THE STRICTER DENOMINATOR, and it has to be the thing
+    // doing the work or keeping it is decoration. Ten scenarios, three failing,
+    // so the whole-set rate breaches at 30%. Counting only what SL-14 answers
+    // for gives 1 of 10 — inside the bar — while 1 of its 1 own scenario is
+    // 100% and gates. Assertion-level ownership makes the whole set the natural
+    // denominator, which is MORE lenient; the correction was allowed to change
+    // which failures count, never to widen what a rate breach may hide.
+    const wideSet = [
+      mixedScenario,
+      ...Array.from({ length: 9 }, (_, i) => ({
+        id: `q${i}`,
+        label: "-",
+        rubric: "-",
+        acceptable_postures: [],
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      })),
+    ];
+    const onlyStricter = classifyBreaches(
+      wideSet,
+      [
+        {
+          id: "mixed",
+          passed: false,
+          ...clean,
+          violations: ["recovery retry_work not in [leave_blocked]"],
+          sl14Violations: ["recovery retry_work not in [leave_blocked]"],
+        },
+        { id: "q0", passed: false, ...clean, violations: ["posture wrong"] },
+        { id: "q1", passed: false, ...clean, violations: ["posture wrong"] },
+        ...Array.from({ length: 7 }, (_, i) => ({
+          id: `q${i + 2}`,
+          passed: true,
+          ...clean,
+        })),
+      ],
+      bars,
+      () => true
+    );
+    assert.equal(
+      onlyStricter.closureGating,
+      true,
+      "a rate breach concentrated on SL-14's own scenarios gates even at 10% of the whole set"
     );
   });
 
