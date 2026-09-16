@@ -302,6 +302,13 @@ const SET_FILES = {
   // holdout is evidence of what it measured, never independent evidence about a
   // change made after reading it. THIS is the independent instrument now.
   holdout3: "supervisor-holdout-3-scenarios.json",
+  // Frozen 2026-09-16, after `holdout3` held every bar in 10 of 10 — so not
+  // because it failed, but because the CRITERION changed once that number had
+  // been read. A holdout measured before a rule existed cannot be said to have
+  // validated the rule independently. Every situation in it is SL-14-owned, so
+  // the closure rule's exception is structurally unavailable there and every
+  // breach gates closure. THIS is the independent instrument now.
+  holdout4: "supervisor-holdout-4-scenarios.json",
 } as const;
 
 const setName = (/^--set=(.+)$/.exec(process.argv.find((a) => a.startsWith("--set=")) ?? "")?.[1] ??

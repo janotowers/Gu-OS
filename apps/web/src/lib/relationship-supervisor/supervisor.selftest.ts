@@ -2379,6 +2379,32 @@ async function main(): Promise<void> {
     }
   });
 
+  await t("holdout 4 is ENTIRELY SL-14-owned, which is the only reason it can test the rule", () => {
+    // The set's defining property, asserted rather than described. The corrected
+    // closure rule can attribute a breach away from SL-14 only on a scenario
+    // carrying no SL-14 expectation; if even one situation here were such a
+    // scenario, this holdout would be partly excusable by the very rule it was
+    // frozen to test.
+    const suite = JSON.parse(
+      readFileSync(path.join(__dirname, "eval", "supervisor-holdout-4-scenarios.json"), "utf8")
+    ) as { scenarios: Array<{ id: string }> };
+    assert.ok(suite.scenarios.length >= 10, "at least ten situations");
+    for (const scenario of suite.scenarios) {
+      assert.equal(
+        isSl14Owned(scenario as never),
+        true,
+        `holdout 4 / ${scenario.id}: not SL-14-owned, so the closure rule could excuse a breach on it`
+      );
+      // Belt and braces: the exception needs BOTH conditions, and this asserts
+      // the first one fails even if the scenario were somehow proven identical.
+      assert.equal(
+        mayAttribute(scenario as never, new Set([scenario.id])),
+        false,
+        `holdout 4 / ${scenario.id}: attributable even when treated as byte-identical`
+      );
+    }
+  });
+
   await t("SA-14.3 a spent retry bound is stated to the judge as unavailable, and only then", () => {
     // The structural repair of 2026-09-16. `planRecovery` already refuses a
     // second Supervisor retry; this stops the prompt from OFFERING one, which
@@ -2477,6 +2503,7 @@ async function main(): Promise<void> {
       "supervisor-holdout-scenarios.json",
       "supervisor-holdout-2-scenarios.json",
       "supervisor-holdout-3-scenarios.json",
+      "supervisor-holdout-4-scenarios.json",
     ];
     const idsPerFile: Array<Set<string>> = [];
 
