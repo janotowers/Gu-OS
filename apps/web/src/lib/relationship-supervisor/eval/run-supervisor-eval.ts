@@ -154,6 +154,134 @@ interface EvalSet {
   scenarios: Scenario[];
 }
 
+// ============================================================================
+// R1 SL-14 — WHOSE FAILURE IS IT?
+//
+// The Accountable's decision of 2026-09-16, recorded as a human-governed
+// CONTRACT CORRECTION and explicitly not as an accepted deviation. Every
+// ratified bar VALUE is unchanged; what this adds is attribution.
+//
+// The contract boundary the evidence exposed: SA-14.1 REQUIRES the pre-SL-14
+// situations to render a byte-identical prompt, while the Definition of Done
+// let a stochastic failure on one of those unchanged SL-4-era prompts block
+// SL-14 indefinitely. A Slice cannot be forbidden to change a behavior and also
+// be solely answerable for making it statistically perfect.
+//
+// SO A BREACH IS STILL A BREACH. `held` keeps its meaning exactly, every run is
+// reported as it measured, and no earlier run becomes a pass. What the rule
+// decides is narrower: whether a breach GATES CLOSURE, or is recorded as the
+// pre-existing Supervisor-quality carry-forward finding it belongs to.
+//
+// IT FAILS CLOSED, and is designed so it cannot mask a regression this Slice
+// introduced:
+//
+//   1. the scenario must carry NO SL-14 acceptance expectation, and no
+//      technically blocked Work at all — SL-14's own situations are always
+//      closure-gating;
+//   2. its prompt must be PROVEN byte-identical to the judge frozen before
+//      SL-14, mechanically, by the audit artifact named in
+//      `SUPERVISOR_EVAL_IDENTITY_AUDIT`;
+//   3. that audit must attest THIS set, by sha256. A stale or absent audit
+//      grants no exception whatsoever.
+//
+// Without the audit the runner behaves exactly as it did before this rule.
+// ============================================================================
+
+/**
+ * Does this scenario measure behavior SL-14 owns?
+ *
+ * True when it carries any SL-14 acceptance expectation, or when its Work list
+ * shows an aliased blocked item — which is precisely the condition under which
+ * SL-14 changed the prompt at all.
+ */
+export function isSl14Owned(scenario: Scenario): boolean {
+  if (
+    scenario.blocked_work !== undefined ||
+    scenario.acceptable_recovery !== undefined ||
+    scenario.recoverable_aliases !== undefined ||
+    scenario.requires_disposition !== undefined ||
+    scenario.retry_is_blind !== undefined ||
+    scenario.not_recoverable !== undefined ||
+    scenario.input.retryExhaustedAliases !== undefined
+  ) {
+    return true;
+  }
+  return (scenario.input.workSummary ?? []).some((line) => /^\[w\d+\]/.test(String(line)));
+}
+
+export interface IdentityAudit {
+  /** The set this audit attests, by digest. Anything else is not attested. */
+  currentSetSha256?: string;
+  /** The pre-SL-14 reference the prompts were compared against. */
+  baselineRef?: string;
+  frozenByteIdentical?: string[];
+  differing?: string[];
+}
+
+/**
+ * Is this audit admissible as proof about the set being measured?
+ *
+ * Separated from reading the file so the refusals are testable without a
+ * process exit: an audit of another set, or one that reports SA-14.1 already
+ * breached, proves nothing here and must not silently degrade to "no proof".
+ */
+export function admissibleAudit(
+  audit: IdentityAudit,
+  measuredSetSha256: string
+): { ids: Set<string>; ref: string | null } | { refused: string } {
+  if (audit.currentSetSha256 !== measuredSetSha256) {
+    return {
+      refused:
+        `it attests set sha256 ${String(audit.currentSetSha256).slice(0, 12)}…,` +
+        ` but this run measures ${measuredSetSha256.slice(0, 12)}….` +
+        " An audit of a different set proves nothing about this one",
+    };
+  }
+  if ((audit.differing ?? []).length > 0) {
+    return { refused: `it reports SA-14.1 breached for: ${(audit.differing ?? []).join(", ")}` };
+  }
+  return { ids: new Set(audit.frozenByteIdentical ?? []), ref: audit.baselineRef ?? null };
+}
+
+/**
+ * The scenario ids whose prompt is PROVEN unchanged, or an empty set.
+ *
+ * Deliberately silent-but-empty rather than throwing when unset: a run without
+ * the audit is the run this file has always done. It is loud when an audit IS
+ * named and is not admissible, because that is a mistake, not a choice.
+ */
+function loadProvenFrozen(): { ids: Set<string>; source: string | null; ref: string | null } {
+  const auditPath = process.env.SUPERVISOR_EVAL_IDENTITY_AUDIT;
+  if (!auditPath) return { ids: new Set(), source: null, ref: null };
+  const verdict = admissibleAudit(
+    JSON.parse(readFileSync(auditPath, "utf8")) as IdentityAudit,
+    setDigest
+  );
+  if ("refused" in verdict) {
+    console.error(`the identity audit at ${auditPath} is INADMISSIBLE: ${verdict.refused}`);
+    process.exit(1);
+  }
+  return { ids: verdict.ids, source: auditPath, ref: verdict.ref };
+}
+
+const provenFrozen = loadProvenFrozen();
+
+/**
+ * May a breach on this scenario be attributed away from SL-14?
+ *
+ * Both conditions are load-bearing and neither is sufficient. Byte-identity
+ * alone would excuse a scenario SL-14 is measured on; absence of an SL-14
+ * expectation alone would excuse an unproven prompt. The `provenIds` argument
+ * is explicit so the conjunction is testable without the environment.
+ */
+export function mayAttribute(scenario: Scenario, provenIds: ReadonlySet<string>): boolean {
+  return !isSl14Owned(scenario) && provenIds.has(scenario.id);
+}
+
+function attributableToPreSl14(scenario: Scenario): boolean {
+  return mayAttribute(scenario, provenFrozen.ids);
+}
+
 /**
  * Which set this run measures.
  *
@@ -574,8 +702,85 @@ interface RunOutcome {
   strandedFailures: number;
   noJudgment: number;
   held: boolean;
+  /**
+   * Did anything breach a bar that SL-14 is answerable for?
+   *
+   * `held` says what the run measured and never changes meaning. This says
+   * whether the breach gates closure, under the contract correction of
+   * 2026-09-16. With no identity audit loaded the two are identical.
+   */
+  closureGating: boolean;
+  /** Every breach attributed away from SL-14, with the reason, for the record. */
+  attributedToPreSl14: string[];
   /** The model the judge that ran this pass requested — from the judge itself. */
   modelId: string | null;
+}
+
+/**
+ * Splits a run's bar breaches into the ones SL-14 answers for and the ones
+ * attributable to unchanged SL-4-era behavior.
+ *
+ * The ZERO bars are per-instance, so each flagged scenario is attributed on its
+ * own. The RATE bar is a property of the whole set, so it is attributed by
+ * asking a stricter question: do SL-14's OWN scenarios, counted alone against
+ * the same bar value, breach it? If they do, the breach is SL-14's. If they do
+ * not, the excess came from prompts it cannot touch.
+ */
+export function classifyBreaches(
+  scenarios: readonly Scenario[],
+  results: readonly { id: string; passed: boolean; fabrication: string[]; reask: string[]; blindRetry: string[]; stranded: string[] }[],
+  bars: Pick<
+    EvalSet,
+    | "failure_rate_bar"
+    | "fabricated_work_bar"
+    | "reask_bar"
+    | "blind_retry_bar"
+    | "stranded_failure_bar"
+  >,
+  isAttributable: (id: string) => boolean
+): { closureGating: boolean; attributed: string[] } {
+  const byId = new Map(scenarios.map((s) => [s.id, s]));
+  const attributed: string[] = [];
+  let gating = false;
+
+  for (const [bar, flags] of [
+    ["fabricated work", (r: (typeof results)[number]) => r.fabrication],
+    ["re-ask", (r: (typeof results)[number]) => r.reask],
+    ["blind retry", (r: (typeof results)[number]) => r.blindRetry],
+    ["stranded failure", (r: (typeof results)[number]) => r.stranded],
+  ] as const) {
+    for (const result of results) {
+      if (flags(result).length === 0) continue;
+      if (isAttributable(result.id) && byId.has(result.id)) {
+        attributed.push(
+          `${bar}: ${result.id} — no SL-14 expectation, and its prompt is proven byte-identical to the pre-SL-14 judge`
+        );
+      } else {
+        gating = true;
+      }
+    }
+  }
+
+  // The rate, counted over SL-14's own scenarios against the same bar value.
+  const owned = results.filter((r) => {
+    const scenario = byId.get(r.id);
+    return scenario !== undefined && !isAttributable(r.id);
+  });
+  const wholeSetRate = results.filter((r) => !r.passed).length / Math.max(1, results.length);
+  if (wholeSetRate > bars.failure_rate_bar) {
+    const ownedRate = owned.filter((r) => !r.passed).length / Math.max(1, owned.length);
+    if (ownedRate > bars.failure_rate_bar) {
+      gating = true;
+    } else {
+      attributed.push(
+        `failure rate: ${(wholeSetRate * 100).toFixed(1)}% over the whole set, but ${(
+          ownedRate * 100
+        ).toFixed(1)}% over the ${owned.length} scenario(s) SL-14 answers for — the excess is on prompts SA-14.1 freezes`
+      );
+    }
+  }
+
+  return { closureGating: gating, attributed };
 }
 
 /**
@@ -652,6 +857,23 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
   const blindRetries = results.filter((r) => r.blindRetry.length > 0).length;
   const strandedFailures = results.filter((r) => r.stranded.length > 0).length;
   const failureRate = failures / results.length;
+  const held =
+    failureRate <= evalSet.failure_rate_bar &&
+    fabrications <= evalSet.fabricated_work_bar &&
+    reasks <= evalSet.reask_bar &&
+    blindRetries <= evalSet.blind_retry_bar &&
+    strandedFailures <= evalSet.stranded_failure_bar;
+  const { closureGating, attributed } = held
+    ? { closureGating: false, attributed: [] as string[] }
+    : classifyBreaches(evalSet.scenarios, results, evalSet, (id) => {
+        const scenario = evalSet.scenarios.find((s) => s.id === id);
+        return scenario !== undefined && attributableToPreSl14(scenario);
+      });
+  if (!held && attributed.length > 0) {
+    for (const line of attributed) {
+      console.log(`       ATTRIBUTED AWAY FROM SL-14 — ${line}`);
+    }
+  }
   return {
     index,
     results,
@@ -662,12 +884,9 @@ async function runOnce(index: number, verbose: boolean): Promise<RunOutcome> {
     blindRetries,
     strandedFailures,
     noJudgment: results.filter((r) => r.proposal === null).length,
-    held:
-      failureRate <= evalSet.failure_rate_bar &&
-      fabrications <= evalSet.fabricated_work_bar &&
-      reasks <= evalSet.reask_bar &&
-      blindRetries <= evalSet.blind_retry_bar &&
-      strandedFailures <= evalSet.stranded_failure_bar,
+    held,
+    closureGating,
+    attributedToPreSl14: attributed,
     modelId: judge.modelId,
   };
 }
@@ -733,6 +952,22 @@ async function main(): Promise<void> {
   }
   console.log(`runs holding:     ${heldRuns} of ${runCount}`);
 
+  // Reported apart from `runs holding`, always, so the two can never be read as
+  // the same number. The first says what the judge did; the second says what
+  // SL-14 answers for.
+  const gatingRuns = runs.filter((r) => r.closureGating).length;
+  if (provenFrozen.source) {
+    console.log(
+      `closure-gating:   ${gatingRuns} of ${runCount} — the contract correction of 2026-09-16.` +
+        ` ${provenFrozen.ids.size} scenario(s) proven byte-identical to ${provenFrozen.ref ?? "the pre-SL-14 judge"}`
+    );
+  } else {
+    console.log(
+      "closure-gating:   every breach, as before — no identity audit was named" +
+        " (`SUPERVISOR_EVAL_IDENTITY_AUDIT`), so nothing is attributed away from SL-14"
+    );
+  }
+
   // Scenarios that fail in EVERY run are a systematic finding; ones that fail
   // in some are instability. Reporting them apart matters, because only the
   // first is something a prompt or a model change can be expected to fix.
@@ -778,6 +1013,23 @@ async function main(): Promise<void> {
           scenarios: total,
           runCount,
           runsHoldingAllBars: heldRuns,
+          // The contract correction of 2026-09-16, carried in the artifact so a
+          // reader never has to be told which rule produced the verdict.
+          closureRule: provenFrozen.source
+            ? {
+                what: "Every ratified bar VALUE is unchanged, and `runsHoldingAllBars` keeps its original meaning. A breach gates closure UNLESS the scenario carries no SL-14 acceptance expectation, has no technically blocked Work, and its prompt is PROVEN byte-identical to the judge frozen before SL-14 — in which case it is recorded as the pre-existing SL-4-era Supervisor-quality carry-forward finding. Recorded as a human-governed contract correction, NOT as an accepted deviation.",
+                identityAudit: provenFrozen.source,
+                baselineRef: provenFrozen.ref,
+                provenByteIdentical: [...provenFrozen.ids].sort(),
+                sl14OwnedScenarios: evalSet.scenarios
+                  .filter((s) => isSl14Owned(s))
+                  .map((s) => s.id),
+                runsGatingClosure: runs.filter((r) => r.closureGating).length,
+              }
+            : {
+                what: "No identity audit was named, so nothing is attributed away from SL-14 and every breach gates closure.",
+                runsGatingClosure: runs.filter((r) => r.closureGating).length,
+              },
           runs: runs.map((run) => ({
             run: run.index,
             failures: run.failures,
@@ -787,6 +1039,8 @@ async function main(): Promise<void> {
             blindRetries: run.blindRetries,
             strandedFailures: run.strandedFailures,
             held: run.held,
+            closureGating: run.closureGating,
+            attributedToPreSl14: run.attributedToPreSl14,
             results: run.results.map((r) => ({
               id: r.id,
               posture: r.proposal?.posture ?? null,
@@ -809,10 +1063,10 @@ async function main(): Promise<void> {
     console.log(`artifact:         ${artifactPath}`);
   }
 
-  if (heldRuns < runCount) {
+  if (gatingRuns > 0) {
     console.error("");
     console.error(
-      `FAILED: ${runCount - heldRuns} of ${runCount} run(s) breached a frozen bar.`
+      `FAILED: ${gatingRuns} of ${runCount} run(s) breached a frozen bar on behavior SL-14 answers for.`
     );
     console.error(
       "The bars were stated before this set was first run and are not to be moved to fit a result."
@@ -821,6 +1075,18 @@ async function main(): Promise<void> {
   }
 
   console.log("");
+  if (heldRuns < runCount) {
+    // Deliberately NOT called a pass of every bar. It is not one, and the
+    // breach stays visible in the line above and in the artifact.
+    console.log(
+      `supervisor eval: ${runCount - heldRuns} of ${runCount} run(s) breached a bar, and EVERY such breach is` +
+        " attributed to unchanged SL-4-era behavior by mechanical proof. No run is recorded as a pass."
+    );
+    console.log(
+      "Those breaches remain the pre-existing Supervisor-quality carry-forward finding, open for R1 graduation."
+    );
+    return;
+  }
   console.log(
     `supervisor eval: every frozen bar held in all ${runCount} run(s).`
   );

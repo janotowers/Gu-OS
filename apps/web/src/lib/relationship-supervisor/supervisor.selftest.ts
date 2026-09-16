@@ -80,8 +80,12 @@ import { checkPostureHistoryCoherence, distinctDaysCovered, reconstructSituation
 import { resolveCommitmentDue } from "./commitments";
 import { attributeModels, summarizePostureDistribution } from "./observability";
 import {
+  admissibleAudit,
   asksAPerson,
+  classifyBreaches,
   evalArtifactModel,
+  isSl14Owned,
+  mayAttribute,
   proposesProspectContact,
   scoreScenario,
 } from "./eval/run-supervisor-eval";
@@ -2100,6 +2104,275 @@ async function main(): Promise<void> {
           assert.ok(
             PLAIN.test(line) || ALIASED.test(line) || BLOCKED_PLAIN.test(line),
             `${file} / ${scenario.id}: the compile cannot emit ${JSON.stringify(line)}`
+          );
+        }
+      }
+    }
+  });
+
+  await t("the closure rule attributes only what SL-14 cannot own, and fails closed", () => {
+    // The Accountable's contract correction of 2026-09-16. These checks exist
+    // because the rule's whole risk is that it could excuse a regression, so
+    // the cases that MUST still gate closure are asserted first and in more
+    // detail than the one that may be attributed away.
+    const bars = {
+      failure_rate_bar: 0.2,
+      fabricated_work_bar: 0,
+      reask_bar: 0,
+      blind_retry_bar: 0,
+      stranded_failure_bar: 0,
+    };
+    const clean = { fabrication: [], reask: [], blindRetry: [], stranded: [] };
+    const frozenScenario = {
+      id: "frozen",
+      label: "nothing blocked",
+      rubric: "-",
+      acceptable_postures: ["no_op"],
+      input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+    };
+    const ownedScenario = {
+      id: "owned",
+      label: "blocked work",
+      rubric: "-",
+      acceptable_postures: ["wait"],
+      blocked_work: "w1",
+      input: {
+        workSummary: ["[w1] inventory_search — blocked (agent_proposed): technical failure"],
+      } as unknown as SupervisorJudgeInput,
+    };
+    const scenarios = [frozenScenario, ownedScenario];
+    const proven = (id: string) => id === "frozen";
+
+    // GATES CLOSURE — a zero-bar breach on SL-14's own scenario. Padded to five
+    // scenarios so ONE failure stays inside the 20% rate bar: the zero bar must
+    // gate on its own, without the rate bar happening to gate too.
+    const padded = [
+      ...["p1", "p2", "p3"].map((id) => ({
+        id,
+        label: "-",
+        rubric: "-",
+        acceptable_postures: [],
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      })),
+      frozenScenario,
+      ownedScenario,
+    ];
+    for (const flag of ["fabrication", "reask", "blindRetry", "stranded"] as const) {
+      const verdict = classifyBreaches(
+        padded,
+        [
+          { id: "p1", passed: true, ...clean },
+          { id: "p2", passed: true, ...clean },
+          { id: "p3", passed: true, ...clean },
+          { id: "frozen", passed: true, ...clean },
+          { id: "owned", passed: false, ...clean, [flag]: ["breached"] },
+        ],
+        bars,
+        proven
+      );
+      assert.equal(
+        verdict.closureGating,
+        true,
+        `a ${flag} breach on SL-14's own scenario must gate closure by itself`
+      );
+      assert.deepEqual(verdict.attributed, [], "and nothing about it is attributed away");
+    }
+
+    // GATES CLOSURE — a byte-frozen scenario that is NOT proven. Silence is not
+    // proof, which is the property that makes a missing audit safe.
+    assert.equal(
+      classifyBreaches(
+        scenarios,
+        [
+          { id: "frozen", passed: false, ...clean, fabrication: ["breached"] },
+          { id: "owned", passed: true, ...clean },
+        ],
+        bars,
+        () => false
+      ).closureGating,
+      true,
+      "with nothing proven, every breach gates closure"
+    );
+
+    // ATTRIBUTED AWAY — proven byte-identical AND carrying no SL-14 expectation.
+    const attributed = classifyBreaches(
+      scenarios,
+      [
+        { id: "frozen", passed: false, ...clean, fabrication: ["breached"] },
+        { id: "owned", passed: true, ...clean },
+      ],
+      bars,
+      proven
+    );
+    assert.equal(attributed.closureGating, false);
+    assert.match(
+      attributed.attributed.join("\n"),
+      /fabricated work: frozen .*byte-identical/,
+      "and it is recorded, not discarded"
+    );
+
+    // THE RATE BAR, attributed by the stricter question: SL-14's own scenarios
+    // counted alone against the same value. Four frozen failures out of five
+    // scenarios breach the whole-set rate while SL-14's own scenario holds.
+    const wide = [
+      { id: "f1", label: "-", rubric: "-", acceptable_postures: [], input: { workSummary: [] } as unknown as SupervisorJudgeInput },
+      { id: "f2", label: "-", rubric: "-", acceptable_postures: [], input: { workSummary: [] } as unknown as SupervisorJudgeInput },
+      { id: "f3", label: "-", rubric: "-", acceptable_postures: [], input: { workSummary: [] } as unknown as SupervisorJudgeInput },
+      { id: "f4", label: "-", rubric: "-", acceptable_postures: [], input: { workSummary: [] } as unknown as SupervisorJudgeInput },
+      ownedScenario,
+    ];
+    const frozenIds = new Set(["f1", "f2", "f3", "f4"]);
+    const rateOnly = classifyBreaches(
+      wide,
+      [
+        { id: "f1", passed: false, ...clean },
+        { id: "f2", passed: false, ...clean },
+        { id: "f3", passed: false, ...clean },
+        { id: "f4", passed: false, ...clean },
+        { id: "owned", passed: true, ...clean },
+      ],
+      bars,
+      (id) => frozenIds.has(id)
+    );
+    assert.equal(rateOnly.closureGating, false, "80% of it on prompts SA-14.1 freezes");
+    assert.match(rateOnly.attributed.join(" "), /failure rate/);
+
+    // …and the same shape gates closure the moment SL-14's own scenario is the
+    // one failing, even though the whole-set rate is identical.
+    assert.equal(
+      classifyBreaches(
+        wide,
+        [
+          { id: "f1", passed: false, ...clean },
+          { id: "f2", passed: false, ...clean },
+          { id: "f3", passed: false, ...clean },
+          { id: "f4", passed: true, ...clean },
+          { id: "owned", passed: false, ...clean },
+        ],
+        bars,
+        (id) => frozenIds.has(id)
+      ).closureGating,
+      true,
+      "SL-14's own scenario failing is never attributed away"
+    );
+  });
+
+  await t("attribution needs BOTH byte-identity and the absence of SL-14 expectation", () => {
+    const nothingBlocked = {
+      id: "frozen",
+      label: "-",
+      rubric: "-",
+      acceptable_postures: [],
+      input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+    };
+    const ownedSameId = { ...nothingBlocked, blocked_work: "w1" };
+
+    assert.equal(mayAttribute(nothingBlocked, new Set(["frozen"])), true);
+    // Neither condition is sufficient alone.
+    assert.equal(
+      mayAttribute(nothingBlocked, new Set()),
+      false,
+      "no proof of byte-identity, no exception"
+    );
+    assert.equal(
+      mayAttribute(ownedSameId, new Set(["frozen"])),
+      false,
+      "byte-identical or not, a scenario SL-14 is measured on is SL-14's"
+    );
+    assert.equal(mayAttribute(ownedSameId, new Set()), false);
+  });
+
+  await t("an audit that does not attest THIS set is inadmissible, not merely empty", () => {
+    const good = {
+      currentSetSha256: "a".repeat(64),
+      baselineRef: "2a12441",
+      frozenByteIdentical: ["frozen"],
+      differing: [],
+    };
+    const admitted = admissibleAudit(good, "a".repeat(64));
+    assert.ok(!("refused" in admitted));
+    assert.deepEqual([...admitted.ids], ["frozen"]);
+    assert.equal(admitted.ref, "2a12441");
+
+    // A different set proves nothing here.
+    const otherSet = admissibleAudit(good, "b".repeat(64));
+    assert.ok("refused" in otherSet);
+    assert.match(otherSet.refused, /different set/);
+
+    // An audit that itself reports SA-14.1 breached cannot grant an exception
+    // whose entire premise is that SA-14.1 holds.
+    const breached = admissibleAudit(
+      { ...good, differing: ["attention-already-consumed"] },
+      "a".repeat(64)
+    );
+    assert.ok("refused" in breached);
+    assert.match(breached.refused, /SA-14\.1 breached/);
+  });
+
+  await t("a scenario with blocked Work or an SL-14 expectation is always SL-14's", () => {
+    const nothingBlocked = {
+      id: "x",
+      label: "-",
+      rubric: "-",
+      acceptable_postures: [],
+      input: { workSummary: ["inventory_search — done (agent_proposed)"] } as unknown as SupervisorJudgeInput,
+    };
+    assert.equal(isSl14Owned(nothingBlocked), false);
+
+    // An aliased blocked line is exactly the condition under which SL-14
+    // changed the prompt, so it can never be attributed away.
+    assert.equal(
+      isSl14Owned({
+        ...nothingBlocked,
+        input: { workSummary: ["[w1] x — blocked (agent_proposed): technical failure"] } as unknown as SupervisorJudgeInput,
+      }),
+      true
+    );
+    // And so is any SL-14 expectation, even with an empty Work list — including
+    // `not_recoverable`, whose whole point is that nothing is blocked.
+    for (const key of [
+      "blocked_work",
+      "acceptable_recovery",
+      "recoverable_aliases",
+      "requires_disposition",
+      "retry_is_blind",
+      "not_recoverable",
+    ] as const) {
+      assert.equal(
+        isSl14Owned({ ...nothingBlocked, [key]: key === "blocked_work" ? "w1" : true } as never),
+        true,
+        `${key} makes a scenario SL-14's`
+      );
+    }
+    assert.equal(
+      isSl14Owned({
+        ...nothingBlocked,
+        input: { workSummary: [], retryExhaustedAliases: ["w1"] } as unknown as SupervisorJudgeInput,
+      }),
+      true,
+      "a declared spent bound is an SL-14 input"
+    );
+  });
+
+  await t("every set's SL-14-owned scenarios are the ones the closure rule gates", () => {
+    // A drift guard with teeth: if a future edit made an SL-14 recovery
+    // scenario look unowned, the rule would quietly stop gating it. Each set's
+    // recovery scenarios are enumerated from the files themselves.
+    for (const file of readdirSync(path.join(__dirname, "eval")).filter((f) =>
+      f.endsWith("-scenarios.json")
+    )) {
+      const suite = JSON.parse(readFileSync(path.join(__dirname, "eval", file), "utf8")) as {
+        scenarios: Array<{ id: string; input: { workSummary?: string[] } }>;
+      };
+      for (const scenario of suite.scenarios) {
+        const showsBlocked = (scenario.input.workSummary ?? []).some((line) =>
+          /^\[w\d+\]/.test(String(line))
+        );
+        if (showsBlocked) {
+          assert.equal(
+            isSl14Owned(scenario as never),
+            true,
+            `${file} / ${scenario.id}: shows blocked Work, so the closure rule must gate it`
           );
         }
       }

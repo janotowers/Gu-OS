@@ -212,7 +212,15 @@ async function main(): Promise<void> {
   };
 
   if (IDENTITY_ONLY) {
-    const frozen = currentSet.scenarios.filter((s) => hasNothingBlocked(s as never));
+    // Any set, not only main: a holdout's scenarios did not exist before SL-14,
+    // but the prompt the two judges build for a given input can still be
+    // compared, which is the only thing the claim rests on.
+    const auditSetRel = process.env.IDENTITY_SET_REL ?? SET_REL;
+    const auditSetBytes = readFileSync(path.join(ROOT, auditSetRel));
+    const auditSet = JSON.parse(auditSetBytes.toString("utf8")) as {
+      scenarios: Array<Record<string, unknown>>;
+    };
+    const frozen = auditSet.scenarios.filter((s) => hasNothingBlocked(s as never));
     const differing: string[] = [];
     for (const sc of frozen) {
       const input = (sc as { input: never }).input;
@@ -221,11 +229,11 @@ async function main(): Promise<void> {
       }
     }
     console.log(
-      `SA-14.1 byte-identity audit against the judge frozen at ${BASE}, no model calls.\n` +
-        `  ${frozen.length} of ${currentSet.scenarios.length} scenario(s) have nothing blocked,` +
-        ` so SA-14.1 requires their prompts to be unchanged:\n    ${frozen
-          .map((s) => String(s.id))
-          .join(", ")}`
+      `SA-14.1 byte-identity audit of ${auditSetRel} against the judge frozen at ${BASE}, no model calls.\n` +
+        `  ${frozen.length} of ${auditSet.scenarios.length} scenario(s) have nothing blocked,` +
+        ` so SA-14.1 requires their prompts to be unchanged:\n    ${
+          frozen.length > 0 ? frozen.map((s) => String(s.id)).join(", ") : "(none)"
+        }`
     );
     const out = process.env.BASELINE_JSON;
     if (out) {
@@ -234,12 +242,15 @@ async function main(): Promise<void> {
         JSON.stringify(
           {
             ranAt: new Date().toISOString(),
-            what: `SA-14.1 byte-identity audit. For every current scenario whose Work list has nothing blocked, the prompt built by the judge frozen at ${BASE} and by the judge as it is now. A scenario listed as identical is one SL-14 is STRUCTURALLY UNABLE to have affected, whatever it scores.`,
+            what: `SA-14.1 byte-identity audit of ${auditSetRel}. For every scenario in it whose Work list has nothing blocked, the prompt built by the judge frozen at ${BASE} and by the judge as it is now. A scenario listed as identical is one SL-14 is STRUCTURALLY UNABLE to have affected, whatever it scores.`,
             notWhat:
               "This is not a measurement and holds no bar. It says what SL-14 could possibly own, not how often anything failed.",
+            usedBy:
+              "`run-supervisor-eval.ts` reads this through SUPERVISOR_EVAL_IDENTITY_AUDIT as the ONLY admissible proof for the closure rule of 2026-09-16, and refuses it unless `currentSetSha256` matches the set actually being measured.",
             baselineRef: BASE,
             baselineJudgeSha256: digest(baseJudgeSource),
-            currentSetSha256: digest(currentSetBytes.toString("utf8")),
+            auditedSet: auditSetRel,
+            currentSetSha256: digest(auditSetBytes.toString("utf8")),
             frozenByteIdentical: frozen
               .map((s) => String(s.id))
               .filter((id) => !differing.includes(id)),
