@@ -1,7 +1,7 @@
 {
   "spec": "LegacyServiceAuth",
   "spec_version": "v1",
-  "artifact_version": "1.0.0",
+  "artifact_version": "1.1.0",
   "owning_artifact": "docs/adr/ADR-111-legacy-service-auth-v1.md",
   "status": "proposed_awaiting_ratification",
   "created": "2026-09-17",
@@ -26,7 +26,14 @@
       "7. body SHA-256, lowercase hex, over the exact raw body bytes"
     ]
   },
-  "canonical_query_rule": "Split the raw query string on '&'; drop zero-length segments; keep every remaining segment verbatim including its original percent-encoding and its '=' if present; sort the segments by byte order; join with '&'. Segments are never decoded, because percent-decoding is lossy ('+' versus '%20') and would not be reproducible across languages.",
+  "canonical_query_rule": "Split the raw query string on '&'; drop zero-length segments; keep every remaining segment verbatim including its original percent-encoding and its '=' if present; sort the segments in ascending order of their unsigned byte values, comparing byte by byte, with a proper prefix sorting first; join with '&'. Segments are never decoded, because percent-decoding is lossy ('+' versus '%20') and would not be reproducible across languages.",
+  "query_alphabet_rule": "Every byte of the query must be printable ASCII, 0x21 to 0x7E, and a request carrying anything else is rejected before canonicalization. RFC 3986 already restricts the request target to ASCII, so this costs nothing, and it is what makes 'byte order' unambiguous across languages: under it a UTF-8 bytewise sort, a Python str sort and a JavaScript UTF-16 code-unit sort are the same ordering. Without it they are not, because UTF-16 encodes supplementary characters as surrogates in D800-DFFF, which sort below the BMP characters in E000-FFFF that UTF-8 encodes with a smaller lead byte. Implementations may therefore use their language's default string sort once this precondition is enforced.",
+  "header_grammar": {
+    "note": "Normative grammar, transcribed from ADR-111 section 2. It lives in a fenced block there, not a table, because a Markdown table cell requires '|' to be escaped as '\\|' -- so an alternation renders as one thing and reads in source as another. An earlier draft carried exactly that defect here: '^(0\\|[1-9][0-9]{0,11})$' matches no ordinary epoch at all, including this fixture's.",
+    "x-guos-key-id": "^[a-z0-9][a-z0-9_-]{2,63}$",
+    "x-guos-timestamp": "^(?:0|[1-9][0-9]{0,11})$",
+    "x-guos-signature": "^v1=[0-9a-f]{64}$"
+  },
   "empty_body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "vectors": [
     {

@@ -1,7 +1,8 @@
 # ADR-112 — Cross-repo integration events: stable event identity and durable publication
 
-**Status:** Proposed — awaiting human ratification. Nothing in this record is an architectural constraint yet.
+**Status:** Proposed (**rev 2**) — awaiting human ratification. Nothing in this record is an architectural constraint yet.
 **Date:** 2026-09-17
+**Revision history:** **rev 2 (2026-09-17)** — the **appointment durability guarantee was unsupported by its own mechanism** and is corrected, with the architecture direction unchanged. Rev 1 concluded that the Atlas Data API's lack of multi-document transactions forced a sequential business-write-then-record, named the resulting process-death window, and then still called the result *at-least-once with a reconciliation backstop* — which that mechanism cannot provide, since a mutation lost in that window leaves no record anywhere that an event was owed. It had asked for the wrong atomicity: every appointment mutation is a write to **exactly one document**, and Mongo is atomic at the single document even through the Data API, so the obligation is now recorded **inside the appointment document** atomically with the business write. At-least-once is therefore earned rather than asserted; the residual risk is reclassified from durability to **coverage**; the reconciliation sweep is retained with its purpose corrected to **drain liveness** and its comparands named (`pending_integration_events` age, `integration_seq` against `last_emitted_seq`) instead of an unspecified last-modified field; and the native-driver migration is **no longer a prerequisite** (§7, Consequences). A stale `§4` cross-reference in §2 was repaired to `§5`.
 **Related:** [ADR-111](ADR-111-legacy-service-auth-v1.md) (the authentication this rides on), [ADR-109](ADR-109-generic-case-relationships-lineage.md), R1 [`technical-plan.md`](../product/roadmap-increments/r1-relationship-operations-v1/technical-plan.md) TD-5 and §4 row C1, [`legacy-source-audit.md`](../product/roadmap-increments/r1-relationship-operations-v1/legacy-source-audit.md) §7, §8, §11, §24
 
 ## Context
@@ -47,7 +48,7 @@ That helper lives in `packages/types` precisely so the polling adapter and the C
 | `inbound_prospect_message` | the Meta/provider message id | The provider already supplies a durable logical message identity. Inventing a UUID would discard it. |
 | `advisor_activity` (same-thread) | the provider echo message id where the source provides one; otherwise a minted UUID | Same-thread takeover arrives as a `smb_message_echoes` change carrying an id. |
 | `assignment_change` | a minted UUID, created once at the mutation | No provider is involved; nothing in legacy state identifies the mutation. |
-| `appointment_change` | a minted UUID, created once at the mutation | The appointment's own id is stable across its whole lifecycle (§4), so it cannot identify one change within it. |
+| `appointment_change` | a minted UUID, created once at the mutation | The appointment's own business key is stable across its whole lifecycle (§5), so it cannot identify one change within it. |
 
 Retries reuse the same `event_id`. A retry that mints a new one is a duplicate event, not a retry.
 
@@ -174,6 +175,7 @@ integration_events
 ```
 
 - The bridge drains `pending`, signs per [ADR-111](ADR-111-legacy-service-auth-v1.md) with an `events-ingest` key, and retries with backoff. Existing Pub/Sub infrastructure may carry the delivery leg **after** the durable record exists; it may not replace it.
+- **The row is not always where the obligation first becomes durable, and §7 is what decides that per store.** For assignment the row is written inside the business Firestore transaction. For appointments the obligation is first recorded inside the appointment document itself, atomically with the business write, and the drain promotes it into this table; the table is then the delivery ledger rather than the durability boundary. Either way, no path attempts delivery before the obligation is durable somewhere.
 - **Gu OS `source_events` remains a second, independent idempotency boundary.** Its `unique (organization_id, dedup_key)` protects Gu OS from duplicate delivery. It is not a substitute for producer-side durability: it can only deduplicate events that arrive.
 - **This is not an event-sourcing platform.** It is one table, four event kinds, and a drain loop. No projections, no replay-as-truth, no generic event bus.
 
@@ -183,13 +185,30 @@ Cross-database atomicity is not invented anywhere. Where a business mutation and
 
 **Assignment mutations — atomic, achievable today.** The authoritative assignment write is Firestore, and the codebase already demonstrates a working `runTransaction` read-then-conditional-write. The integration record is written **inside the same Firestore transaction** as the assignment write. Placing it at an organization-scoped path makes `legacy_scope` structural rather than a supplied value. The separate Mongo mirror write stays non-atomic, but the event describes the assignment decision, which Firestore owns.
 
-**Appointment mutations — not atomic, and the window is real.** The canonical store is Mongo, and a Mongo-side outbox cannot be transactional with the business write today:
-- the TypeScript services reach Mongo through the **Atlas Data API**, which is stateless HTTP and cannot participate in a multi-document transaction at all;
-- the Python runtime uses PyMongo, which could in principle open a session, but **no session or transaction usage exists anywhere in the repository**, so the capability is unproven there rather than available.
+**Appointment mutations — atomic at the document, which is enough, and this record's earlier draft got it wrong.** A *separate* Mongo outbox collection cannot be transactional with the business write today: the TypeScript services reach Mongo through the **Atlas Data API**, which is stateless HTTP and cannot participate in a multi-document transaction at all, and while the Python runtime's PyMongo could in principle open a session, **no session or transaction usage exists anywhere in the repository**, so that capability is unproven rather than available.
 
-The specified behavior is therefore: business write, then integration record, both in Mongo, sequentially. **The remaining window is process death between the two, and its consequence is a lost event.** Its bounded recovery is a periodic reconciliation sweep comparing each appointment's last-modified state against the last event emitted for that appointment key, emitting a synthetic `status_changed` for any drift it finds. This is **at-least-once with a reconciliation backstop, and it is explicitly not exactly-once and not atomic.**
+The earlier draft concluded from this that the business write and the integration record must be sequential, named the resulting process-death window, and then called the result *at-least-once with a reconciliation backstop*. **That claim was not supported by that mechanism** — a mutation lost in that window leaves no record anywhere that an event was owed, so nothing downstream can be at-least-once about it. The conclusion was also unnecessary, because it asked for the wrong atomicity:
 
-That window closes — and this becomes symmetric with assignment — if appointment writes move off the Atlas Data API onto a native driver with sessions. That is named as the upgrade path, not required by this record, and not a reason to redesign legacy persistence now.
+> **Every appointment mutation is a write to exactly one appointment document, and MongoDB is atomic at the single document — including through the Atlas Data API.**
+
+So the event obligation is made durable **at mutation time** by writing it **into the appointment document itself**, in the same update as the business change:
+
+```
+appointments/<doc>
+  ...business fields...
+  integration_seq          -- $inc by 1 in the same update; monotonic per appointment
+  pending_integration_events: [        -- $push in the same update
+    { event_id, event_kind, operation, occurred_at, seq, payload }
+  ]
+```
+
+One `updateOne` (or the insert, at creation) carries both. There is no window: either the business change and its pending event both exist, or neither does. The drain then copies each pending entry into `integration_events`, delivers it, and `$pull`s it by `event_id`, recording the drained `seq` as `last_emitted_seq` on the document. **A crash anywhere in the drain re-delivers rather than loses**, which is what at-least-once means and is exactly what Gu OS's `source_events` uniqueness absorbs.
+
+**So the guarantee is at-least-once, and it is now earned rather than asserted** — for every mutation that goes through the shared emission helper. **What can still be lost is a mutation written by a path that bypasses the helper**, and that is a **coverage** property, not a durability one. The difference matters: coverage is enumerable and testable, and the fourteen appointment writers are named in the R1 Technical Plan Appendix D.2. It is enforced where such things belong — a deterministic test asserting that no appointment write path constructs its update outside the helper — rather than by a runtime sweep that cannot see what was never recorded.
+
+**The reconciliation sweep is retained with its purpose corrected.** It is a **drain-liveness** check, not a lost-event detector, and it compares named durable fields rather than an unspecified last-modified: it finds documents whose `pending_integration_events` is non-empty beyond a declared age, or whose `integration_seq` exceeds `last_emitted_seq` beyond that age, and alerts. **It cannot detect a mutation by a writer that maintained neither field**, and this record says so rather than implying a backstop that does not exist.
+
+**No native-driver migration is required.** The earlier draft named moving off the Atlas Data API as the upgrade path that would close the window; single-document atomicity closes it without touching the driver, so that migration is not a prerequisite for C1 and is not proposed here.
 
 **Message ingress — covered by provider retry, conditional on one change.** Meta redelivers unacknowledged webhooks, so the ingress leg is already durable *provided the receiver acknowledges only after the durable record exists*. The audit records that the current webhook acknowledges receipt before downstream processing completes, so this is a requirement on the ingress seam and not a property it has today.
 
@@ -207,12 +226,13 @@ Both are nullable and additive, so existing rows and the polling adapter are una
 - C1 becomes implementable by the other team once this and [ADR-111](ADR-111-legacy-service-auth-v1.md) are ratified. Until then it is specified, not executable.
 - Traditional Gu gains one new table, a drain/retry bridge, and an emission call inside each mutation family. Because thirteen assignment writers and fourteen appointment writers have no common seam, the realistic path is a shared emission helper per runtime; the concrete placement is in the R1 Technical Plan's implementation map, which names the two writers that will still bypass any per-lead helper (a bulk reassignment on advisor offboarding, and a lead re-keying job that mutates assignment by recreating documents).
 - Gu OS gains two nullable columns and, later, the ingestion route. The `source_events` CHECK constraint and dedup uniqueness are unchanged, which is what lets the polling adapter and the webhook coexist.
-- The honest asymmetry in §7 is a feature of the record, not a gap in it: an architecture that claimed uniform exactly-once delivery across these two stores would be wrong, and the place that wrongness would surface is a silently missing appointment event in production.
+- **The guarantee is at-least-once in both stores, by two different mechanisms** (§7): a multi-document transaction for assignment, single-document atomicity for appointments. It is **not** exactly-once, and duplicate delivery is expected and absorbed by `source_events` uniqueness. The residual risk is **coverage** — a writer that bypasses the emission helper — which is enumerable against the writers named in the implementation map and enforced by a deterministic test, not by a runtime sweep that cannot see what was never recorded.
+- **An earlier draft of this record claimed at-least-once from a mechanism that could not provide it**, having concluded that the Atlas Data API's lack of multi-document transactions forced a sequential write-then-record with a real loss window. It asked for the wrong atomicity. The correction is recorded in §7 rather than quietly replaced, because the failure mode it would have shipped — a silently missing appointment event, with nothing anywhere recording that one was owed — is exactly the one this record exists to prevent.
 - Assignment-selection policy, the legacy role vocabulary and the Mongo/Firestore appointment model are all left where they are. This record consumes their results; it does not migrate or normalize them.
 
 ## Reevaluate when
 
-- Appointment writes move off the Atlas Data API, which would let §7 become uniformly atomic.
+- An appointment mutation stops being a write to exactly one document, which is the property §7's durability rests on.
 - Event volume makes one-event-per-request wasteful, at which point a batch form with per-event disposition is the additive change.
 - Ownership of leads or appointments moves into Gu OS, at which point the transitional source precedence these events assume no longer holds and the affected kinds should be retired rather than reinterpreted.
 - A fifth event kind is needed: the kind vocabulary is a database constraint on the Gu OS side, so adding one is a migration and a contract change, deliberately not a convention.

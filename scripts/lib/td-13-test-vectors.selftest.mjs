@@ -41,8 +41,63 @@ function checkNot(label, actual, forbidden) {
   }
 }
 
+function checkTrue(label, actual) {
+  checks += 1;
+  if (actual !== true) failures.push(label);
+}
+
+// ADR-111 section 2, transcribed from the fenced block that is the normative grammar.
+// They live in a fence there rather than a table because a table cell needs `|` escaped
+// as `\|`, so an alternation renders as one thing and reads in source as another -- which
+// is the defect this block and these checks exist to keep from recurring.
+const HEADER_GRAMMAR = {
+  keyId: /^[a-z0-9][a-z0-9_-]{2,63}$/,
+  timestamp: /^(?:0|[1-9][0-9]{0,11})$/,
+  signature: /^v1=[0-9a-f]{64}$/,
+};
+
+// One malformed value per rejection ADR-111 names, so the grammar is proven to exclude
+// them rather than merely to admit the good case.
+const MALFORMED = {
+  keyId: ["", "ab", "Tgu-Events", "tgu events", "-leading-dash", "x".repeat(65), " tgu-events-ingest-pilot-01"],
+  timestamp: [
+    "",
+    "0177",
+    "1789670400.5",
+    "+1789670400",
+    "-1789670400",
+    " 1789670400",
+    "1789670400 ",
+    "1789670400, 1789670400",
+    "1789670400000000",
+    "0x6A8B",
+  ],
+  signature: [
+    "",
+    "4877C10F04DDDD6DE8CDAA3BA14898D93FDFC7FFA67D4F740305FD8DD706D895",
+    "v1=4877C10F04DDDD6DE8CDAA3BA14898D93FDFC7FFA67D4F740305FD8DD706D895",
+    "4877c10f04dddd6de8cdaa3ba14898d93fdfc7ffa67d4f740305fd8dd706d895",
+    "v2=4877c10f04dddd6de8cdaa3ba14898d93fdfc7ffa67d4f740305fd8dd706d895",
+    "v1=4877c10f",
+    "v1=4877c10f04dddd6de8cdaa3ba14898d93fdfc7ffa67d4f740305fd8dd706d895, v1=4877c10f04dddd6de8cdaa3ba14898d93fdfc7ffa67d4f740305fd8dd706d895",
+  ],
+};
+
+// ADR-111 section 3: ascending unsigned byte value, byte by byte, a proper prefix sorting
+// first. Written out so the fixture is checked against the rule rather than against
+// whichever ordering the host language happens to implement.
+function compareBytewise(a, b) {
+  const left = Buffer.from(a, "utf8");
+  const right = Buffer.from(b, "utf8");
+  return Buffer.compare(left, right);
+}
+
 // The canonical query rule, restated here from ADR-111 rather than imported, so the
 // fixture is checked against an independent transcription of the spec.
+//
+// ADR-111 permits a language's default string sort once the ASCII precondition holds,
+// which is what this uses. `assertSortEquivalence` below proves that permission sound
+// for these segments instead of taking it on trust.
 function canonicalQuery(rawQuery) {
   if (!rawQuery) return "";
   return rawQuery
@@ -50,6 +105,27 @@ function canonicalQuery(rawQuery) {
     .filter((segment) => segment.length > 0)
     .sort()
     .join("&");
+}
+
+// ADR-111 section 3 rejects any query byte outside 0x21-0x7E before canonicalization,
+// because that precondition is the whole reason "byte order" and a UTF-16 code-unit sort
+// are the same ordering. Above U+07FF they are not, and the disagreement would stay
+// invisible until a non-ASCII query reached production.
+function assertQueryAlphabetAndSortEquivalence(id, rawQuery) {
+  const segments = (rawQuery ?? "").split("&").filter((segment) => segment.length > 0);
+
+  checkTrue(
+    `${id}: every query byte is within the printable-ASCII range ADR-111 requires`,
+    segments.every((segment) => /^[\x21-\x7E]*$/.test(segment))
+  );
+
+  // The default sort and an explicit bytewise sort must agree on these segments. If they
+  // ever disagree, the ASCII precondition has been violated somewhere upstream.
+  checkTrue(
+    `${id}: the default string sort agrees with explicit bytewise ordering`,
+    JSON.stringify([...segments].sort()) ===
+      JSON.stringify([...segments].sort(compareBytewise))
+  );
 }
 
 function buildSigningString(parts) {
@@ -104,7 +180,24 @@ for (const vector of fixture.vectors ?? []) {
 
   check(`${id}: body byte length`, body.length, vector.body_bytes);
   check(`${id}: body SHA-256`, bodySha256, vector.body_sha256);
-  check(`${id}: canonical query`, canonicalQuery(vector.raw_query), vector.canonical_query);
+    check(`${id}: canonical query`, canonicalQuery(vector.raw_query), vector.canonical_query);
+    assertQueryAlphabetAndSortEquivalence(id, vector.raw_query);
+
+    // Every header the fixture publishes must satisfy the normative grammar. A vector
+    // the spec's own regexes would reject is worse than no vector: both sides would
+    // implement against a request their verifier refuses.
+    checkTrue(
+      `${id}: key-id header satisfies the ADR-111 grammar`,
+      HEADER_GRAMMAR.keyId.test(vector.header_x_guos_key_id)
+    );
+    checkTrue(
+      `${id}: timestamp header satisfies the ADR-111 grammar`,
+      HEADER_GRAMMAR.timestamp.test(vector.header_x_guos_timestamp)
+    );
+    checkTrue(
+      `${id}: signature header satisfies the ADR-111 grammar`,
+      HEADER_GRAMMAR.signature.test(vector.header_x_guos_signature)
+    );
 
   const signingString = buildSigningString({
     keyId: vector.key_id,
@@ -185,6 +278,73 @@ if (!sawEmptyBody) {
 if (!sawQueryReordering) {
   failures.push(
     "no vector has a received query order differing from canonical order, so a signer that skips sorting would still pass"
+  );
+}
+
+// The fixture publishes the grammar too, because the other team implements from the
+// fixture and may never open the ADR. The two transcriptions must not drift.
+check(
+  "fixture key-id grammar matches ADR-111",
+  fixture.header_grammar?.["x-guos-key-id"],
+  HEADER_GRAMMAR.keyId.source
+);
+check(
+  "fixture timestamp grammar matches ADR-111",
+  fixture.header_grammar?.["x-guos-timestamp"],
+  HEADER_GRAMMAR.timestamp.source
+);
+check(
+  "fixture signature grammar matches ADR-111",
+  fixture.header_grammar?.["x-guos-signature"],
+  HEADER_GRAMMAR.signature.source
+);
+checkTrue(
+  "fixture states the ASCII query-alphabet precondition that makes byte ordering unambiguous",
+  typeof fixture.query_alphabet_rule === "string" && fixture.query_alphabet_rule.includes("0x21")
+);
+
+// The grammar must exclude, not merely admit. A pattern that accepts every good header
+// and also every bad one would pass every check above.
+for (const [header, values] of Object.entries(MALFORMED)) {
+  for (const value of values) {
+    checkTrue(
+      `ADR-111 ${header} grammar must reject ${JSON.stringify(value)}`,
+      HEADER_GRAMMAR[header].test(value) === false
+    );
+  }
+}
+
+// The specific defect this file is meant to keep from recurring. An earlier draft of
+// ADR-111 carried the timestamp pattern inside a Markdown table cell, where `|` must be
+// escaped, so the source read `^(0\|[1-9][0-9]{0,11})$` -- an alternation to a human
+// reading the rendered table, and a literal backslash-pipe to anyone implementing from
+// the raw file. That pattern matches no ordinary epoch at all, including the fixture's.
+checkTrue(
+  "the escaped-pipe form of the timestamp pattern really does reject an ordinary epoch, which is why the grammar is not in a table",
+  /^(0\|[1-9][0-9]{0,11})$/.test("1789670400") === false
+);
+checkTrue(
+  "the corrected timestamp pattern accepts an ordinary epoch",
+  HEADER_GRAMMAR.timestamp.test("1789670400")
+);
+
+// Bytewise ordering must be a real constraint, not one the default sort satisfies by
+// accident for every input. The two orderings agree across the whole BMP and diverge for
+// supplementary characters, because UTF-16 encodes those as surrogates in D800-DFFF,
+// which sort BELOW the BMP characters in E000-FFFF that UTF-8 encodes with a smaller
+// lead byte. Asserting that divergence exists is what makes the ASCII precondition
+// load-bearing rather than decorative.
+{
+  const divergent = ["\u{10000}", "\uFF01"];
+  checkTrue(
+    "a UTF-16 code-unit sort and a UTF-8 bytewise sort disagree on supplementary characters, so the ASCII precondition is load-bearing",
+    JSON.stringify([...divergent].sort()) !==
+      JSON.stringify([...divergent].sort(compareBytewise))
+  );
+  checkTrue(
+    "the two orderings nonetheless agree across the BMP, which is why only the supplementary range exposes the bug",
+    JSON.stringify(["\uFF01", "\u0800", "\u00E9"].sort()) ===
+      JSON.stringify(["\uFF01", "\u0800", "\u00E9"].sort(compareBytewise))
   );
 }
 

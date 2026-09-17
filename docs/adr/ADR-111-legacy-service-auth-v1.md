@@ -1,7 +1,8 @@
 # ADR-111 — LegacyServiceAuth v1: cross-repo service authentication
 
-**Status:** Proposed — awaiting human ratification. Nothing in this record is an architectural constraint yet.
+**Status:** Proposed (**rev 2**) — awaiting human ratification. Nothing in this record is an architectural constraint yet.
 **Date:** 2026-09-17
+**Revision history:** **rev 2 (2026-09-17)** — two implementation-blocking defects corrected in pre-ratification review, with the **mechanism, key-binding model, purposes, rotation model and existing vectors unchanged**. (1) The header grammar moved out of a Markdown table into a fenced block: a table cell requires `|` to be escaped as `\|`, so the timestamp pattern read `^(0\|[1-9][0-9]{0,11})$` in source — which matches no ordinary epoch, including the fixture's — while rendering as an alternation (§2). (2) "Sort by byte order" was ambiguous against a host language's default string sort, so the query alphabet is now an enforced printable-ASCII precondition under which the two orderings are provably identical, with the divergence outside it named precisely (§3). Both are now asserted by `npm run test:td-13-test-vectors`, which grew from 43 checks to 85.
 **Related:** [ADR-106](ADR-106-organization-native-multiseat-tenancy.md) (Organization tenancy), [ADR-107](ADR-107-runtime-conversation-authority.md) (runtime/conversation authority), R1 [`technical-plan.md`](../product/roadmap-increments/r1-relationship-operations-v1/technical-plan.md) TD-13 (the recommendation this record makes precise), [`td-13-legacy-service-auth-v1.test-vectors.json`](../product/roadmap-increments/r1-relationship-operations-v1/td-13-legacy-service-auth-v1.test-vectors.json) (the interoperability fixture)
 
 ## Context
@@ -31,11 +32,19 @@ A verifier that supports only v1 rejects any other prefix with the same response
 
 Exactly three request headers carry the authentication. All names are lowercase on the wire.
 
-| Header | Accepted form | Notes |
-|---|---|---|
-| `x-guos-key-id` | `^[a-z0-9][a-z0-9_-]{2,63}$` | Opaque. Names one calling service **and** one purpose. Carries no authority by itself. |
-| `x-guos-timestamp` | `^(0\|[1-9][0-9]{0,11})$` | Unix epoch **seconds**, decimal ASCII. No fraction, no sign, no leading zeros, no whitespace. |
-| `x-guos-signature` | `^v1=[0-9a-f]{64}$` | Lowercase hex only. Uppercase hex is rejected rather than normalized. |
+**The accepted forms are given in a fenced block rather than in a table, deliberately.** A Markdown table cell requires `|` to be escaped as `\|`, so a regex containing an alternation renders as one thing and reads in source as another — and an implementer working from either the raw file or a copied cell gets a pattern that matches nothing. An earlier draft of this record carried exactly that defect on the timestamp. A fenced block has no escaping rules, so what is read is what is implemented.
+
+```
+x-guos-key-id      ^[a-z0-9][a-z0-9_-]{2,63}$
+x-guos-timestamp   ^(?:0|[1-9][0-9]{0,11})$
+x-guos-signature   ^v1=[0-9a-f]{64}$
+```
+
+- **`x-guos-key-id`** is opaque. It names one calling service **and** one purpose, and carries no authority by itself (§6).
+- **`x-guos-timestamp`** is Unix epoch **seconds**, decimal ASCII: no fraction, no sign, no leading zeros, no whitespace, and no value wider than twelve digits. The group is non-capturing only so the alternation cannot be misread; `^(0|[1-9][0-9]{0,11})$` accepts the same language.
+- **`x-guos-signature`** is lowercase hex only. Uppercase hex is **rejected rather than normalized**, as is a missing `v1=` prefix.
+
+These three patterns are the normative grammar. `npm run test:td-13-test-vectors` asserts that every header in the fixture matches them, and that a set of representative malformed forms — uppercase hex, a fractional or signed or zero-padded timestamp, a missing `v1=` prefix, a comma-joined duplicate value, and surrounding whitespace — does not.
 
 **Duplicate headers are rejected, never joined or resolved to the first value.** This is not a stylistic rule: several HTTP stacks, including the `Headers` object Gu OS's Next.js routes receive, silently join repeated headers with `, `. The strict regexes above are what make that rejection automatic, because a joined value cannot match them. Implementations that read headers through an API which drops duplicates instead of joining them must check duplication explicitly.
 
@@ -58,7 +67,9 @@ LegacyServiceAuth-v1
 - **Method.** Uppercased ASCII (`POST`, `GET`). Uppercasing is the only normalization.
 - **Path.** The request-target path only: no scheme, host, query or fragment. **Percent-encoding is preserved exactly as received.** The path is not decoded, not re-encoded, not trailing-slash-normalized, and dot segments are not collapsed. Decoding is lossy and re-encoding is implementation-specific, so any normalization would make the two sides disagree. An empty path signs as `/`.
   - Consequence, stated because it is a real operational risk rather than a theoretical one: if an intermediary rewrites the path, verification fails. That is the intended behavior — a signature that survives path rewriting does not protect the path.
-- **Canonical query.** The empty string when there is no query string. Otherwise: split the raw query on `&`; drop zero-length segments; keep every remaining segment **verbatim**, including its original percent-encoding and its `=` if present; **sort the segments by byte order**; join with `&`. Segments are never parsed or decoded, because `+` versus `%20` is not recoverable after decoding and the two languages would not agree. Sorting makes parameter order irrelevant; duplicate names are permitted and simply sort together.
+- **Canonical query.** The empty string when there is no query string. Otherwise: split the raw query on `&`; drop zero-length segments; keep every remaining segment **verbatim**, including its original percent-encoding and its `=` if present; **sort the segments in ascending order of their unsigned byte values, comparing byte by byte and treating a proper prefix as smaller** (`a` before `ab` before `b`); join with `&`. Segments are never parsed or decoded, because `+` versus `%20` is not recoverable after decoding and the two languages would not agree. Sorting makes parameter order irrelevant; duplicate names are permitted and simply sort together.
+  - **The query must be pure ASCII, and a byte outside `0x21`–`0x7E` is rejected before canonicalization.** This is what makes "byte order" unambiguous across languages. RFC 3986 already restricts the request target to ASCII — anything else must arrive percent-encoded — so the constraint costs nothing, and it is stated as an enforced precondition rather than an assumption. Under it, an ordinary lexicographic sort over UTF-8 bytes, over Python `str`, and over JavaScript UTF-16 code units are **provably the same ordering**, because every code unit is a single byte below `0x80`. Without it they are not: UTF-16 encodes supplementary characters as surrogates in `D800`–`DFFF`, which sort *below* the BMP characters in `E000`–`FFFF` that UTF-8 encodes with a smaller lead byte, so the two orderings disagree for any comparison spanning that boundary. The divergence is narrow, which is exactly what makes it dangerous: it would stay invisible until a query carrying a supplementary character appeared in production.
+  - Implementations are free to use their language's default string sort once the ASCII precondition is enforced. `npm run test:td-13-test-vectors` asserts the precondition holds for every fixture segment **and** that an explicit bytewise comparison agrees with the default sort on those segments, so the equivalence is checked rather than asserted.
 - **Timestamp.** Byte-identical to the `x-guos-timestamp` header. A verifier that re-renders the timestamp from a parsed integer will disagree with a signer that sent a differently formatted equivalent, which is why the header form is constrained in §2 and copied verbatim here.
 - **Body hash.** Lowercase hex SHA-256 over the exact raw body bytes (§4). An empty body hashes to the SHA-256 of zero bytes, `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
 
