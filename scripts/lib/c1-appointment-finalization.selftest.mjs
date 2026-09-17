@@ -118,7 +118,20 @@ function effectsUnresolvedAtDurability(family) {
 // ---------------------------------------------------------------------------
 
 function newAppointmentDoc(appointmentRef) {
-  return { appointment_ref: appointmentRef, pending_integration_events: [] };
+  return { appointment_ref: appointmentRef, pending_integration_events: [], late_outcome_observations: [] };
+}
+
+// §7B/§7C-bis. Finalization is a compare-and-set, not a write: the filter requires the
+// entry to still be `pending`, so MongoDB decides the winner when the writer and the
+// recovery sweep reach the same entry. Returns the matched entry, or null for no-match --
+// which callers must read as "someone else finalized this", never as an error.
+function conditionalFinalize(doc, eventId, mutate) {
+  const entry = doc.pending_integration_events.find((e) => e.event_id === eventId && e.state === "pending");
+  if (!entry) return null;
+  mutate(entry);
+  entry.awaiting = [];
+  entry.state = "finalized";
+  return entry;
 }
 
 // §7A. The canonical mutation and the obligation land in ONE update. There is no code
@@ -144,45 +157,46 @@ function applyCanonicalMutation(doc, { eventId, eventKind, operation, occurredAt
   return doc;
 }
 
-// §7B. The writer reports what actually happened and the entry becomes deliverable.
+// §7B. The writer reports what actually happened. Validation runs BEFORE the transition so
+// a bad vocabulary cannot half-apply. Returns null if the writer lost to recovery.
 function finalizeByWriter(doc, eventId, observed, at) {
-  const entry = doc.pending_integration_events.find((e) => e.event_id === eventId);
-  if (!entry) throw new Error("no such pending entry");
-  for (const [key, value] of Object.entries(observed.stores ?? {})) {
+  for (const value of Object.values(observed.stores ?? {})) {
     if (!STORE_OUTCOMES.includes(value)) throw new Error(`§5: ${value} is not a store outcome`);
-    entry.payload.store_write_outcomes[key] = value;
   }
-  if (observed.calendar) {
-    if (!CALENDAR_OPERATIONS.includes(observed.calendar.operation)) {
-      throw new Error(`§5: ${observed.calendar.operation} is not a calendar operation`);
+  if (observed.calendar && !CALENDAR_OPERATIONS.includes(observed.calendar.operation)) {
+    throw new Error(`§5: ${observed.calendar.operation} is not a calendar operation`);
+  }
+  const entry = conditionalFinalize(doc, eventId, (e) => {
+    for (const [key, value] of Object.entries(observed.stores ?? {})) {
+      e.payload.store_write_outcomes[key] = value;
     }
-    entry.payload.calendar_effect = { ...observed.calendar };
-  }
-  entry.awaiting = [];
-  entry.state = "finalized";
-  entry.finalized_at = at;
-  entry.finalized_by = "writer";
-  return entry;
+    if (observed.calendar) e.payload.calendar_effect = { ...observed.calendar };
+    e.finalized_at = at;
+    e.finalized_by = "writer";
+  });
+  if (entry) return entry;
+  // §7C-bis: recovery won. The event may already be delivered and Gu OS dedups on
+  // event_id, so a corrected redelivery would be silently dropped. Keep the observation
+  // as diagnostics instead of overwriting anything.
+  doc.late_outcome_observations.push({ event_id: eventId, observed, observed_at: at });
+  return null;
 }
 
-// §7C. Recovery knows only that the process died. It may mark outcomes `unknown` and
-// nothing else -- each other value is a claim about what happened.
+// §7C. Recovery knows only that the process died -- or that the writer is slow. It may
+// mark outcomes `unknown` and nothing else; each other value is a claim about what
+// happened. A no-match means the writer finalized first, which is a success, not an error.
 function finalizeByRecovery(doc, eventId, at) {
-  const entry = doc.pending_integration_events.find((e) => e.event_id === eventId);
-  if (!entry) throw new Error("no such pending entry");
-  if (entry.state === "finalized") throw new Error("§7C: recovery must not re-finalize a finalized entry");
-  for (const effect of entry.awaiting) {
-    if (effect === "calendar") {
-      entry.payload.calendar_effect = { google_event_id: null, operation: "unknown" };
-    } else {
-      entry.payload.store_write_outcomes[effect] = "unknown";
+  return conditionalFinalize(doc, eventId, (e) => {
+    for (const effect of e.awaiting) {
+      if (effect === "calendar") {
+        e.payload.calendar_effect = { google_event_id: null, operation: "unknown" };
+      } else {
+        e.payload.store_write_outcomes[effect] = "unknown";
+      }
     }
-  }
-  entry.awaiting = [];
-  entry.state = "finalized";
-  entry.finalized_at = at;
-  entry.finalized_by = "recovery";
-  return entry;
+    e.finalized_at = at;
+    e.finalized_by = "recovery";
+  });
 }
 
 // §7B/§7E. The drain sees finalized entries only, in array order, and claims exclusively.
@@ -356,7 +370,9 @@ checkTrue(
     "§7C: recovery asserts none of the four outcomes that would be a claim about what happened",
     !OUTCOMES_RECOVERY_MAY_NOT_ASSERT.includes(recovered.payload.calendar_effect.operation)
   );
-  checkThrows("§7C: recovery must refuse to re-finalize", () => finalizeByRecovery(doc, "evt-resched-2", "2026-09-17T23:00:00Z"));
+  check("§7C-bis: a second recovery pass matches nothing", finalizeByRecovery(doc, "evt-resched-2", "2026-09-17T23:00:00Z"), null);
+  check("§7C-bis: and changes nothing -- provenance is untouched", recovered.finalized_by, "recovery");
+  check("§7C-bis: including the finalization timestamp", recovered.finalized_at, "2026-09-17T22:30:00Z");
   check("§7C: the recovered event is deliverable", drainable(doc).length, 1);
 }
 
@@ -429,6 +445,164 @@ checkTrue(
   pullDelivered(doc, "evt-2");
   pullDelivered(doc, "evt-3");
   check("§7D: an empty array is the signal that everything drained", doc.pending_integration_events.length, 0);
+}
+
+// ---------------------------------------------------------------------------
+// §7F — the case that disproved rev 3's "the drain preserves array order"
+//
+// A is pending, B is finalized, and B is LATER in the array. Rev 3 claimed append order
+// was delivery order; it is not, because drainability is finalized-and-unclaimed. This is
+// the realistic shape: a reschedule awaiting its Calendar outcome, then a confirmation
+// that finalizes in one write.
+// ---------------------------------------------------------------------------
+
+{
+  let doc = newAppointmentDoc("appt-order");
+
+  // A: prospect-side reschedule -- Calendar still outstanding.
+  doc = applyCanonicalMutation(doc, {
+    eventId: "evt-A-reschedule",
+    eventKind: "appointment_change",
+    operation: "rescheduled",
+    occurredAt: "2026-09-18T09:00:00Z",
+    businessFields: { date: "2026-09-30" },
+    resolvedOutcomes: { stores: { mongo: "written", firestore: "written" }, calendar: { google_event_id: null, operation: "unknown" } },
+    awaiting: ["calendar"],
+  });
+
+  // B: advisor confirmation -- Mongo-only, so finalized at the canonical write.
+  doc = applyCanonicalMutation(doc, {
+    eventId: "evt-B-confirm",
+    eventKind: "appointment_change",
+    operation: "confirmed",
+    occurredAt: "2026-09-18T09:00:05Z",
+    businessFields: { appointment_status: "confirmed" },
+    resolvedOutcomes: { stores: { mongo: "written", firestore: "not_attempted" }, calendar: { google_event_id: null, operation: "none" } },
+    awaiting: [],
+  });
+
+  checkDeep(
+    "§7E: the array records canonical mutation order, A before B",
+    doc.pending_integration_events.map((e) => e.event_id),
+    ["evt-A-reschedule", "evt-B-confirm"]
+  );
+
+  // The load-bearing assertion. If this ever returns both, or A alone, the ADR's §7F
+  // reasoning has changed and the record must change with it.
+  checkDeep(
+    "§7F: B is deliverable while A is not, so append order is NOT delivery order",
+    drainable(doc).map((e) => e.event_id),
+    ["evt-B-confirm"]
+  );
+  check("§7F: A is still pending", doc.pending_integration_events[0].state, "pending");
+  checkThrows("§7F: and the drain cannot claim it out of turn or otherwise", () => claim(doc, "evt-A-reschedule", "worker-a"));
+
+  // Head-of-line delivery was the rejected alternative. Prove the property it would have
+  // given is genuinely absent, rather than merely undocumented.
+  claim(doc, "evt-B-confirm", "worker-a");
+  pullDelivered(doc, "evt-B-confirm");
+  checkTrue(
+    "§7F: the later mutation is delivered first, and C1 promises no order within one appointment",
+    doc.pending_integration_events.length === 1 && doc.pending_integration_events[0].event_id === "evt-A-reschedule"
+  );
+
+  // A finalizes afterwards and is delivered second -- out of mutation order, by design.
+  finalizeByWriter(doc, "evt-A-reschedule", { calendar: { google_event_id: "gcal-r", operation: "updated" } }, "2026-09-18T09:01:00Z");
+  checkDeep("§7F: A becomes deliverable only after it finalizes", drainable(doc).map((e) => e.event_id), ["evt-A-reschedule"]);
+  checkTrue(
+    "§7F: consumers must order by occurred_at, not arrival -- A's mutation precedes B's",
+    doc.pending_integration_events[0].occurred_at < "2026-09-18T09:00:05Z"
+  );
+}
+
+// ---------------------------------------------------------------------------
+// §7C-bis — the writer/recovery race. Exactly one transition wins, and the loser
+// cannot overwrite it.
+// ---------------------------------------------------------------------------
+
+function pendingRescheduleDoc(ref, eventId) {
+  return applyCanonicalMutation(newAppointmentDoc(ref), {
+    eventId,
+    eventKind: "appointment_change",
+    operation: "rescheduled",
+    occurredAt: "2026-09-18T10:00:00Z",
+    businessFields: { date: "2026-10-01" },
+    resolvedOutcomes: { stores: { mongo: "written", firestore: "written" }, calendar: { google_event_id: null, operation: "unknown" } },
+    awaiting: ["calendar"],
+  });
+}
+
+// Race 1: the writer gets there first. Recovery must be a silent no-op.
+{
+  const doc = pendingRescheduleDoc("appt-race-1", "evt-race-1");
+
+  const won = finalizeByWriter(doc, "evt-race-1", { calendar: { google_event_id: "gcal-1", operation: "updated" } }, "2026-09-18T10:00:03Z");
+  checkTrue("§7C-bis: the writer's transition succeeded", won !== null);
+
+  const lost = finalizeByRecovery(doc, "evt-race-1", "2026-09-18T10:05:00Z");
+  check("§7C-bis: recovery matches nothing, which is a no-op and a success", lost, null);
+
+  const entry = doc.pending_integration_events[0];
+  check("§7C-bis: the observed outcome survives", entry.payload.calendar_effect.operation, "updated");
+  check("§7C-bis: the Calendar id survives", entry.payload.calendar_effect.google_event_id, "gcal-1");
+  check("§7C-bis: provenance stays `writer`", entry.finalized_by, "writer");
+  check("§7C-bis: recovery did not overwrite the observed outcome with unknown", entry.payload.calendar_effect.operation === "unknown", false);
+  check("§7C-bis: and recorded no late observation, having observed nothing", doc.late_outcome_observations.length, 0);
+}
+
+// Race 2: recovery ages the entry out first, then the slow writer returns with a REAL
+// outcome. It must not overwrite an event that may already have been delivered.
+{
+  const doc = pendingRescheduleDoc("appt-race-2", "evt-race-2");
+
+  const won = finalizeByRecovery(doc, "evt-race-2", "2026-09-18T10:05:00Z");
+  checkTrue("§7C-bis: recovery's transition succeeded", won !== null);
+  check("§7C-bis: with unknown and recovery provenance", won.payload.calendar_effect.operation, "unknown");
+
+  // Simulate the event having already gone out, which is the reason overwriting is unsafe:
+  // Gu OS dedups on event_id, so a corrected redelivery would be silently dropped.
+  claim(doc, "evt-race-2", "worker-a");
+  const delivered = JSON.parse(JSON.stringify(doc.pending_integration_events[0]));
+
+  const lost = finalizeByWriter(doc, "evt-race-2", { calendar: { google_event_id: "gcal-2", operation: "updated" } }, "2026-09-18T10:06:00Z");
+  check("§7C-bis: the late writer matches nothing", lost, null);
+
+  const entry = doc.pending_integration_events[0];
+  check("§7C-bis: the delivered outcome is unchanged", entry.payload.calendar_effect.operation, "unknown");
+  check("§7C-bis: no Calendar id was grafted onto a delivered event", entry.payload.calendar_effect.google_event_id, null);
+  check("§7C-bis: provenance stays `recovery`, so it still describes what was sent", entry.finalized_by, "recovery");
+  check("§7C-bis: and the finalization timestamp is recovery's", entry.finalized_at, "2026-09-18T10:05:00Z");
+  checkDeep("§7C-bis: the delivered entry is byte-identical to what went out", entry, delivered);
+
+  // The real outcome is retained -- as diagnostics, not as a mutation and not as an event.
+  check("§7C-bis: the late real outcome is recorded separately", doc.late_outcome_observations.length, 1);
+  check("§7C-bis: keyed to the event it belongs to", doc.late_outcome_observations[0]?.event_id, "evt-race-2");
+  check(
+    "§7C-bis: carrying what was actually observed",
+    doc.late_outcome_observations[0]?.observed?.calendar?.operation,
+    "updated"
+  );
+  check("§7C-bis: and no second event was emitted for it", doc.pending_integration_events.length, 1);
+}
+
+// The invariant, asserted directly against every interleaving of the two callers.
+{
+  for (const order of [["writer", "recovery"], ["recovery", "writer"]]) {
+    const doc = pendingRescheduleDoc(`appt-invariant-${order[0]}`, "evt-invariant");
+    const results = order.map((who) =>
+      who === "writer"
+        ? finalizeByWriter(doc, "evt-invariant", { calendar: { google_event_id: "gcal-i", operation: "updated" } }, "2026-09-18T11:00:00Z")
+        : finalizeByRecovery(doc, "evt-invariant", "2026-09-18T11:05:00Z")
+    );
+    check(`§7C-bis: with ${order.join(" then ")}, exactly one transition succeeds`, results.filter((r) => r !== null).length, 1);
+    check(`§7C-bis: with ${order.join(" then ")}, the winner is the first caller`, results[0] !== null, true);
+    check(
+      `§7C-bis: with ${order.join(" then ")}, provenance matches the winner`,
+      doc.pending_integration_events[0].finalized_by,
+      order[0]
+    );
+    check(`§7C-bis: with ${order.join(" then ")}, the entry is finalized exactly once`, doc.pending_integration_events[0].state, "finalized");
+  }
 }
 
 // §1/§7E: identity is the event_id, and it must be unique within the document.
