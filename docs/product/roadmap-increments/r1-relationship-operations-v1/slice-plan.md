@@ -33,7 +33,17 @@ The **READY Horizon** is the amount of genuinely READY work maintained ahead of 
 - **Maintaining the horizon never lowers the Definition of Ready** (Methodology §10.2). A Slice is not labelled READY to fill the horizon.
 - **READY ≠ PLANNED ≠ EXECUTABLE.** Readiness makes a Slice eligible for Cycle planning; planning confirms Cycle inclusion and a human Accountable / DRI; executability additionally requires prerequisites actually satisfied and capacity available (Methodology §10.2, §12.1).
 
-**Current READY Horizon: SL-14** *(as of v1.36)*.
+**Current READY Horizon: empty** *(as of v1.43)*. **SL-14 leaves the horizon with its Done record** (§6), as SL-3, SL-4, SL-7 and SL-12 did before it. It had entered on 2026-09-15.
+
+**Replenishment re-tested on 2026-09-16, without result — case D of the continuity loop** (Methodology §12.3, §10.5). SL-14's closure changes no dependency fact among the candidates, because nothing depended on SL-14: it was created to close SL-4's carry-forward finding and no later Slice waits behind it. Every verdict in the §3 table stands, so **no candidate can be made READY by readiness work**, and the blocking set is unchanged from the 2026-09-15 re-test:
+
+- no artifact records C1, C2 or C6 as available, and the Technical Plan's §4 contract table still names their fallbacks as the current state;
+- SL-5 waits on C1, SL-6 on C2 advisory, SL-9 on the C6 hard gate;
+- SL-8 and SL-8b wait behind SL-5's C1, and SL-13 behind SL-9.
+
+**C1, C2 and C6 are owned by the Traditional Gu team, not by this one**, so advancing them is a human action and not readiness work an agent can perform. That is the boundary, and it is the same one SL-12's closure reached. **Two governed questions are also outstanding and neither blocks a Slice today:** §8 Q11, which must be dispositioned before R1 graduation, and §8 Q6.
+
+*The v1.36 state, preserved as it was recorded:*
 
 - **How SL-14 entered.** It entered the horizon by a route other than replenishment. The Accountable's disposition of SL-4's carry-forward finding (option 2, 2026-09-15) created it inside already-approved R1 intent, and it was elaborated to READY the same day (§4, §9). It was **Planned into Cycle 3 as order 6** the same day (§5); a Planned Slice stays in the horizon until it is Done.
 - **Its capacity.** Its one frozen range is `2–3 days` / **Low**, which is below the one-to-two-Cycle operating default.
