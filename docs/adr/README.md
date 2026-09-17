@@ -15,9 +15,12 @@ ADRs capture cross-cutting decisions that should not remain buried in long plans
 | [ADR-108](ADR-108-versioned-organization-policy.md) | Typed, versioned organization policy with governed publication and runtime resolution | Accepted direction |
 | [ADR-109](ADR-109-generic-case-relationships-lineage.md) | Generic cross-domain Case relationships and lineage; association remains distinct from identity/history lineage | Accepted direction |
 | [ADR-110](ADR-110-resource-usage-cost-attribution.md) | Cross-domain resource usage, cost valuation and causal attribution kept separate from customer pricing/billing | Accepted direction |
+| [ADR-111](ADR-111-legacy-service-auth-v1.md) | `LegacyServiceAuth` v1: per-service, per-purpose HMAC request signing across the Gu OS / Traditional Gu trust boundary, with server-side Organization binding | Proposed |
+| [ADR-112](ADR-112-cross-repo-integration-events.md) | Cross-repo integration events: entity identity separated from logical event identity, and durable producer-side publication with per-store atomicity stated honestly | Proposed |
 
 Status meanings:
 
+- **Proposed:** fully specified and awaiting human ratification; **not yet an architectural constraint**, and not to be implemented against.
 - **Accepted direction:** architectural constraint for target design; implementation may still be pending.
 - **Implemented:** verified in current code/migrations.
 - **Superseded:** retained for history with a link to the replacement.

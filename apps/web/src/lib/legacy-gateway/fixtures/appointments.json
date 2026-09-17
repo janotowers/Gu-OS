@@ -20,7 +20,8 @@
       "The two stores share NO per-appointment identifier. The Firestore document id is a 20-character auto-id; the `appointment_id` field is present on 63/126 documents and never equalled the document id in the sample. Mongo is keyed by ObjectId. Pairing therefore uses property + date + hour.",
       "The Mongo collection lives in `gu2`, the guv3 runtime database. `bot` has no `appointments` collection at all - verified first-hand on 2026-09-04.",
       "`created_time` is a Firestore Timestamp on one side and a string on the other; both normalize to the same instant.",
-      "The pairs below reproduce the three outcomes audit 11.3 says the legacy flow tolerates: both stores agreeing, both stores disagreeing on status, and a record present in only one store."
+      "The pairs below reproduce the three outcomes audit 11.3 says the legacy flow tolerates: both stores agreeing, both stores disagreeing on status, and a record present in only one store.",
+      "`google_event_id` is written by the legacy appointment creators to BOTH stores, not to Firestore alone - confirmed against ungga-full@gcp/main on 2026-09-17 (audit 24.3). The Mongo-only pair below therefore carries one, because a Calendar effect recorded solely in the canonical store is exactly the orphan case audit 11.4 warns about."
     ]
   },
   "legacyDealId": "deal-0000000000000000000001",
@@ -85,7 +86,9 @@
         "property_id": "property-0000000000000003",
         "user_owner": "owner-uid-0000000000000001",
         "title": "Visita solo en mongo",
-        "finished": false
+        "finished": false,
+        "appointment_id": "99999999-8888-7777-6666-555555555555",
+        "google_event_id": "synthetic-calendar-event-mongo-only"
       }
     }
   ]
