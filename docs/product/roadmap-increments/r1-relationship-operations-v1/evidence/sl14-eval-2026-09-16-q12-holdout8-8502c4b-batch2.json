@@ -1,0 +1,2000 @@
+{
+  "ranAt": "2026-09-16T23:25:58.830Z",
+  "model": {
+    "source": "the judge that ran each pass (NextWorkJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ],
+    "unattributed": 0
+  },
+  "set": "holdout8",
+  "setFile": "supervisor-holdout-8-scenarios.json",
+  "setSha256": "665014dcf2104e444ff4b450264e2cc060d84aa517b18f6eeddcbf50d2bb58da",
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "reask_bar": 0,
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0,
+  "scenarios": 10,
+  "runCount": 5,
+  "runsHoldingAllBars": 4,
+  "closureRule": {
+    "what": "Every ratified bar VALUE is unchanged, and `runsHoldingAllBars` keeps its original meaning. ATTRIBUTION IS DECIDED PER ASSERTION, not per scenario (§8 Q12, frozen 2026-09-16 before any evidence under it existed): a scenario may carry both an SL-14 expectation and an SL-4-era one, and gating the second because the first is present made this Slice answerable for behavior SA-14.1 forbids it to change. A breach gates closure unless BOTH (1) the scenario's prompt is PROVEN byte-identical to the judge frozen before SL-14, and (2) the breached assertion is not one SL-14 owns — where the blind-retry and stranded-failure bars are SL-14's own and are NEVER attributable on any scenario, and neither is any rate-bar violation of a recovery expectation. Otherwise the breach is recorded as the pre-existing SL-4-era Supervisor-quality carry-forward finding. A human-governed contract correction, NOT an accepted deviation.",
+    "unitOfAttribution": "assertion",
+    "identityAudit": "../../docs/product/roadmap-increments/r1-relationship-operations-v1/evidence/sl14-sa141-byte-identity-holdout8-2026-09-16-4298818.json",
+    "baselineRef": "2a12441",
+    "provenByteIdentical": [
+      "h8-waiting-on-the-bank-committee-not-technical",
+      "h8-waiting-on-the-municipal-appointment-not-technical"
+    ],
+    "neverAttributable": [
+      "blind retry",
+      "stranded failure",
+      "rate-bar violations of a recovery expectation"
+    ],
+    "sl14OwnedScenarios": [
+      "h8-blocked-cadastral-certificate-first-outage",
+      "h8-blocked-water-rights-same-rejection-after-the-window",
+      "h8-blocked-notary-index-capability-withdrawn",
+      "h8-blocked-result-the-owner-already-sent-it",
+      "h8-blocked-with-a-listed-alternative-registry",
+      "h8-blocked-after-the-advisor-settled-the-question",
+      "h8-blocked-and-only-a-person-can-authorize-the-cost",
+      "h8-blocked-while-a-due-promise-waits-on-it",
+      "h8-waiting-on-the-municipal-appointment-not-technical",
+      "h8-waiting-on-the-bank-committee-not-technical"
+    ],
+    "runsGatingClosure": 0
+  },
+  "runs": [
+    {
+      "run": 1,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h8-blocked-cadastral-certificate-first-outage",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "retry",
+              "reason": "Fue un fallo técnico transitorio del servicio catastral y no hay evidencia de que siga igual ahora."
+            }
+          ],
+          "rationale": "El notario pidió el certificado catastral y el trabajo bloqueado w1 quedó pendiente por una caída técnica del servicio catastral.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "El certificado catastral sigue siendo el bloqueo útil y el intento previo falló por indisponibilidad técnica del servicio.",
+            "rationale": "El notario pidió el certificado catastral y el trabajo bloqueado w1 quedó pendiente por una caída técnica del servicio catastral.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "cadastral_certificate_read",
+                "purpose": "Reintentar la obtención del certificado catastral para cumplir el requerimiento del notario.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "retry",
+                "reason": "Fue un fallo técnico transitorio del servicio catastral y no hay evidencia de que siga igual ahora."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-water-rights-same-rejection-after-the-window",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La consulta directa al registro ya recurrió con el mismo rechazo; la responsabilidad debe pasar a una vía alternativa de verificación o a una persona."
+            }
+          ],
+          "rationale": "El prospecto dijo que sin agua ese terreno no le sirve y w1 falló dos veces con el mismo rechazo, así que corresponde dejarlo bloqueado y buscar otra vía de verificación disponible.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "El único trabajo bloqueado ya agotó sus reintentos y el obstáculo es verificar derechos de agua, que sigue siendo central para la viabilidad.",
+            "rationale": "El prospecto dijo que sin agua ese terreno no le sirve y w1 falló dos veces con el mismo rechazo, así que corresponde dejarlo bloqueado y buscar otra vía de verificación disponible.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "Buscar una vía alternativa de indicios sobre servicios o infraestructura de agua para reconducir la verificación de derechos/servicio.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "La consulta directa al registro ya recurrió con el mismo rechazo; la responsabilidad debe pasar a una vía alternativa de verificación o a una persona."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-notary-index-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La capacidad necesaria fue revocada y ya agotó sus intentos; hace falta una vía alternativa o confirmación humana, no otro retry."
+            }
+          ],
+          "rationale": "El único trabajo pendiente falla por una capacidad ya no disponible y el prospecto preguntó por escrituras previas.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "La verificación del índice notarial está bloqueada por revocación de acceso a la cuenta.",
+            "rationale": "El único trabajo pendiente falla por una capacidad ya no disponible y el prospecto preguntó por escrituras previas.",
+            "insufficient_evidence": false,
+            "capability_gap": "No hay acceso disponible al índice notarial ni a otra fuente interna que permita verificar antecedentes notariales.",
+            "proposed_work": [
+              {
+                "work_type": "ask_advisor_to_confirm_alternate_path",
+                "purpose": "Obtener de un humano una vía válida para verificar antecedentes notariales o decidir si el objetivo debe limitarse sin esa verificación.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "La capacidad necesaria fue revocada y ya agotó sus intentos; hace falta una vía alternativa o confirmación humana, no otro retry."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The needed document has already been obtained by another path, so this failed portal fetch no longer serves the objective."
+            }
+          ],
+          "rationale": "The current facts show the tax statement received from the owner for 2026, which settles the stated need.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "The predial statement is already received directly from the owner, so the blocked portal fetch is no longer needed.",
+            "rationale": "The current facts show the tax statement received from the owner for 2026, which settles the stated need.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": null,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The needed document has already been obtained by another path, so this failed portal fetch no longer serves the objective."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-with-a-listed-alternative-registry",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This same technical failure has already recurred, so retrying would loop; replan with an alternate internal source instead."
+            }
+          ],
+          "rationale": "The only blocking work is the failed transit access read, and the prospect’s stated need makes the transport criterion central.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "The key constraint is an unresolved transit-accessibility check that failed after repeated attempts, while the prospect’s requirement is specifically proximity to transport.",
+            "rationale": "The only blocking work is the failed transit access read, and the prospect’s stated need makes the transport criterion central.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "Use the alternate internal capability to reconcile whether Centro Sur is well connected to transport and avoid repeating the failed access check.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "This same technical failure has already recurred, so retrying would loop; replan with an alternate internal source instead."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-after-the-advisor-settled-the-question",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile]"
+          ],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The deed-annex read is superseded by the advisor's answer, so it no longer needs retry or replacement work."
+            }
+          ],
+          "rationale": "The advisor already confirmed the cajon is separately deeded and included, and there is no new evidence requiring further action now.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "The key question about the parking space is already answered: it has its own deed and is included, so the blocked annex read is no longer needed.",
+            "rationale": "The advisor already confirmed the cajon is separately deeded and included, and there is no new evidence requiring further action now.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": null,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The deed-annex read is superseded by the advisor's answer, so it no longer needs retry or replacement work."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-and-only-a-person-can-authorize-the-cost",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Ya agotó sus reintentos; la responsabilidad debe pasar a un humano o a otra vía de obtención del dictamen."
+            }
+          ],
+          "rationale": "La evidencia muestra una preocupación estructural del prospecto y un reporte estructural bloqueado tras 4 fallos iguales.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "El único trabajo bloqueado es leer el dictamen estructural y ya agotó sus reintentos por una falla técnica repetida.",
+            "rationale": "La evidencia muestra una preocupación estructural del prospecto y un reporte estructural bloqueado tras 4 fallos iguales.",
+            "insufficient_evidence": false,
+            "capability_gap": "No hay otra vía interna disponible para verificar la estructura; falta acceso efectivo al repositorio del dictamen.",
+            "proposed_work": [
+              {
+                "work_type": "targeted_human_input_request_structural_report",
+                "purpose": "Pedir a un humano que obtenga o confirme el dictamen estructural por otra vía.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "Ya agotó sus reintentos; la responsabilidad debe pasar a un humano o a otra vía de obtención del dictamen."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-while-a-due-promise-waits-on-it",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry would loop because the same provider service error already recurred across all attempts; replan via human input is the better path."
+            }
+          ],
+          "rationale": "The tracked commitment is due today and w1 has exhausted retries with a provider service error.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "The due school summary is blocked because the education data provider failed after all attempts were used.",
+            "rationale": "The tracked commitment is due today and w1 has exhausted retries with a provider service error.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "request_human_decision_on_school_summary_path",
+                "purpose": "Ask the advisor to supply an alternate source or approve manual compilation since the automated school data build is blocked.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 4,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "Retry would loop because the same provider service error already recurred across all attempts; replan via human input is the better path."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-municipal-appointment-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The last inbound says the office will notify when there is an appointment, and the only tracked work is blocked waiting on that person.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "pending municipal appointment for land-use regularization",
+            "rationale": "The last inbound says the office will notify when there is an appointment, and the only tracked work is blocked waiting on that person.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 48
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-bank-committee-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only current blocker is an external committee decision, and earlier reconsiderations already concluded to wait for it.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "The sale is currently constrained by the bank credit committee decision and no new information has arrived.",
+            "rationale": "The only current blocker is an external committee decision, and earlier reconsiderations already concluded to wait for it.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 24
+          }
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h8-blocked-cadastral-certificate-first-outage",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retrying the same cadastral read would loop because the same technical failure already recurred; a human or alternate path is needed."
+            }
+          ],
+          "rationale": "The notary has requested the cadastral certificate, but the certificate read task has already failed three times for a technical reason.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "The only directly relevant task is blocked because the cadastral service failed after exhausting attempts, and I cannot contact the prospect right now.",
+            "rationale": "The notary has requested the cadastral certificate, but the certificate read task has already failed three times for a technical reason.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "ask_advisor_to_provide_or_obtain_cadastral_certificate_alternative",
+                "purpose": "Get the certificate through a human or alternate channel since the automated read is exhausted.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "Retrying the same cadastral read would loop because the same technical failure already recurred; a human or alternate path is needed."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-water-rights-same-rejection-after-the-window",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "debe quedar a cargo de otra vía o de un humano, porque la consulta al registro ya agotó sus intentos y repite el mismo rechazo"
+            }
+          ],
+          "rationale": "El prospecto condicionó el terreno al agua y el objetivo sigue viable, pero w1 ya agotó reintentos técnicos y requiere otra vía interna disponible.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "La única pieza bloqueada es la verificación de derechos de agua, y ya falló dos veces con el mismo rechazo de oficina.",
+            "rationale": "El prospecto condicionó el terreno al agua y el objetivo sigue viable, pero w1 ya agotó reintentos técnicos y requiere otra vía interna disponible.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "read_case_facts",
+                "purpose": "revisar los hechos del caso y lo ya intentado para reconciliar si existe una vía interna distinta para confirmar el agua",
+                "durable": false
+              },
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "buscar señales locales/indirectas sobre servicios o acceso a agua que ayuden a triangul ar la situación sin repetir la consulta fallida",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "debe quedar a cargo de otra vía o de un humano, porque la consulta al registro ya agotó sus intentos y repite el mismo rechazo"
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-notary-index-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The needed capability is no longer available to this case, so another retry would hit the same wall; this responsibility should be handled via human input or another authorized path."
+            }
+          ],
+          "rationale": "The only unfinished work is w1, which failed because this account no longer has index access.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "The notarial index check is blocked by revoked access, and the objective still depends on confirming whether there were unusual prior deeds.",
+            "rationale": "The only unfinished work is w1, which failed because this account no longer has index access.",
+            "insufficient_evidence": false,
+            "capability_gap": "Notarial index access is unavailable to this case; only a human with access or a different authorized channel can verify the title history.",
+            "proposed_work": [
+              {
+                "work_type": "request_human_title_check",
+                "purpose": "Ask the advisor to obtain a notarial/title-history check for the Carretas property through an authorized channel.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The needed capability is no longer available to this case, so another retry would hit the same wall; this responsibility should be handled via human input or another authorized path."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the needed outcome is already met by the owner-supplied statement, so there is no remaining value in retrying the portal fetch"
+            }
+          ],
+          "rationale": "Current facts show the tax statement was received from the owner and the wake reason is prior_work_settled.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "the predial statement for 2026 is already received directly from the owner, so the blocked fetch is no longer needed",
+            "rationale": "Current facts show the tax statement was received from the owner and the wake reason is prior_work_settled.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": null,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "the needed outcome is already met by the owner-supplied statement, so there is no remaining value in retrying the portal fetch"
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-with-a-listed-alternative-registry",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This same transit read already failed three times; retrying would loop, so the responsibility should be left blocked while a different path is pursued."
+            }
+          ],
+          "rationale": "The prospect’s only stated constraint is transport proximity, and the mobility service failed three times while the case remains viable.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "The only active blocker is an unavailable transit-accessibility read that failed repeatedly, so the next useful step is to reconcile that requirement using another internal source.",
+            "rationale": "The prospect’s only stated constraint is transport proximity, and the mobility service failed three times while the case remains viable.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "Use the alternate internal data source to approximate transport-connectedness and reconcile the failed transit read.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "This same transit read already failed three times; retrying would loop, so the responsibility should be left blocked while a different path is pursued."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-after-the-advisor-settled-the-question",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile]"
+          ],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The matter is already resolved by the advisor’s confirmation, so retrying the deed annex read is unnecessary."
+            }
+          ],
+          "rationale": "The only remaining blocked work was to read the deed annex, but that was a technical failure already exhausted and the prospect’s concern is resolved by the advisor’s answer.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "The key question was already answered: the advisor confirmed the parking space has its own deed and is included.",
+            "rationale": "The only remaining blocked work was to read the deed annex, but that was a technical failure already exhausted and the prospect’s concern is resolved by the advisor’s answer.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": null,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The matter is already resolved by the advisor’s confirmation, so retrying the deed annex read is unnecessary."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-and-only-a-person-can-authorize-the-cost",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Use a different path now: reconcile the structural concern through comparable sales/context rather than retrying the exhausted report read."
+            }
+          ],
+          "rationale": "The only unfinished work is a failed structural-report read, and there is an available alternate internal capability to reconcile risk via comparable sales/context.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "The structural-report read has exhausted retries, and the prospect’s concern still leaves structural risk unresolved.",
+            "rationale": "The only unfinished work is a failed structural-report read, and there is an available alternate internal capability to reconcile risk via comparable sales/context.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "comparable_sales_read",
+                "purpose": "Gather comparable sales evidence to triangulate whether the house’s apparent age/condition implies a structural-risk price or inspection concern.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "Use a different path now: reconcile the structural concern through comparable sales/context rather than retrying the exhausted report read."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-while-a-due-promise-waits-on-it",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same school data provider failure has recurred through all attempts, so retrying would loop; a different source or human help is needed."
+            }
+          ],
+          "rationale": "The tracked commitment is due and w1 failed three times because the school data provider errored.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "The promised school summary is due today but the school data build has exhausted retries after repeated service errors.",
+            "rationale": "The tracked commitment is due and w1 failed three times because the school data provider errored.",
+            "insufficient_evidence": false,
+            "capability_gap": "No listed capability can replace the failed school data source or verify school status externally.",
+            "proposed_work": [
+              {
+                "work_type": "request_human_decision_on_alternative_source_or_manual_school_summary",
+                "purpose": "Ask the advisor to supply an alternate source, manual school list, or permission to proceed without the school summary so the due commitment can be handled.",
+                "durable": true
+              }
+            ],
+            "commitments": [
+              {
+                "expected_outcome": "Deliver the prospect the summary of schools in the area today",
+                "actor": "gu",
+                "due_at": null,
+                "due_stated": true,
+                "key": "resumen_escuelas"
+              }
+            ],
+            "reconsider_in_hours": 4,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The same school data provider failure has recurred through all attempts, so retrying would loop; a different source or human help is needed."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-municipal-appointment-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only concrete blocker is the municipality saying they will notify when an appointment is available.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "pending municipal appointment for zoning regularization",
+            "rationale": "The only concrete blocker is the municipality saying they will notify when an appointment is available.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 72
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-bank-committee-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The case already records that the committee is being awaited and the objective remains viable.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "The only live blocker is the bank credit committee decision, which is still pending from the prospect’s update.",
+            "rationale": "The case already records that the committee is being awaited and the objective remains viable.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 24
+          }
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 2,
+      "failureRate": 0.2,
+      "fabrications": 1,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": false,
+      "closureGating": false,
+      "attributedToPreSl14": [
+        "fabricated work: h8-waiting-on-the-bank-committee-not-technical — the breached assertion predates SL-14, and this prompt is proven byte-identical to the pre-SL-14 judge (§8 Q12)"
+      ],
+      "results": [
+        {
+          "id": "h8-blocked-cadastral-certificate-first-outage",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La consulta automática ya agotó 3 intentos y la misma falla recurrió; conviene replanear con apoyo humano o una vía alternativa."
+            }
+          ],
+          "rationale": "El servicio catastral falló repetidamente y el trabajo w1 ya no puede avanzarse por vía automática.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "El certificado catastral sigue siendo el cuello de botella y el intento automático agotó sus reintentos por una caída del servicio.",
+            "rationale": "El servicio catastral falló repetidamente y el trabajo w1 ya no puede avanzarse por vía automática.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "ask_advisor_to_obtain_certificate_alternatively",
+                "purpose": "Pedir al humano que consiga el certificado catastral por una vía alternativa o que aporte el documento si ya lo tiene.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "La consulta automática ya agotó 3 intentos y la misma falla recurrió; conviene replanear con apoyo humano o una vía alternativa."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-water-rights-same-rejection-after-the-window",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "No conviene reintentar el registro porque ya repitió el mismo rechazo; la responsabilidad pasa a una ruta distinta de verificación mediante neighborhood_services_read."
+            }
+          ],
+          "rationale": "El prospecto dejó claro que sin agua el terreno no sirve y el acceso al registro de derechos de agua falló repetidamente con el mismo motivo.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "La verificación de derechos de agua sigue siendo el bloqueo central y el intento w1 ya agotó sus reintentos por el mismo rechazo.",
+            "rationale": "El prospecto dejó claro que sin agua el terreno no sirve y el acceso al registro de derechos de agua falló repetidamente con el mismo motivo.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "Cruzar señales locales sobre disponibilidad/servicios de agua del rancho o su zona y reconciliar si hay una vía alternativa de confirmación interna.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "No conviene reintentar el registro porque ya repitió el mismo rechazo; la responsabilidad pasa a una ruta distinta de verificación mediante neighborhood_services_read."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-notary-index-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The needed notarial-index capability is no longer available in this case; route it through human access or another external path instead of retrying."
+            }
+          ],
+          "rationale": "The notarial index work failed because this account was revoked from that index, and the prospect’s question makes the missing notarial-history check material.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "The only relevant blocked work needs notarial-index access that this case can no longer use, while the prospect explicitly asked about prior deeds.",
+            "rationale": "The notarial index work failed because this account was revoked from that index, and the prospect’s question makes the missing notarial-history check material.",
+            "insufficient_evidence": false,
+            "capability_gap": "Access to the colegio de notarios index or another notarial-history source is unavailable in the listed capabilities.",
+            "proposed_work": [
+              {
+                "work_type": "ask_advisor_to_obtain_notarial_history",
+                "purpose": "Have a human with access check for prior deeds or any unusual escritura before advancing the purchase.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The needed notarial-index capability is no longer available in this case; route it through human access or another external path instead of retrying."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the required tax statement was received from the owner, so the portal fetch is no longer necessary"
+            }
+          ],
+          "rationale": "The owner already sent the 2026 predial receipt directly, so the blocked portal fetch is no longer needed.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "needed evidence already received from owner",
+            "rationale": "The owner already sent the 2026 predial receipt directly, so the blocked portal fetch is no longer needed.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": null,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "the required tax statement was received from the owner, so the portal fetch is no longer necessary"
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-with-a-listed-alternative-registry",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same transit reader already failed repeatedly with no new condition; replan through neighborhood_services_read instead of looping."
+            }
+          ],
+          "rationale": "The prospect’s requirement is near-transit access and the prior transit read failed three times with the mobility service unavailable.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "The only blocked work is transit accessibility measurement, which failed technically after exhausting attempts, so the next useful step is to reconcile via another internal source or path.",
+            "rationale": "The prospect’s requirement is near-transit access and the prior transit read failed three times with the mobility service unavailable.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "Use an alternate internal source to verify neighborhood transport-related services and proximity proxies after the transit reader failed.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The same transit reader already failed repeatedly with no new condition; replan through neighborhood_services_read instead of looping."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-after-the-advisor-settled-the-question",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile]"
+          ],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El intento técnico de leer el anexo ya agotó sus intentos y la respuesta del asesor volvió innecesario ese camino."
+            }
+          ],
+          "rationale": "La única duda pendiente sobre la escritura del cajón ya fue respondida por el asesor hace 3 días.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "La condición clave ya fue resuelta: el asesor confirmó que el cajón tiene escritura propia e incluido, y no hay otra señal útil de avance inmediato.",
+            "rationale": "La única duda pendiente sobre la escritura del cajón ya fue respondida por el asesor hace 3 días.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 48,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "El intento técnico de leer el anexo ya agotó sus intentos y la respuesta del asesor volvió innecesario ese camino."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-and-only-a-person-can-authorize-the-cost",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La lectura del dictamen estructural ya agotó sus reintentos técnicos; conviene dejarla bloqueada y avanzar por la ruta de comparables mientras se espera otra vía o persona para ese dato."
+            }
+          ],
+          "rationale": "El prospecto ya expresó una preocupación estructural y la lectura del dictamen público falló repetidamente, mientras que sí hay otra capacidad interna disponible para avanzar la decisión.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "La única vía bloqueada es la lectura del dictamen estructural, pero existe otra ruta interna útil para reducir el riesgo: comparar ventas similares y reconciliar si el precio/condición sostienen una compra segura.",
+            "rationale": "El prospecto ya expresó una preocupación estructural y la lectura del dictamen público falló repetidamente, mientras que sí hay otra capacidad interna disponible para avanzar la decisión.",
+            "insufficient_evidence": true,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "comparable_sales_read",
+                "purpose": "Obtener comparables de casas similares en Tequisquiapan para estimar si la condición aparente y el precio siguen siendo compatibles con una compra sin riesgo estructural excesivo.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "La lectura del dictamen estructural ya agotó sus reintentos técnicos; conviene dejarla bloqueada y avanzar por la ruta de comparables mientras se espera otra vía o persona para ese dato."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-while-a-due-promise-waits-on-it",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry would loop because the same technical failure already recurred three times; replan via manual inputs or an alternate source is needed."
+            }
+          ],
+          "rationale": "The tracked promise to deliver the school summary is due today, and the only available path to produce it has already failed repeatedly with a service error.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "The due school-summary commitment is blocked because the education-data provider failed after 3 attempts.",
+            "rationale": "The tracked promise to deliver the school summary is due today, and the only available path to produce it has already failed repeatedly with a service error.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "ask_advisor_for_manual_school_inputs_or_alternate_source",
+                "purpose": "Obtain the school list/details needed to fulfill the due summary without the failed data provider",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 4,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "Retry would loop because the same technical failure already recurred three times; replan via manual inputs or an alternate source is needed."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-municipal-appointment-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The owner said the municipal counter will notify them when there is an appointment, and no new information has arrived since then.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "pending municipal appointment notice",
+            "rationale": "The owner said the municipal counter will notify them when there is an appointment, and no new information has arrived since then.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 24
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-bank-committee-not-technical",
+          "posture": "wait",
+          "passed": false,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [
+            "invented a commitment: Resolver la decisión del comité de crédito bancario"
+          ],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La evidencia actual muestra que el comité del banco sigue siendo el único bloqueo activo y no hay nuevo dato interno que cambie la decisión.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "El avance sigue bloqueado por la resolución del comité de crédito bancario, que es una expectativa externa pendiente.",
+            "rationale": "La evidencia actual muestra que el comité del banco sigue siendo el único bloqueo activo y no hay nuevo dato interno que cambie la decisión.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [
+              {
+                "expected_outcome": "Resolver la decisión del comité de crédito bancario",
+                "actor": "external",
+                "due_at": null,
+                "due_stated": false,
+                "key": "bank_credit_committee_decision"
+              }
+            ],
+            "reconsider_in_hours": 24
+          }
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h8-blocked-cadastral-certificate-first-outage",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Ya agotó 3 intentos con el mismo fallo técnico; conviene esperar a que el servicio externo se recupere en lugar de reintentar en bucle."
+            }
+          ],
+          "rationale": "El notario pidió el certificado catastral y la consulta al catastro falló repetidamente por indisponibilidad técnica.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "El único trabajo pendiente depende del certificado catastral y el servicio ya falló tras 3 intentos.",
+            "rationale": "El notario pidió el certificado catastral y la consulta al catastro falló repetidamente por indisponibilidad técnica.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "Ya agotó 3 intentos con el mismo fallo técnico; conviene esperar a que el servicio externo se recupere en lugar de reintentar en bucle."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-water-rights-same-rejection-after-the-window",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry is no longer available after repeated identical registry rejection; use an alternate internal path or escalate to a person if a definitive water-rights verification is still required."
+            }
+          ],
+          "rationale": "The only active work item is w1, which has exhausted retries on the same technical rejection, while the prospect’s water requirement remains the key unresolved fact.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "The water-rights registry lookup has already failed repeatedly with the same rejection, so progress is now constrained by needing an alternate internal path or reconciliation of what can still be verified.",
+            "rationale": "The only active work item is w1, which has exhausted retries on the same technical rejection, while the prospect’s water requirement remains the key unresolved fact.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "Check nearby service or local utility context as an alternate internal source for clues that may help reconcile whether water access can be substantiated without the registry.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "Retry is no longer available after repeated identical registry rejection; use an alternate internal path or escalate to a person if a definitive water-rights verification is still required."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-notary-index-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "No puede reintentarse: el acceso fue revocado y no hay una capacidad alternativa interna para resolverlo; requiere vía humana o replanteo externo."
+            }
+          ],
+          "rationale": "El único trabajo pendiente relevante está bloqueado por una revocación de acceso y no existe otra capacidad interna para consultar ese índice.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "La verificación del índice notarial quedó imposible porque la cuenta perdió acceso revocado por el colegio de notarios.",
+            "rationale": "El único trabajo pendiente relevante está bloqueado por una revocación de acceso y no existe otra capacidad interna para consultar ese índice.",
+            "insufficient_evidence": false,
+            "capability_gap": "Consulta del índice notarial o cualquier verificación registral/documental externa.",
+            "proposed_work": [
+              {
+                "work_type": "ask_advisor_for_alternative_access_or_documents",
+                "purpose": "Pedir al humano que aporte una vía alternativa de verificación notarial o la documentación ya disponible.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "No puede reintentarse: el acceso fue revocado y no hay una capacidad alternativa interna para resolverlo; requiere vía humana o replanteo externo."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Ya no hace falta para avanzar ahora porque el documento requerido fue recibido por otro medio; si vuelve a ser necesario, conviene replanear con otra vía o pedir confirmación humana."
+            }
+          ],
+          "rationale": "Los hechos actuales muestran que el estado del predial 2026 ya fue recibido directamente y el único trabajo bloqueado no requiere más acción inmediata.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "No hay trabajo útil ahora porque el recibo de predial ya fue enviado por el propietario y el intento de obtención del portal quedó agotado por falla técnica.",
+            "rationale": "Los hechos actuales muestran que el estado del predial 2026 ya fue recibido directamente y el único trabajo bloqueado no requiere más acción inmediata.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "Ya no hace falta para avanzar ahora porque el documento requerido fue recibido por otro medio; si vuelve a ser necesario, conviene replanear con otra vía o pedir confirmación humana."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-with-a-listed-alternative-registry",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The transit_accessibility_read path already failed three times with the same technical issue, so another retry would loop; use the alternative neighborhood_services_read path instead."
+            }
+          ],
+          "rationale": "The prospect explicitly requires proximity to transport, and the only blocked work is verifying that fact for Centro Sur.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "The lead constraint is unresolved transit-accessibility verification for the target area, and the prior transit check failed technically after exhausting retries.",
+            "rationale": "The prospect explicitly requires proximity to transport, and the only blocked work is verifying that fact for Centro Sur.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "Cross-check transport connectivity for Centro Sur using the available neighborhood services capability to replace the failed transit-specific check.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The transit_accessibility_read path already failed three times with the same technical issue, so another retry would loop; use the alternative neighborhood_services_read path instead."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-after-the-advisor-settled-the-question",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile]"
+          ],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The deed-annex read already failed 3 times on the development registry system and the needed fact is now confirmed by the advisor, so this work is no longer necessary."
+            }
+          ],
+          "rationale": "The key question was answered 3 days ago and no other unresolved obstacle is evidenced.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "The advisor already confirmed the parking space has its own deed and is included, which resolves the prospect’s only stated condition.",
+            "rationale": "The key question was answered 3 days ago and no other unresolved obstacle is evidenced.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": null,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The deed-annex read already failed 3 times on the development registry system and the needed fact is now confirmed by the advisor, so this work is no longer necessary."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-and-only-a-person-can-authorize-the-cost",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El mismo fallo técnico ya recurrió; conviene cambiar de vía y usar comparables o esperar a un repositorio distinto, no volver a intentar la lectura ahora."
+            }
+          ],
+          "rationale": "La única tarea bloqueada falló repetidamente y no debe reintentarse; sí hay otra vía interna disponible para avanzar sin contactar al prospecto.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "El dictamen estructural público quedó bloqueado por fallo técnico recurrente y aún falta una base alternativa para responder la preocupación estructural del prospecto.",
+            "rationale": "La única tarea bloqueada falló repetidamente y no debe reintentarse; sí hay otra vía interna disponible para avanzar sin contactar al prospecto.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "comparable_sales_read",
+                "purpose": "Buscar comparables de casas antiguas en Tequisquiapan para inferir señales de riesgo estructural y contexto de precio sin depender del dictamen caído.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "El mismo fallo técnico ya recurrió; conviene cambiar de vía y usar comparables o esperar a un repositorio distinto, no volver a intentar la lectura ahora."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-while-a-due-promise-waits-on-it",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry would loop because the same technical failure recurred across all attempts; replan or human intervention is needed instead."
+            }
+          ],
+          "rationale": "The tracked today-due school summary is unfinished and the only available builder has already failed three times with the same provider error.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "The due school-summary commitment is blocked because the school data service failed after exhausting retries.",
+            "rationale": "The tracked today-due school summary is unfinished and the only available builder has already failed three times with the same provider error.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "Check whether any locally available neighborhood-services facts can support a partial fallback for the school summary without the failed school provider.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "Retry would loop because the same technical failure recurred across all attempts; replan or human intervention is needed instead."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-municipal-appointment-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only live dependency is the municipality’s pending citation date, and no new information has arrived since the last wait decision.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "pending municipal appointment date from the ventanilla blocks the zoning-regularization path",
+            "rationale": "The only live dependency is the municipality’s pending citation date, and no new information has arrived since the last wait decision.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 24
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-bank-committee-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "El expediente indica que el crédito está en comité, la oportunidad sigue viable y ya se intentó esperar sin nueva información.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "La decisión del comité bancario sigue siendo el único bloqueo activo y se espera resolución externa.",
+            "rationale": "El expediente indica que el crédito está en comité, la oportunidad sigue viable y ya se intentó esperar sin nueva información.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 24
+          }
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h8-blocked-cadastral-certificate-first-outage",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La misma consulta ya falló repetidamente por la misma causa técnica; conviene replanear o escalar en lugar de reintentar."
+            }
+          ],
+          "rationale": "El notario pidió el certificado catastral y la consulta catastral ya agotó 3 intentos por caída del servicio.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "El certificado catastral sigue siendo el bloqueo, pero la única vía interna falló tras agotar sus intentos.",
+            "rationale": "El notario pidió el certificado catastral y la consulta catastral ya agotó 3 intentos por caída del servicio.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "escalar_pendiente_catastral",
+                "purpose": "Pedir al asesor que obtenga el certificado catastral por una vía alternativa o confirme el siguiente paso documental.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "La misma consulta ya falló repetidamente por la misma causa técnica; conviene replanear o escalar en lugar de reintentar."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-water-rights-same-rejection-after-the-window",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "No puede reintentarse: el mismo rechazo ya recurrió y la responsabilidad debe pasar a otra vía, en particular reconciliar con fuentes alternativas o escalar a humano si hace falta confirmar derechos de agua."
+            }
+          ],
+          "rationale": "La única pista material sigue siendo la objeción del prospecto sobre el agua y el intento de registro agotó sus reintentos con el mismo fallo.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "El bloqueo real es la confirmación de derechos de agua, y la consulta registral ya falló repetidamente por el mismo rechazo técnico.",
+            "rationale": "La única pista material sigue siendo la objeción del prospecto sobre el agua y el intento de registro agotó sus reintentos con el mismo fallo.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "reconciliar si hay indicios externos sobre el servicio o infraestructura hídrica del área que puedan orientar la siguiente decisión",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "No puede reintentarse: el mismo rechazo ya recurrió y la responsabilidad debe pasar a otra vía, en particular reconciliar con fuentes alternativas o escalar a humano si hace falta confirmar derechos de agua."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-notary-index-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El acceso al índice notarial fue revocado y esta capacidad ya no está disponible; hay que replanificar o pedir confirmación humana, no reintentar."
+            }
+          ],
+          "rationale": "La única tarea bloqueada usa un índice revocado y no hay otra capacidad interna que permita comprobar antecedentes notariales.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "El índice notarial ya no es accesible con esta cuenta y es la única vía interna indicada para verificar escrituras previas.",
+            "rationale": "La única tarea bloqueada usa un índice revocado y no hay otra capacidad interna que permita comprobar antecedentes notariales.",
+            "insufficient_evidence": false,
+            "capability_gap": "Verificación de antecedentes notariales / acceso al índice notarial",
+            "proposed_work": [
+              {
+                "work_type": "ask_advisor_to_confirm_next_path",
+                "purpose": "Pedir al humano que confirme una vía alternativa para revisar el historial notarial o si debe escalarse a otra fuente.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "El acceso al índice notarial fue revocado y esta capacidad ya no está disponible; hay que replanificar o pedir confirmación humana, no reintentar."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-result-the-owner-already-sent-it",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the needed document is already in hand, so this fetch responsibility no longer needs another retry or alternate path"
+            }
+          ],
+          "rationale": "The current facts show the tax statement was received from the owner, which settles the objective behind w1.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "the predial statement is already received directly from the owner for 2026, so the failed portal fetch is no longer needed",
+            "rationale": "The current facts show the tax statement was received from the owner, which settles the objective behind w1.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": null,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "the needed document is already in hand, so this fetch responsibility no longer needs another retry or alternate path"
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-with-a-listed-alternative-registry",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same transit lookup already failed repeatedly, so another retry would loop; use the alternative available source instead."
+            }
+          ],
+          "rationale": "The prospect explicitly requires being close to transport, and the blocked transit read needs a new path rather than another retry.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "The lead is viable but the key criterion is transit proximity, and the prior transit lookup failed after 3 attempts.",
+            "rationale": "The prospect explicitly requires being close to transport, and the blocked transit read needs a new path rather than another retry.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "neighborhood_services_read",
+                "purpose": "Use the available neighborhood services source to reconcile transit-related accessibility signals for Centro Sur and nearby options.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 12,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The same transit lookup already failed repeatedly, so another retry would loop; use the alternative available source instead."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-after-the-advisor-settled-the-question",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile]"
+          ],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The deed-annex read has already failed repeatedly and the needed fact is already confirmed by the advisor, so no further internal work is worth retrying."
+            }
+          ],
+          "rationale": "The only remaining blocked work is a failed deed-annex read, but the key factual question has already been settled by the advisor’s answer.",
+          "proposal": {
+            "posture": "no_op",
+            "diagnosis": "The advisor already confirmed the parking spot is deeded with the department, which directly answers the prospect’s condition.",
+            "rationale": "The only remaining blocked work is a failed deed-annex read, but the key factual question has already been settled by the advisor’s answer.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": null,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The deed-annex read has already failed repeatedly and the needed fact is already confirmed by the advisor, so no further internal work is worth retrying."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-and-only-a-person-can-authorize-the-cost",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same structural-report access has already failed repeatedly with no new condition; use another path and keep this responsibility blocked until a different source or human input is available."
+            }
+          ],
+          "rationale": "The public structural dictamen read has failed repeatedly, while a comparable-sales read is still available and can advance valuation context.",
+          "proposal": {
+            "posture": "gather_research_reconcile",
+            "diagnosis": "The only blocked work is a failed structural-report read, and the prospect’s concern is specifically structural risk.",
+            "rationale": "The public structural dictamen read has failed repeatedly, while a comparable-sales read is still available and can advance valuation context.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "comparable_sales_read",
+                "purpose": "Reconcile market context for the Tequisquiapan house so the next decision is grounded in recent comparable value data while structural-report access remains blocked.",
+                "durable": false
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 24,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The same structural-report access has already failed repeatedly with no new condition; use another path and keep this responsibility blocked until a different source or human input is available."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-blocked-while-a-due-promise-waits-on-it",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same technical failure has already recurred and another retry would loop; the responsibility now needs a different path via human input."
+            }
+          ],
+          "rationale": "The tracked promise to deliver the school-area summary is due today and w1 failed 3/3 times with a provider service error.",
+          "proposal": {
+            "posture": "targeted_human_input",
+            "diagnosis": "The school-summary commitment is due today, but the only relevant work source has exhausted retries after a service error.",
+            "rationale": "The tracked promise to deliver the school-area summary is due today and w1 failed 3/3 times with a provider service error.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [
+              {
+                "work_type": "escalate_school_data_blocker",
+                "purpose": "Ask the advisor to choose an alternate source or supply local school information so the due school summary can still be completed today.",
+                "durable": true
+              }
+            ],
+            "commitments": [],
+            "reconsider_in_hours": 4,
+            "recovery": [
+              {
+                "work": "w1",
+                "action": "leave",
+                "reason": "The same technical failure has already recurred and another retry would loop; the responsibility now needs a different path via human input."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-municipal-appointment-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only actionable blocker is that the municipal office has not yet provided a cita, and no new information has arrived since the last wait decision.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "pending municipal appointment scheduling is the current constraint",
+            "rationale": "The only actionable blocker is that the municipal office has not yet provided a cita, and no new information has arrived since the last wait decision.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 48
+          }
+        },
+        {
+          "id": "h8-waiting-on-the-bank-committee-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "sl14Violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The case facts show the opportunity is viable and the bank committee is still the unresolved blocker.",
+          "proposal": {
+            "posture": "wait",
+            "diagnosis": "credit committee decision is still pending and remains the only live dependency",
+            "rationale": "The case facts show the opportunity is viable and the bank committee is still the unresolved blocker.",
+            "insufficient_evidence": false,
+            "capability_gap": null,
+            "proposed_work": [],
+            "commitments": [],
+            "reconsider_in_hours": 24
+          }
+        }
+      ]
+    }
+  ]
+}
