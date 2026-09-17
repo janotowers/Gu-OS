@@ -25,3 +25,16 @@ apps/web/tmp/
 # too, so keep a copy outside the repo.
 gu-os-sl1-reader.*.json
 *.password.txt
+
+# Raw console transcripts of eval batches and smoke runs. The evidence is the
+# JSON artifact under docs/.../evidence/, which is committed; this is the
+# scrollback that produced it.
+.evallogs/
+
+# The hosted verifier's staging target — the pilot Organization and owner-user
+# UUIDs, resolved through the authorized staging read path so a run does not
+# need them typed in by hand. Not secret material, and still never committed:
+# every hosted evidence artifact in this repo carries `sha256:` digests of these
+# identifiers rather than the identifiers, and a resolved copy in history would
+# undo that on the first grep.
+.rs2-target.local.json

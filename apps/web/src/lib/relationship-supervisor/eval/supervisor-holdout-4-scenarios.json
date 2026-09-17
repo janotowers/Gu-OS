@@ -1,0 +1,543 @@
+{
+  "recorded": {
+    "what": "SL-14 HOLDOUT 4 - INVENTED, and frozen on 2026-09-16 BEFORE it was run even once, and before any evidence existed under the closure rule it is meant to test. Ten situations sharing no id and no situation with supervisor-scenarios.json, with the 2026-09-15 holdout, with holdout 2 or with holdout 3.",
+    "whyAFOURTHHoldout": "Not because holdout 3 failed - it held every bar in 10 of 10 - but because the CRITERION changed after that result was read. On 2026-09-16 the Accountable resolved Q10 by a narrow prospective re-scope of SL-14's eval Definition of Done (Slice Plan v1.40 §4). A holdout measured BEFORE a rule was written cannot be presented as having independently validated that rule: the rule's author had seen the number. Holdout 3 remains recorded evidence, unedited, and keeps exactly what it proved - the implementation at `205b1f1` holding every ratified bar in 10 of 10 runs - but it is OBSERVED, and this set exists so the corrected contract is tested by evidence produced after it was frozen.",
+    "whyEVERYSituationHereIsSL14OWNED": "This is the property that makes the set answer the exact question the re-scope raises. The corrected rule may attribute a breach away from SL-14 only when a scenario carries no SL-14 acceptance expectation AND its prompt is mechanically proven byte-identical to the judge frozen at `2a12441`. Every scenario in this file carries an SL-14 expectation - a blocked alias with a disposition owed, or the boundary assertion that NOTHING here may be offered recovery. So the exception is not merely unused on this set: `isSl14Owned` returns true for all ten, and the exception is STRUCTURALLY UNAVAILABLE. Every breach here gates closure, and a byte-identity audit of this set can buy it nothing. That is deliberate, and it is the difference between a holdout that tests the new rule and one the new rule could excuse.",
+    "whatWasKNOWNWhenThisWasAUTHORED": "Stated because it is the only thing that makes an independence claim checkable. Known: the full 2026-09-16 measurement at `205b1f1` (main 9 of 10, holdout 3 10 of 10), the byte-identity audit of the main set, the completed same-day baseline, the reverted `884649d` attempt and every per-scenario detail of all of them - including that the one residual main-set breach was a fabrication on `attention-already-consumed`. Not known: any behavior of the implementation on any of the ten situations below, none of which existed before this file. NOTHING in the implementation, the prompt, the judge or the scorer was changed while this set was authored, and nothing will be changed on the strength of its result without freezing a fifth holdout first - the same rule that produced this one.",
+    "whatThisSetDeliberatelyDOESNOTDo": "It does not make closure easier. Holding every bar here is strictly harder than on holdout 3, because every situation is one this Slice is answerable for and none can be attributed to SL-4-era behavior. If the corrected rule had been written to let SL-14 through, this set is where that would show.",
+    "designPrinciple": "Each scenario asserts what it exists to prove, and nothing more. Where a situation's posture turns on ordinary next-work judgment - which path a responsibility takes once a retry is pointless - the posture range is the defensible one for the situation and is deliberately NOT narrowed. Narrowing it would score SL-4's ordinary judgment as an SL-14 failure, which is the authoring defect found in the main set on 2026-09-16 and avoided here from the start, as it was in holdouts 2 and 3.",
+    "coverage": "The five recovery situations the earlier holdouts cover, in situations that share nothing with them, plus four this instrument adds: FOUR blocked items at once with genuinely different dispositions owed - one still needed, one superseded, one whose retry is already spent, one whose capability is gone - which is past the point where a single summarising answer can be right by accident; a blocked item while prospect contact IS available, so the fabrication bar is measured where reaching out is permitted rather than forbidden; a blocked item beside an OWNER's answered question rather than an advisor's; and both boundary assertions - a human wait and an unfavourable result - stated as `not_recoverable` so that offering recovery where none exists is scored on a holdout.",
+    "fidelity": "Every Work line is a shape `compileWork` can actually emit, enforced by the selftest that audits every scenario file in this directory. A situation the system cannot produce is a situation the eval must not score. Where a blocked item has already spent its one Supervisor retry, the set declares `retryExhaustedAliases`, exactly as the compile does.",
+    "gap": "Wholly synthetic, like every other set here. No production lead, message, contact or property is reproduced. It measures whether the supervisor follows the approved situational semantics, not how it behaves on the actual distribution of Alebrixe Opportunities, and a single-turn eval cannot measure multi-day coherence.",
+    "bars": "The same five bars as the main set, at the same ratified values. The Accountable's contract correction of 2026-09-16 moved no bar value and none is moved here.",
+    "howThisSetMayBeUSED": "Once. If its result is read and an implementation change follows, this set is observed too, and a further independent holdout must be frozen before that change."
+  },
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "reask_bar": 0,
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0,
+  "bar_rationale": "Identical to the main set's bars; see supervisor-scenarios.json.",
+  "scenarios": [
+    {
+      "id": "h4-blocked-preapproval-gateway-timed-out-once",
+      "label": "A pre-approval lookup blocked by a gateway timeout, first failure, and the prospect is waiting",
+      "covers": [
+        "blocked_work_recovery",
+        "contact_restriction"
+      ],
+      "rubric": "The lookup timed out at the bank's gateway, once, and the prospect is explicitly waiting on the number. Retrying is the obvious recovery; carrying the responsibility another way is also defensible. The timeout says nothing about the prospect, and contact is unavailable, so nothing here may propose reaching them.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en Refugio con credito bancario preaprobado",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: en cuanto tengas el monto preaprobado me dices"
+        ],
+        "workSummary": [
+          "[w1] preapproval_amount_lookup — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el gateway del banco corto la conexion por tiempo de espera"
+        ],
+        "postureHistory": [
+          "work — se propuso consultar el monto preaprobado"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "preapproval_amount_lookup",
+          "comparable_sales_read"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "wait",
+        "targeted_human_input"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "retry",
+        "leave"
+      ],
+      "requires_disposition": true,
+      "must_not_propose_outbound": true
+    },
+    {
+      "id": "h4-blocked-same-signature-error-after-the-window-was-spent",
+      "label": "The identical signature-service rejection returned after the Supervisor's one retry",
+      "covers": [
+        "blocked_work_recovery",
+        "loop_stopping"
+      ],
+      "rubric": "One Supervisor retry was already granted and the same certificate rejection came back, which the situation states outright. A further attempt is looping with no new information, and the executor would refuse it in any case. The responsibility needs another path, a person, or an explicit wait; retrying again is a blind retry.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 3,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Firmar el contrato de exclusiva de la casa en Zibata",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Asesor: el propietario ya quiere firmar, nada mas falta mandarle el documento"
+        ],
+        "workSummary": [
+          "[w1] signature_request_send — blocked (agent_proposed): technical failure, 4 of 4 attempts used; last error: el servicio de firma rechazo el certificado, el mismo error del intento anterior"
+        ],
+        "postureHistory": [
+          "work — se propuso enviar la solicitud de firma",
+          "work — se reintento el envio tras el fallo tecnico; volvio a fallar con el mismo rechazo de certificado"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "signature_request_send",
+          "comparable_sales_read"
+        ],
+        "retryExhaustedAliases": [
+          "w1"
+        ]
+      },
+      "acceptable_postures": [
+        "targeted_human_input",
+        "gather_research_reconcile",
+        "work",
+        "wait"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "requires_disposition": true,
+      "retry_is_blind": true
+    },
+    {
+      "id": "h4-blocked-appraisal-capability-no-longer-listed",
+      "label": "The appraisal capability the blocked Work needs is no longer on the available list",
+      "covers": [
+        "blocked_work_recovery",
+        "capability_gap"
+      ],
+      "rubric": "The appraisal service the Work depends on is gone from the available capabilities - the contract with the provider lapsed. Retrying sends it into the same wall whatever the judge decides: the gap must be named and the responsibility carried another way.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 4,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Vender la casa de Cimatario con un precio sustentado",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Propietario: quiero un avaluo formal antes de definir el precio"
+        ],
+        "workSummary": [
+          "[w1] appraisal_order — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el proveedor de avaluos ya no acepta solicitudes de esta cuenta"
+        ],
+        "postureHistory": [
+          "work — se propuso ordenar el avaluo"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "comparable_sales_read"
+        ]
+      },
+      "acceptable_postures": [
+        "targeted_human_input",
+        "gather_research_reconcile",
+        "wait"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "requires_disposition": true,
+      "retry_is_blind": true,
+      "must_report_capability_gap": true
+    },
+    {
+      "id": "h4-blocked-result-nobody-needs-the-property-is-gone",
+      "label": "The blocked Work was about a property that has since been sold to someone else",
+      "covers": [
+        "blocked_work_recovery",
+        "deliberate_no_op"
+      ],
+      "rubric": "The photo tour scheduling failed technically, and meanwhile the property was sold to another buyer, so the Work's result is of no use to anyone. Retrying it is work for its own sake. Which posture the situation then warrants - other inventory, a conversation, or nothing yet - is ordinary next-work judgment and is deliberately not narrowed.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en Vista Real para mudarse en diciembre",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "property.status: {\"state\":\"sold_to_another_buyer\",\"learned_from\":\"listing_sync\"}"
+        ],
+        "recentMessages": [
+          "Asesor: esa casa ya se vendio, hay que buscarle otra opcion"
+        ],
+        "workSummary": [
+          "[w1] photo_tour_schedule — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el calendario del fotografo respondio 500"
+        ],
+        "postureHistory": [
+          "work — se propuso agendar el recorrido fotografico"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "photo_tour_schedule",
+          "comparable_sales_read",
+          "inventory_search"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "no_op",
+        "wait"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "leave"
+      ],
+      "requires_disposition": true,
+      "retry_is_blind": true
+    },
+    {
+      "id": "h4-blocked-with-an-equivalent-source-available",
+      "label": "A blocked flood-risk report while a listed capability answers the same question",
+      "covers": [
+        "blocked_work_recovery",
+        "information_gathering_as_work"
+      ],
+      "rubric": "The flood-risk provider is down, and the municipal hazard map read is available and answers the same question the prospect asked. Replanning around the available capability is the useful move, and the blocked item may be left or retried alongside it - what may not happen is the question going unanswered while the outage is treated as the end of the matter.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en La Vista evitando zonas inundables",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: mi preocupacion es que no se inunde en temporada de lluvias"
+        ],
+        "workSummary": [
+          "[w1] flood_risk_report — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el proveedor del reporte esta fuera de servicio"
+        ],
+        "postureHistory": [
+          "work — se propuso el reporte de riesgo de inundacion"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "flood_risk_report",
+          "hazard_map_read"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "retry",
+        "leave"
+      ],
+      "requires_disposition": true,
+      "must_propose_work": true
+    },
+    {
+      "id": "h4-four-blocked-items-four-different-dispositions",
+      "label": "Four technically blocked items at once, each owed a different disposition",
+      "covers": [
+        "blocked_work_recovery",
+        "capability_gap"
+      ],
+      "rubric": "Four items are blocked for technical reasons and no single answer is right for all of them: the survey still matters and has failed only once, the tax certificate has already been obtained by the advisor, the deed extract has spent its one Supervisor retry on the same registry outage, and the utility feasibility check needs a capability that is no longer listed. Saying nothing about an alias is the one answer that is always wrong, and four situations this different cannot be covered by one summarising sentence.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar terreno en Amazcala con todo en regla antes de escriturar",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "property.tax_certificate: {\"received\":true,\"source\":\"el asesor lo consiguio en la tesoreria\"}"
+        ],
+        "recentMessages": [
+          "Asesor: el certificado de no adeudo ya lo tengo yo, lo demas sigue pendiente"
+        ],
+        "workSummary": [
+          "[w1] boundary_survey_order — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el topografo respondio 500",
+          "[w2] tax_certificate_fetch — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el portal de la tesoreria no respondio",
+          "[w3] deed_extract_fetch — blocked (agent_proposed): technical failure, 4 of 4 attempts used; last error: el registro publico sigue fuera de servicio, el mismo error del intento anterior",
+          "[w4] utility_feasibility_check — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: la comision ya no acepta consultas de esta cuenta"
+        ],
+        "postureHistory": [
+          "work — se propusieron el levantamiento, el certificado, el extracto de escritura y la factibilidad de servicios",
+          "work — se reintento el extracto de escritura tras el fallo tecnico; volvio a fallar con el mismo cierre del registro"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "boundary_survey_order",
+          "tax_certificate_fetch",
+          "deed_extract_fetch"
+        ],
+        "retryExhaustedAliases": [
+          "w3"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "wait",
+        "targeted_human_input"
+      ],
+      "recoverable_aliases": [
+        "w1",
+        "w2",
+        "w3",
+        "w4"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "retry",
+        "leave"
+      ],
+      "requires_disposition": true,
+      "must_report_capability_gap": true
+    },
+    {
+      "id": "h4-blocked-after-the-owner-answered",
+      "label": "Blocked Work beside a question the owner has already answered",
+      "covers": [
+        "blocked_work_recovery",
+        "answered_human_input"
+      ],
+      "rubric": "The one question a person could answer here - whether the owner accepts showings while tenants are still living there - was asked and answered, and the answer is in the context. The tenant-schedule read that depends on it is blocked technically and still owed a disposition. Asking that question again is the defect the Cycle 3 repair removed, and contact is unavailable, so nothing here may propose reaching the prospect either.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": [],
+        "humanAnswers": [
+          "Se pregunto al asesor si el propietario aceptaba visitas con inquilinos en la casa. El asesor respondio el 2026-09-15: \"si, el propietario ya acepto, con aviso de un dia\""
+        ],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Vender la casa de Alamos con los inquilinos aun habitandola",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Propietario: con un dia de aviso no hay problema para las visitas"
+        ],
+        "workSummary": [
+          "[w1] tenant_schedule_read — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el sistema de administracion de rentas respondio 503"
+        ],
+        "postureHistory": [
+          "targeted_human_input — se pregunto al asesor si el propietario aceptaba visitas con inquilinos",
+          "work — se propuso leer el calendario de los inquilinos"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "tenant_schedule_read",
+          "comparable_sales_read"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "wait"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "retry",
+        "leave"
+      ],
+      "requires_disposition": true,
+      "must_not_reask": true,
+      "must_not_propose_outbound": true
+    },
+    {
+      "id": "h4-blocked-while-contact-is-available",
+      "label": "Blocked Work in a Case where reaching the prospect IS permitted",
+      "covers": [
+        "blocked_work_recovery",
+        "commitment_detection"
+      ],
+      "rubric": "The comparables read is blocked technically and the responsibility stands. Unlike every other situation in this set, contact is available, so reaching the prospect is a legitimate path and is not scored against. What may not happen is the technical failure becoming a promise: nobody in this conversation committed to anything, by any date, and recording a commitment here would manufacture one out of an outage.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": true,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en Juriquilla comparando precios de la zona",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: me gustaria ver como andan los precios por ahi",
+          "Asesor: claro, lo revisamos"
+        ],
+        "workSummary": [
+          "[w1] comparable_sales_read — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el indice de comparables respondio 502"
+        ],
+        "postureHistory": [
+          "work — se propuso leer los comparables de la zona"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "comparable_sales_read",
+          "inventory_search"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "wait",
+        "targeted_human_input"
+      ],
+      "recoverable_aliases": [
+        "w1"
+      ],
+      "blocked_work": "w1",
+      "acceptable_recovery": [
+        "retry",
+        "leave"
+      ],
+      "requires_disposition": true,
+      "must_not_detect_commitment": true
+    },
+    {
+      "id": "h4-waiting-on-the-bank-adjuster-not-technical",
+      "label": "Work blocked waiting on the bank's adjuster, which is not a technical failure",
+      "covers": [
+        "blocked_work_recovery"
+      ],
+      "rubric": "This item is blocked because the bank's adjuster has not scheduled the inspection, not because anything failed technically. It carries no alias, so no recovery may be offered for it at all - the boundary assertion, stated on a holdout. Which posture the wait warrants is ordinary next-work judgment and is deliberately not narrowed.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 3,
+        "outboundAvailable": false,
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Comprar casa en Hacienda Grande con credito bancario",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}"
+        ],
+        "recentMessages": [
+          "Asesor: el banco dijo que su valuador agenda la inspeccion esta semana"
+        ],
+        "workSummary": [
+          "bank_inspection_schedule — blocked (human): waiting_on_person, 1 of 3 attempts used"
+        ],
+        "postureHistory": [
+          "wait — se espera que el banco agende la inspeccion"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "comparable_sales_read"
+        ]
+      },
+      "acceptable_postures": [
+        "wait",
+        "no_op",
+        "gather_research_reconcile",
+        "targeted_human_input"
+      ],
+      "not_recoverable": true,
+      "recoverable_aliases": []
+    },
+    {
+      "id": "h4-appraisal-came-back-below-the-asking-price",
+      "label": "Work that ran correctly and returned an appraisal below the asking price",
+      "covers": [
+        "blocked_work_recovery",
+        "diagnose_before_act"
+      ],
+      "rubric": "The appraisal RAN and returned a number nobody wanted. That is information, not a technical failure: there is nothing to retry, and the judge must not treat it as one. What this scenario tests is that no recovery is offered for it; which posture the situation then warrants - renegotiate, inform, gather more evidence, or wait - is ordinary next-work judgment and is deliberately not narrowed.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en Balcones con credito bancario",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "property.appraisal: {\"result\":\"below_asking_price\",\"learned_from\":\"appraisal_order\"}"
+        ],
+        "recentMessages": [
+          "Prospecto: esa es la casa que queremos, esperamos que salga bien"
+        ],
+        "workSummary": [
+          "appraisal_order — done (agent_proposed)"
+        ],
+        "postureHistory": [
+          "work — se propuso ordenar el avaluo"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "appraisal_order",
+          "comparable_sales_read"
+        ]
+      },
+      "acceptable_postures": [
+        "work",
+        "gather_research_reconcile",
+        "targeted_human_input",
+        "wait",
+        "no_op"
+      ],
+      "not_recoverable": true,
+      "recoverable_aliases": []
+    }
+  ]
+}

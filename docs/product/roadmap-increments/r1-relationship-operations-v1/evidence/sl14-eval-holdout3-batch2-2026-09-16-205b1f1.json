@@ -1,0 +1,953 @@
+{
+  "ranAt": "2026-09-16T16:35:39.093Z",
+  "model": {
+    "source": "the judge that ran each pass (NextWorkJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ],
+    "unattributed": 0
+  },
+  "set": "holdout3",
+  "setFile": "supervisor-holdout-3-scenarios.json",
+  "setSha256": "560251a76fb37f6473309d9e08d8563ac11b6dafb72ad497d351e5eed5ab0a0b",
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "reask_bar": 0,
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0,
+  "scenarios": 10,
+  "runCount": 5,
+  "runsHoldingAllBars": 5,
+  "runs": [
+    {
+      "run": 1,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-blocked-title-check-first-failure",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry would loop because the same public-registry 502 has already recurred; a human or alternate access path is needed."
+            }
+          ],
+          "rationale": "The prospect asked for title cleanliness, but the only relevant internal check has exhausted retries with the registry returning 502."
+        },
+        {
+          "id": "h3-blocked-same-portal-error-returned",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Otro camino es mejor ahora: reconciliar con evidencia interna mientras el estatus municipal sigue bloqueado por un fallo repetido."
+            }
+          ],
+          "rationale": "El portal municipal cerró sesión en ambos intentos y hay una pregunta abierta sobre si se puede construir ahí."
+        },
+        {
+          "id": "h3-blocked-capability-credentials-revoked",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "No puedo reintentar sin credenciales válidas; el resultado ahora depende de que un humano renueve acceso o aporte cotizaciones actuales, así que conviene replanear con input humano."
+            }
+          ],
+          "rationale": "El único trabajo abierto es un feed de tasas fallido por credenciales revocadas, y comparar créditos requiere datos externos que no puedo leer con las capacidades disponibles."
+        },
+        {
+          "id": "h3-blocked-need-supplied-by-the-prospect",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the same portal fetch already failed 3 times and the needed documents have already been received directly, so retrying would loop with no new information"
+            }
+          ],
+          "rationale": "The only blocked work was portal fetching, but the prospect has already provided the documents and the objective remains viable."
+        },
+        {
+          "id": "h3-blocked-replan-with-available-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The report provider has already failed three times and the same technical failure has recurred, so repeating it would loop; use map-based verification instead."
+            }
+          ],
+          "rationale": "The only unfinished work is w1, and the available internal capabilities include a map/amenities read path that can still inform the school-distance question."
+        },
+        {
+          "id": "h3-three-blocked-items-each-owed-a-disposition",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El renderizador falló 3/3 veces con el mismo error 500; repetir sería un bucle sin nueva información, y no hay otra vía interna disponible."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "El generador de reportes ya agotó 3 intentos con el mismo fallo; el reporte ya fue cubierto por el asesor, así que no aporta reintentar."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "La simulación del banco falló 3/3 veces con 503 y además ese banco fue descartado por el cliente, así que ya no merece otro intento."
+            }
+          ],
+          "rationale": "El asesor ya hizo el reporte de zona, el cliente descartó ese banco y los demás trabajos siguen bloqueados sin cambio de condición."
+        },
+        {
+          "id": "h3-succeeded-with-adverse-zoning",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "El único hecho nuevo relevante es el zoning commercial_only ya verificado y no puedo resolver el cambio de objetivo sin confirmación humana."
+        },
+        {
+          "id": "h3-blocked-on-the-notary-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La última información útil dice que la notaria confirmará la fecha esta semana y el trabajo ya está bloqueado esperando a una persona."
+        },
+        {
+          "id": "h3-blocked-after-the-advisor-answered",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with comparable_sales_read; retrying the same simulator after the same 500 would loop with no new information."
+            }
+          ],
+          "rationale": "La única responsabilidad pendiente es w1, pero el mismo fallo 500 ya recurrió 3 veces y no hay cambio material; la evidencia suficiente permite reconducir el caso sin volver a simular ahora."
+        },
+        {
+          "id": "h3-quiet-control-vague-intention",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The latest exchange shows no new information beyond a deferred interest from the prospect and an already-running price alert watch."
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-blocked-title-check-first-failure",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same title-status check has already been retried three times and the 502 recurred, so another retry would loop; this needs a different path or human intervention."
+            }
+          ],
+          "rationale": "The prospect asked for clean-title confirmation and the title check work is blocked after 3 failed attempts with the same public registry 502."
+        },
+        {
+          "id": "h3-blocked-same-portal-error-returned",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El portal municipal repitió el mismo cierre de sesión; corresponde cambiar de vía o pedir a un humano que gestione la consulta en lugar de reintentar lo mismo."
+            }
+          ],
+          "rationale": "Hay un bloqueado w1 agotado y una pregunta concreta de edificabilidad sin confirmación interna."
+        },
+        {
+          "id": "h3-blocked-capability-credentials-revoked",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry would repeat the same credential failure; the better path is to ask a human for a valid rate source or access restoration."
+            }
+          ],
+          "rationale": "The case is viable and the prospect wants to compare rates, but the only listed internal source for that comparison is blocked by revoked credentials."
+        },
+        {
+          "id": "h3-blocked-need-supplied-by-the-prospect",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La responsabilidad queda mejor servida por la vía ya satisfecha por el prospecto; no hay base nueva para reintentar el portal y la documentación debe reconciliarese por otra ruta."
+            }
+          ],
+          "rationale": "La evidencia dice que el prospecto envió directamente sus recibos y el intento de portal falló tras 3 intentos."
+        },
+        {
+          "id": "h3-blocked-replan-with-available-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same report already failed three times with the provider down, so another retry would loop; use map-based reconciliation instead."
+            }
+          ],
+          "rationale": "The case facts and prior message show the key constraint is verifying school proximity for primary schools, and the listed report capability is the relevant internal path."
+        },
+        {
+          "id": "h3-three-blocked-items-each-owed-a-disposition",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "No hay cambio identificado que vuelva diferente otro intento del renderizador tras 3 fallos; mejor dejarlo bloqueado."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "El reporte de zona ya fue resuelto por el asesor, así que esta responsabilidad quedó satisfecha/no necesaria."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "El banco fue descartado por el cliente, así que esta simulación ya no es una responsabilidad útil a perseguir."
+            }
+          ],
+          "rationale": "El asesor confirmó que el reporte de zona ya lo armó y que el cliente descartó ese banco, y los demás trabajos técnicos ya fallaron tras 3 intentos."
+        },
+        {
+          "id": "h3-succeeded-with-adverse-zoning",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "El uso de suelo ya verificado como commercial_only es incompatible con habitarla."
+        },
+        {
+          "id": "h3-blocked-on-the-notary-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only fresh evidence is that the notary said she will confirm the date this week, so progress is waiting on an external confirmation."
+        },
+        {
+          "id": "h3-blocked-after-the-advisor-answered",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry would loop because the simulator already failed the same way on all three attempts; switch to comparable-sales research instead."
+            }
+          ],
+          "rationale": "The only blocked work is a repeatedly failed cofinanced credit simulation, while cofinancing has been confirmed and a comparable-sales capability is available."
+        },
+        {
+          "id": "h3-quiet-control-vague-intention",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only new evidence is a deferred prospect reply and no tracked commitments or blocked work requiring action now."
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-blocked-title-check-first-failure",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same registry lookup has already failed repeatedly with the same 502 error, so another retry would loop; replan or human decision is needed instead."
+            }
+          ],
+          "rationale": "The only actionable work is the blocked title_status_check, and its registry lookup failed 3 of 3 times with the same 502 error."
+        },
+        {
+          "id": "h3-blocked-same-portal-error-returned",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El portal municipal ya repitió el mismo fallo; mejor replanear con otra vía de información o pedir a una persona que gestione la consulta fuera de este canal."
+            }
+          ],
+          "rationale": "El intento de estatus de permisos falló dos veces por cierre de sesión en el portal municipal, así que no conviene repetirlo."
+        },
+        {
+          "id": "h3-blocked-capability-credentials-revoked",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with human input or another source because external rate access is unavailable and retry would repeat the revoked-credential failure."
+            }
+          ],
+          "rationale": "w1 failed because the provider revoked credentials, and the available capabilities do not include any way to read current bank rates."
+        },
+        {
+          "id": "h3-blocked-need-supplied-by-the-prospect",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the needed documents are already received by a different path, so this failed portal fetch no longer serves the objective"
+            }
+          ],
+          "rationale": "The inbound message says they sent their payslips and current facts confirm receipt from the prospect."
+        },
+        {
+          "id": "h3-blocked-replan-with-available-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The report provider has already failed 3 times, so retrying would loop; replan with map/amenity data instead."
+            }
+          ],
+          "rationale": "The prospect said the priority is being near primary schools, and the school proximity report is blocked after repeated technical failure."
+        },
+        {
+          "id": "h3-three-blocked-items-each-owed-a-disposition",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El renderizador ya falló 3/3 veces con el mismo 500; repetir sería loop sin información nueva, y no hay otra vía interna disponible."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "El generador de reportes ya falló 3/3 veces con el mismo no-response; repetir sería loop sin información nueva, y el reporte además ya fue armado por el asesor."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "La simulación bancaria ya falló 3/3 veces con 503 y el cliente descartó ese banco, así que ya no hay motivo comercial para insistir."
+            }
+          ],
+          "rationale": "Solo queda responsabilidad técnica agotada y no hay evidencia nueva que haga útil reintentar o replantear ahora."
+        },
+        {
+          "id": "h3-succeeded-with-adverse-zoning",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "A zoning check already determined the property is commercial_only, creating a mismatch with buying it to live in."
+        },
+        {
+          "id": "h3-blocked-on-the-notary-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The notary said she would confirm the date this week, so the useful move is to wait for that specific external update."
+        },
+        {
+          "id": "h3-blocked-after-the-advisor-answered",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The simulator already failed repeatedly with the same technical error, so another retry would loop; use a different path instead."
+            }
+          ],
+          "rationale": "The advisor already approved cofinanced credit, and the simulation task failed 500 on all three attempts."
+        },
+        {
+          "id": "h3-quiet-control-vague-intention",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only recent signal is the prospect's indefinite intent to revisit, with no due date or missing fact blocking progress."
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-blocked-title-check-first-failure",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The registry failure has recurred across all attempts, so retrying the same check would loop with no new information; replan or wait for the external registry to recover."
+            }
+          ],
+          "rationale": "The only unfinished work is the blocked title check, and the available capability has already failed three times with the same registry error."
+        },
+        {
+          "id": "h3-blocked-same-portal-error-returned",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Another path is better because the permit portal has already failed repeatedly with the same session-closure error; use case facts or other evidence instead, or ask a human if buildability still must be confirmed."
+            }
+          ],
+          "rationale": "The prospect's question is whether construction is allowed, and the municipal lookup has recurred with the same technical failure."
+        },
+        {
+          "id": "h3-blocked-capability-credentials-revoked",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with human input because the external rate-feed capability is unavailable and the same technical failure already recurred."
+            }
+          ],
+          "rationale": "The prospect wants a rate comparison before signing, but the live rate-feed capability failed permanently and no listed capability can replace it."
+        },
+        {
+          "id": "h3-blocked-need-supplied-by-the-prospect",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The responsibility is obsolete because the documents were received directly from the prospect, so no retry or alternate path is worth doing."
+            }
+          ],
+          "rationale": "The needed recibos are already received from the prospect, and the only unfinished work was a technically failed fetch now made unnecessary by new evidence."
+        },
+        {
+          "id": "h3-blocked-replan-with-available-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with map_amenities_read because the school report provider has repeatedly failed and another available capability can still advance the objective."
+            }
+          ],
+          "rationale": "The prospect said proximity to primaries is important, and the dedicated report has exhausted attempts due to provider failure."
+        },
+        {
+          "id": "h3-three-blocked-items-each-owed-a-disposition",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El renderizador ya agotó 3 intentos con el mismo 500 y no hay nueva condición que lo haga diferente; no conviene reintentar."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "El generador de reportes ya agotó 3 intentos con el mismo fallo y el asesor indicó que ese reporte ya fue armado, así que la responsabilidad está satisfecha o no aporta más."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "La simulación del banco ya agotó 3 intentos y además el cliente descartó ese banco, por lo que no hay una vía comercial vigente para repetirla."
+            }
+          ],
+          "rationale": "No queda trabajo interno útil que avance este objetivo con las capacidades disponibles y el único insumo nuevo confirma que dos de las piezas ya no hacen falta."
+        },
+        {
+          "id": "h3-succeeded-with-adverse-zoning",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The zoning fact already learned says commercial_only for a property the prospect liked most."
+        },
+        {
+          "id": "h3-blocked-on-the-notary-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only concrete blocker is the notary’s promised date confirmation this week, and there is no new internal evidence to advance the closing today."
+        },
+        {
+          "id": "h3-blocked-after-the-advisor-answered",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Ya recurrió el mismo fallo técnico y otro intento repetiría el bloqueo; mejor cambiar de ruta con comparables o tratarlo por otra vía."
+            }
+          ],
+          "rationale": "La única pieza bloqueada es la simulación técnica con 3 fallos 500 ya repetidos."
+        },
+        {
+          "id": "h3-quiet-control-vague-intention",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "No new inbound or changed facts indicate a useful next step, and the existing watch is already underway."
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "results": [
+        {
+          "id": "h3-blocked-title-check-first-failure",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with targeted human input because the registry lookup has already failed repeatedly with the same technical error."
+            }
+          ],
+          "rationale": "The prospect asked for clean-title confirmation, but the registry lookup failed three times and no other internal capability can answer it."
+        },
+        {
+          "id": "h3-blocked-same-portal-error-returned",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El mismo fallo técnico recurrió; mejor replanear con otra vía de investigación o escalar a un humano si hace falta confirmación formal."
+            }
+          ],
+          "rationale": "La pregunta pendiente del prospecto es si se puede construir ahí, y la vía de estatus de permisos quedó bloqueada tras dos fallos iguales."
+        },
+        {
+          "id": "h3-blocked-capability-credentials-revoked",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The provider revoked credentials and the failure already recurred; this needs another source or human-supplied data rather than another retry."
+            }
+          ],
+          "rationale": "w1 failed repeatedly for a non-transient technical reason, and no listed capability can fetch current bank rates or replace that source."
+        },
+        {
+          "id": "h3-blocked-need-supplied-by-the-prospect",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the needed documents are already received by another path, so this responsibility no longer needs retrying"
+            }
+          ],
+          "rationale": "The latest message says the receipts were sent and current facts confirm income_documents received."
+        },
+        {
+          "id": "h3-blocked-replan-with-available-source",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The report provider has already failed through all attempts; use map_amenities_read as the better path instead of retrying the same blocked work."
+            }
+          ],
+          "rationale": "The prior work failed technically, but the needed capability still exists and the prospect’s school-distance preference makes verification useful now."
+        },
+        {
+          "id": "h3-three-blocked-items-each-owed-a-disposition",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Ya agotó 3 intentos con el mismo 500 del renderizador; no hay cambio que haga válido otro retry."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "Ya agotó 3 intentos con el mismo fallo del generador y el reporte ya fue armado por el asesor."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "Ya agotó 3 intentos con el mismo 503 del simulador y el banco fue descartado por el cliente."
+            }
+          ],
+          "rationale": "Solo queda responsabilidad bloqueada sin una vía distinta útil dentro de las capacidades disponibles."
+        },
+        {
+          "id": "h3-succeeded-with-adverse-zoning",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "El hecho relevante es el zoning comercial-only ya conocido frente a un objetivo de vivienda."
+        },
+        {
+          "id": "h3-blocked-on-the-notary-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only current evidence is that the notary said they would confirm the date this week, so progress is waiting on that external confirmation."
+        },
+        {
+          "id": "h3-blocked-after-the-advisor-answered",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "retrying the same simulator would loop after 3 technical failures; replan with reconciliation or another path instead"
+            }
+          ],
+          "rationale": "The advisor already approved cofinanced credit and the only unfinished item is a repeatedly failed simulation."
+        },
+        {
+          "id": "h3-quiet-control-vague-intention",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La única evidencia es un intercambio de cortesía y una oportunidad viable sin fecha ni compromiso, con un aviso de precio ya en curso."
+        }
+      ]
+    }
+  ]
+}

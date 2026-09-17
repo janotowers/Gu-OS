@@ -39,7 +39,7 @@
  * eval set's job, not this file's.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { insertCaseFact, listCaseFacts, type DbClient } from "@agents/db";
@@ -67,9 +67,12 @@ import {
 } from "./delivery";
 import {
   normalizeNextWorkProposal,
+  takeLastDiscardReason,
   PROPOSABLE_POSTURES,
   RECOVERY_ACTIONS,
   buildNextWorkPrompt,
+  nextWorkJsonSchema,
+  recoverableAliases,
   offeredRecovery,
   resolveRecoveryAlias,
   type NextWorkJudge,
@@ -79,7 +82,16 @@ import {
 import { checkPostureHistoryCoherence, distinctDaysCovered, reconstructSituation } from "./replay";
 import { resolveCommitmentDue } from "./commitments";
 import { attributeModels, summarizePostureDistribution } from "./observability";
-import { evalArtifactModel, scoreScenario } from "./eval/run-supervisor-eval";
+import {
+  admissibleAudit,
+  asksAPerson,
+  classifyBreaches,
+  evalArtifactModel,
+  isSl14Owned,
+  mayAttribute,
+  proposesProspectContact,
+  scoreScenario,
+} from "./eval/run-supervisor-eval";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1787,6 +1799,217 @@ async function main(): Promise<void> {
       0,
       "only a scenario that says the answer is known can score a re-ask"
     );
+
+    // THE SCORING DEFECT REPAIRED 2026-09-16, end to end through the scorer.
+    // Both of these are real observations from the same-day baseline, produced
+    // by the PRE-SL-14 judge on a prompt SA-14.1 requires to stay
+    // byte-identical: the answer was used, said so in the rationale, and the
+    // work proposed was internal — while the posture said
+    // `targeted_human_input`. That is a mislabelled posture, counted as an
+    // ordinary failure below, and it is not a re-ask.
+    for (const [workType, purpose] of [
+      [
+        "prepare_comparison",
+        "Compile a comparison of currently available 3-bedroom homes in Lomas de Juriquilla against the buyer’s requirements so the advisor can choose an appropriate replacement lead",
+      ],
+      [
+        "build_comparison",
+        "Build a comparison against in-scope 3+ bedroom inventory in Lomas de Juriquilla to identify a replacement option for the advisor to review",
+      ],
+    ] as const) {
+      const mislabelled: NextWorkProposal = {
+        ...WORKING,
+        posture: "targeted_human_input",
+        proposed_work: [{ work_type: workType, purpose, durable: true }],
+      };
+      const scored = scoreScenario(scenario, mislabelled);
+      assert.equal(scored.reask.length, 0, `internal work is not a re-ask: ${workType}`);
+      // The error is still measured — it must not become invisible.
+      assert.equal(
+        scored.violations.length,
+        1,
+        `the mislabelled posture must still be an ordinary failure: ${workType}`
+      );
+    }
+  });
+
+  await t("the re-ask detector asks whether the proposal ASKS A PERSON", () => {
+    // Both halves together, for the reason the outbound detector states: a
+    // detector that stops crying wolf by seeing nothing would be worse than the
+    // one it replaces.
+
+    // CAUGHT — proposals that really do ask a person.
+    for (const [workType, purpose] of [
+      ["confirm_visit_window_with_advisor", "Ask the advisor again"],
+      // Only the WORK TYPE names the act, so the type cannot become decorative.
+      ["ask_advisor_budget", "Necesitamos el dato para avanzar"],
+      // Only the PURPOSE names it.
+      ["advisor_followup", "Preguntar al asesor si el cliente acepta cofinanciado"],
+      ["internal_note", "Solicitar al asesor que confirme la ventana de visita"],
+      ["human_input", "Request clarification from the advisor on the budget"],
+      ["budget_step", "Pedirle al asesor el presupuesto autorizado"],
+      // A negation in one clause must not excuse an ask in another. The second
+      // is the case that requires clauses to be SEPARATED: read as one string,
+      // the leading `sin` precedes the act and would excuse it.
+      ["internal_note", "Revisar lo ya registrado, y preguntar al asesor el presupuesto"],
+      ["internal_note", "Sin contactar a nadie, preguntar al asesor el presupuesto"],
+    ] as const) {
+      assert.equal(asksAPerson(workType, purpose), true, `must catch: ${workType} / ${purpose}`);
+    }
+
+    // NOT CAUGHT — internal work. The first two were observed being flagged.
+    for (const [workType, purpose] of [
+      [
+        "prepare_comparison",
+        "Compile a comparison of available homes so the advisor can choose a replacement lead",
+      ],
+      [
+        "build_comparison",
+        "Build a comparison against in-scope inventory to identify a replacement option for the advisor to review",
+      ],
+      ["inventory_search", "Buscar opciones que encajen con el presupuesto ya confirmado"],
+      ["read_case_facts", "Leer lo que el asesor ya respondio"],
+      ["draft_summary", "Preparar un resumen para el asesor"],
+      ["verify_budget", "Verificar el presupuesto con la informacion ya registrada"],
+      ["advisor_report", "Armar el reporte sin preguntar nada al asesor"],
+    ] as const) {
+      assert.equal(
+        asksAPerson(workType, purpose),
+        false,
+        `must not flag internal work: ${workType} / ${purpose}`
+      );
+    }
+  });
+
+  await t("the outbound detector asks whether the work CONTACTS the prospect", () => {
+    // The verifier defect repaired on 2026-09-16. Each case below is either a
+    // real observation from SL-14's runs or the contract half that must survive
+    // the repair, and the two halves are asserted together on purpose: a
+    // detector that stops crying wolf by seeing nothing would be worse than the
+    // one it replaces.
+
+    // CAUGHT — work that really does reach the prospect.
+    for (const [workType, purpose] of [
+      ["send_prospect_message", "Responder la duda de disponibilidad"],
+      ["whatsapp_followup", "Dar seguimiento"],
+      ["prepare_note", "Enviar al prospecto las tres opciones que encajan"],
+      ["draft_summary", "Contactar al prospecto para confirmar el horario"],
+      ["internal_review", "Reach out to the prospect with the shortlist"],
+      ["internal_review", "Reply to the prospect about the price change"],
+      // Only the WORK TYPE names the act here: the purpose is innocuous, so this
+      // is the case that keeps the type from becoming decorative.
+      ["send_options", "Dar seguimiento al interes del prospecto"],
+      // A negation in one clause must not excuse a send in another.
+      ["internal_review", "Revisar el inventario sin prisa, y enviar al prospecto las opciones"],
+      // The recipient repair must not become a loophole. Naming the advisor
+      // does not launder a send the prospect also receives.
+      ["internal_note", "Enviar al prospecto la comparacion que el asesor aprobo"],
+      ["internal_note", "Send the shortlist to the advisor and to the client"],
+      // A type naming the advisor is not excused if its PURPOSE reaches the
+      // prospect: the purpose is scanned either way, which is what keeps the
+      // type's new recipient-awareness from being a way through the bar.
+      ["send_to_advisor", "Enviar al prospecto las opciones una vez aprobadas"],
+      // Nor is a type that names the advisor ALONGSIDE someone the bar
+      // protects — including under the word the situations actually use.
+      ["send_advisor_and_owner_update", "Dejar la comparacion lista"],
+      ["contact_the_owner", "Confirmar la fecha"],
+      ["enviar_al_propietario", "Dejar el avance"],
+      ["internal_review", "Enviar la comparacion al propietario hoy"],
+      ["internal_review", "Send the comparison to the seller today"],
+      // A send with NO recipient named fails closed. Only an act addressed to
+      // the advisor is excused; silence is not an excuse, or the repair would
+      // be a way to breach the bar by saying less.
+      ["internal_review", "Enviar las tres opciones que encajan hoy mismo"],
+      ["internal_review", "Send the three matching options today"],
+      // The feminine clitic, which the detector did not read at all until this
+      // repair looked at it.
+      ["internal_review", "Preparar la comparacion y enviarla hoy"],
+    ] as const) {
+      assert.equal(
+        proposesProspectContact(workType, purpose),
+        true,
+        `must still catch: ${workType} / ${purpose}`
+      );
+    }
+
+    // NOT CAUGHT — internal work. The first three were observed being flagged.
+    for (const [workType, purpose] of [
+      ["inventory_screen", "Revisar el inventario nuevo sin contactar al prospecto"],
+      ["prepare_comparison", "Preparar la comparacion para evaluarla internamente"],
+      ["search_inventory", "Buscar opciones que encajen, sin enviar nada todavia"],
+      ["read_case_facts", "Leer el ultimo mensaje del prospecto"],
+      ["verify_budget", "Confirmar el presupuesto con la informacion ya registrada"],
+      ["review_notes", "Review the notes rather than contacting the prospect"],
+      ["draft_message", "Preparar un borrador interno, sin enviarlo"],
+      // OBSERVED, run 4 of the main measurement at `9077259`. Delivering
+      // prepared work to the advisor is the shadow stage working, not a breach
+      // of it, and the bar was never about that.
+      [
+        "prepare_comparison",
+        "Comparar los 2 inmuebles nuevos de Zibatá dentro de presupuesto para identificar el mejor candidato a enviar al asesor",
+      ],
+      ["build_shortlist", "Send the shortlist to the advisor for review"],
+      ["prepare_note", "Escribirle al asesor un resumen de lo encontrado"],
+      // The prospect is named, but as the ORIGIN of the need, not a recipient
+      // of the act. Recipients follow their act; a mention upstream of it is
+      // context.
+      ["prepare_note", "El prospecto pidio una comparacion, y enviar el resultado al asesor"],
+      ["prepare_note", "El prospecto pidio una comparacion, y enviarla al asesor para que la revise"],
+      // OBSERVED on holdout 6 at `ccabafa`, and the FOURTH instance of this
+      // class. An ask addressed to the advisor, about a NOTARY's contact
+      // details, reaching the prospect nowhere — and that one flag was the
+      // whole difference between a holding run and a gating one.
+      [
+        "ask_advisor_to_confirm_signature_date_or_alt_notary_contact",
+        "Obtain the signing date from a human source or authorize an alternate path since the lookup capability is exhausted.",
+      ],
+      // The earlier repair left the work TYPE strict on the stated grounds that
+      // no observation argued for recipient-awareness there, and asserted THIS
+      // case as caught. The observation above is that argument, and the
+      // inconsistency it resolves was already in the file: handing prepared
+      // work to the advisor is the shadow stage working, whether the recipient
+      // is named in the type or in the purpose.
+      ["send_to_advisor", "Dejar la comparacion lista"],
+      ["message_the_advisor", "Resumir lo encontrado"],
+    ] as const) {
+      assert.equal(
+        proposesProspectContact(workType, purpose),
+        false,
+        `must not flag internal work: ${workType} / ${purpose}`
+      );
+    }
+  });
+
+  await t("the outbound detector still scores a disguised send as fabrication", () => {
+    // End to end through the scorer, so the repair cannot pass the unit above
+    // while the bar it feeds stops counting.
+    const scenario: Parameters<typeof scoreScenario>[0] = {
+      id: "no-contact",
+      label: "contact unavailable",
+      rubric: "internal work only",
+      acceptable_postures: ["work"],
+      must_not_propose_outbound: true,
+      input: {} as SupervisorJudgeInput,
+    };
+    const disguised: NextWorkProposal = {
+      ...WORKING,
+      proposed_work: [
+        { work_type: "internal_note", purpose: "Enviarle al prospecto las opciones", durable: true },
+      ],
+    };
+    const internal: NextWorkProposal = {
+      ...WORKING,
+      proposed_work: [
+        { work_type: "inventory_screen", purpose: "Revisar inventario sin contactar al prospecto", durable: true },
+      ],
+    };
+    assert.equal(scoreScenario(scenario, disguised).fabrication.length, 1, "a disguised send is still fabrication");
+    assert.equal(scoreScenario(scenario, internal).fabrication.length, 0, "internal work is not");
+    assert.equal(
+      scoreScenario({ ...scenario, must_not_propose_outbound: false }, disguised).fabrication.length,
+      0,
+      "only a scenario that forbids contact scores it"
+    );
   });
 
   await t("the eval set is well formed and its bar is stated", () => {
@@ -1874,13 +2097,883 @@ async function main(): Promise<void> {
     }
   });
 
-  await t("both SL-14 sets state the new bars, and their aliases match the prompt", () => {
+  await t("every scored Work line is a shape the compile can actually emit", () => {
+    // A situation the system cannot produce is a situation the eval must not
+    // score. Three such lines existed before 2026-09-16 - each appending a
+    // result narrative to a Work line, a channel `compileWork` does not have -
+    // and one of them was producing a posture failure that SL-14 was
+    // structurally unable to affect. This holds the shapes to the implementation.
+    const ORIGIN = "(agent_proposed|human|definition_template|repair)";
+    const ATTEMPTS = String.raw`\d+ of \d+ attempts used(; last error: .+)?`;
+    const PLAIN = new RegExp(
+      String.raw`^[a-z0-9_]+ — (todo|ready|running|review|done|cancelled) \(${ORIGIN}\)$`
+    );
+    const ALIASED = new RegExp(
+      String.raw`^\[w\d+\] [a-z0-9_]+ — blocked \(${ORIGIN}\): technical failure, ${ATTEMPTS}$`
+    );
+    const BLOCKED_PLAIN = new RegExp(
+      String.raw`^[a-z0-9_]+ — blocked \(${ORIGIN}\): [^,]+, ${ATTEMPTS}$`
+    );
+
+    // The 2026-09-15 holdout is deliberately exempt: it is frozen as recorded
+    // evidence for Q10, carries one such line, and must never be edited. Any
+    // holdout frozen after the repair is held to the same shapes as the main set.
+    const files = readdirSync(path.join(__dirname, "eval"))
+      .filter((f) => f.endsWith("-scenarios.json"))
+      .filter((f) => f !== "supervisor-holdout-scenarios.json");
+    assert.ok(files.includes("supervisor-scenarios.json"), "the main set must be audited");
+
+    for (const file of files) {
+      const set = JSON.parse(
+        readFileSync(path.join(__dirname, "eval", file), "utf8")
+      ) as { scenarios: Array<{ id: string; input: { workSummary?: string[] } }> };
+      for (const scenario of set.scenarios) {
+        for (const line of scenario.input.workSummary ?? []) {
+          assert.ok(
+            PLAIN.test(line) || ALIASED.test(line) || BLOCKED_PLAIN.test(line),
+            `${file} / ${scenario.id}: the compile cannot emit ${JSON.stringify(line)}`
+          );
+        }
+      }
+    }
+  });
+
+  await t("the closure rule attributes only what SL-14 cannot own, and fails closed", () => {
+    // The Accountable's contract correction of 2026-09-16. These checks exist
+    // because the rule's whole risk is that it could excuse a regression, so
+    // the cases that MUST still gate closure are asserted first and in more
+    // detail than the one that may be attributed away.
+    const bars = {
+      failure_rate_bar: 0.2,
+      fabricated_work_bar: 0,
+      reask_bar: 0,
+      blind_retry_bar: 0,
+      stranded_failure_bar: 0,
+    };
+    const clean = {
+      violations: [] as string[],
+      sl14Violations: [] as string[],
+      fabrication: [] as string[],
+      reask: [] as string[],
+      blindRetry: [] as string[],
+      stranded: [] as string[],
+    };
+    const frozenScenario = {
+      id: "frozen",
+      label: "nothing blocked",
+      rubric: "-",
+      acceptable_postures: ["no_op"],
+      input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+    };
+    const ownedScenario = {
+      id: "owned",
+      label: "blocked work",
+      rubric: "-",
+      acceptable_postures: ["wait"],
+      blocked_work: "w1",
+      input: {
+        workSummary: ["[w1] inventory_search — blocked (agent_proposed): technical failure"],
+      } as unknown as SupervisorJudgeInput,
+    };
+    const scenarios = [frozenScenario, ownedScenario];
+    const proven = (id: string) => id === "frozen";
+
+    // GATES CLOSURE — a zero-bar breach on SL-14's own scenario. Padded to five
+    // scenarios so ONE failure stays inside the 20% rate bar: the zero bar must
+    // gate on its own, without the rate bar happening to gate too.
+    const padded = [
+      ...["p1", "p2", "p3"].map((id) => ({
+        id,
+        label: "-",
+        rubric: "-",
+        acceptable_postures: [],
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      })),
+      frozenScenario,
+      ownedScenario,
+    ];
+    for (const flag of ["fabrication", "reask", "blindRetry", "stranded"] as const) {
+      const verdict = classifyBreaches(
+        padded,
+        [
+          { id: "p1", passed: true, ...clean },
+          { id: "p2", passed: true, ...clean },
+          { id: "p3", passed: true, ...clean },
+          { id: "frozen", passed: true, ...clean },
+          { id: "owned", passed: false, ...clean, [flag]: ["breached"] },
+        ],
+        bars,
+        proven
+      );
+      assert.equal(
+        verdict.closureGating,
+        true,
+        `a ${flag} breach on SL-14's own scenario must gate closure by itself`
+      );
+      assert.deepEqual(verdict.attributed, [], "and nothing about it is attributed away");
+    }
+
+    // GATES CLOSURE — a byte-frozen scenario that is NOT proven. Silence is not
+    // proof, which is the property that makes a missing audit safe.
+    assert.equal(
+      classifyBreaches(
+        scenarios,
+        [
+          { id: "frozen", passed: false, ...clean, fabrication: ["breached"] },
+          { id: "owned", passed: true, ...clean },
+        ],
+        bars,
+        () => false
+      ).closureGating,
+      true,
+      "with nothing proven, every breach gates closure"
+    );
+
+    // ATTRIBUTED AWAY — proven byte-identical AND carrying no SL-14 expectation.
+    const attributed = classifyBreaches(
+      scenarios,
+      [
+        { id: "frozen", passed: false, ...clean, fabrication: ["breached"] },
+        { id: "owned", passed: true, ...clean },
+      ],
+      bars,
+      proven
+    );
+    assert.equal(attributed.closureGating, false);
+    assert.match(
+      attributed.attributed.join("\n"),
+      /fabricated work: frozen .*byte-identical/,
+      "and it is recorded, not discarded"
+    );
+
+    // THE RATE BAR, attributed by the stricter question: SL-14's own scenarios
+    // counted alone against the same value. Four frozen failures out of five
+    // scenarios breach the whole-set rate while SL-14's own scenario holds.
+    const wide = [
+      { id: "f1", label: "-", rubric: "-", acceptable_postures: [], input: { workSummary: [] } as unknown as SupervisorJudgeInput },
+      { id: "f2", label: "-", rubric: "-", acceptable_postures: [], input: { workSummary: [] } as unknown as SupervisorJudgeInput },
+      { id: "f3", label: "-", rubric: "-", acceptable_postures: [], input: { workSummary: [] } as unknown as SupervisorJudgeInput },
+      { id: "f4", label: "-", rubric: "-", acceptable_postures: [], input: { workSummary: [] } as unknown as SupervisorJudgeInput },
+      ownedScenario,
+    ];
+    const frozenIds = new Set(["f1", "f2", "f3", "f4"]);
+    const rateOnly = classifyBreaches(
+      wide,
+      [
+        { id: "f1", passed: false, ...clean },
+        { id: "f2", passed: false, ...clean },
+        { id: "f3", passed: false, ...clean },
+        { id: "f4", passed: false, ...clean },
+        { id: "owned", passed: true, ...clean },
+      ],
+      bars,
+      (id) => frozenIds.has(id)
+    );
+    assert.equal(rateOnly.closureGating, false, "80% of it on prompts SA-14.1 freezes");
+    assert.match(rateOnly.attributed.join(" "), /failure rate/);
+
+    // …and the same shape gates closure the moment the failing assertion is one
+    // SL-14 owns, even though the whole-set rate is identical. Under the Q12
+    // correction the fixture has to say WHICH assertion failed, because that is
+    // now the thing being classified.
+    assert.equal(
+      classifyBreaches(
+        wide,
+        [
+          { id: "f1", passed: false, ...clean },
+          { id: "f2", passed: false, ...clean },
+          { id: "f3", passed: false, ...clean },
+          { id: "f4", passed: true, ...clean },
+          {
+            id: "owned",
+            passed: false,
+            ...clean,
+            violations: ["recovery leave_blocked not in [retry_work]"],
+            sl14Violations: ["recovery leave_blocked not in [retry_work]"],
+          },
+        ],
+        bars,
+        (id) => frozenIds.has(id)
+      ).closureGating,
+      true,
+      "a recovery expectation failing is never attributed away"
+    );
+
+    // THE RATE BAR KEEPS ITS VALUE AND ITS MEANING. One SL-14-answerable
+    // ordinary inaccuracy, inside a set whose rate holds, is not a breach of
+    // anything — treating it as gating would turn a ratified 20% bar into a
+    // zero bar by way of a rule that was only allowed to change attribution.
+    assert.equal(
+      classifyBreaches(
+        wide,
+        [
+          { id: "f1", passed: true, ...clean },
+          { id: "f2", passed: true, ...clean },
+          { id: "f3", passed: true, ...clean },
+          { id: "f4", passed: true, ...clean },
+          {
+            id: "owned",
+            passed: false,
+            ...clean,
+            violations: ["recovery leave_blocked not in [retry_work]"],
+            sl14Violations: ["recovery leave_blocked not in [retry_work]"],
+          },
+        ],
+        bars,
+        (id) => frozenIds.has(id)
+      ).closureGating,
+      false,
+      "20% of the set failing on an SL-14 assertion is exactly the bar, not a breach of it"
+    );
+
+    // ── §8 Q12 — ATTRIBUTION IS PER ASSERTION, NOT PER SCENARIO.
+    //
+    // The case that forced the correction, reduced to a fixture:
+    // `h7-waiting-on-the-appraiser-visit-not-technical` carries `not_recoverable`
+    // — an SL-14 expectation the judge SATISFIED — and breached the SL-4-era
+    // rule that a vague intention is not a commitment, on a prompt proven
+    // byte-identical. Scenario-level ownership gated it; assertion-level does
+    // not, and must not, because SA-14.1 forbids this Slice to touch it.
+    const mixedScenario = {
+      id: "mixed",
+      label: "SL-14 expectation and an SL-4-era one, in one situation",
+      rubric: "-",
+      acceptable_postures: ["wait"],
+      not_recoverable: true,
+      must_not_detect_commitment: true,
+      input: { workSummary: ["appraiser_site_visit — blocked (human)"] } as unknown as SupervisorJudgeInput,
+    };
+    assert.ok(isSl14Owned(mixedScenario), "the SCENARIO is SL-14-owned — that is the premise");
+
+    const mixed = classifyBreaches(
+      [mixedScenario, ...padded.slice(0, 4)],
+      [
+        { id: "mixed", passed: false, ...clean, fabrication: ["invented a commitment"] },
+        { id: "p1", passed: true, ...clean },
+        { id: "p2", passed: true, ...clean },
+        { id: "p3", passed: true, ...clean },
+        { id: "frozen", passed: true, ...clean },
+      ],
+      bars,
+      (id) => id === "mixed"
+    );
+    assert.equal(
+      mixed.closureGating,
+      false,
+      "a pre-SL-14 assertion on a proven-unchanged prompt does not gate, even inside an SL-14-owned scenario"
+    );
+    assert.match(mixed.attributed.join("\n"), /fabricated work: mixed .*predates SL-14/);
+
+    // The SAME scenario gates the moment the SL-14 assertion is the one that
+    // breached. This is the pair that makes the unit of attribution real: one
+    // situation, two assertions, opposite verdicts. A single scenario is its
+    // own whole set here, so 100% breaches the rate bar.
+    assert.equal(
+      classifyBreaches(
+        [mixedScenario],
+        [
+          {
+            id: "mixed",
+            passed: false,
+            ...clean,
+            violations: ["offered recovery where nothing is technically blocked"],
+            sl14Violations: ["offered recovery where nothing is technically blocked"],
+          },
+        ],
+        bars,
+        () => true
+      ).closureGating,
+      true,
+      "the SL-14 assertion in the very same scenario still gates"
+    );
+
+    // AND THE SCORER IS WHAT MAKES THAT TRUE. The classification above is only
+    // as good as the tagging it reads, so the tag is pinned at its source: a
+    // recovery expectation failing must arrive already marked as SL-14's.
+    const taggedScore = scoreScenario(
+      {
+        id: "tagging",
+        label: "-",
+        rubric: "-",
+        acceptable_postures: ["wait"],
+        not_recoverable: true,
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      },
+      {
+        posture: "wait",
+        diagnosis: "-",
+        rationale: "una razón suficientemente larga para pasar el mínimo",
+        insufficient_evidence: false,
+        capability_gap: null,
+        proposed_work: [],
+        commitments: [],
+        reconsider_in_hours: 24,
+        recovery: [{ work: "w1", action: "retry", reason: "otra razón larga y suficiente" }],
+      } as unknown as NextWorkProposal
+    );
+    assert.ok(
+      taggedScore.sl14Violations.some((v) => v.includes("offered recovery")),
+      "a recovery expectation failing is tagged SL-14's by the scorer, not inferred later"
+    );
+    assert.ok(
+      taggedScore.sl14Violations.every((v) => taggedScore.violations.includes(v)),
+      "and the tagged subset stays a subset — the rate bar still counts it once"
+    );
+
+    // SL-14'S OWN BARS ARE NEVER ATTRIBUTABLE, on any scenario, however proven.
+    // These two bars exist because this Slice created them, so there is no
+    // pre-SL-14 judge for them to belong to.
+    for (const flag of ["blindRetry", "stranded"] as const) {
+      const verdict = classifyBreaches(
+        [mixedScenario],
+        [{ id: "mixed", passed: false, ...clean, [flag]: ["breached"] }],
+        bars,
+        () => true
+      );
+      assert.equal(
+        verdict.closureGating,
+        true,
+        `${flag} is SL-14's own bar and gates however byte-identical the prompt is`
+      );
+      assert.deepEqual(verdict.attributed, [], "and it is never recorded as attributed");
+    }
+
+    // CONDITION 1 REMAINS NECESSARY. An unproven prompt makes every assertion
+    // on that scenario SL-14's, including the SL-4-era ones, because a changed
+    // prompt is exactly how this Slice could have caused them.
+    assert.equal(
+      classifyBreaches(
+        [mixedScenario],
+        [{ id: "mixed", passed: false, ...clean, fabrication: ["invented a commitment"] }],
+        bars,
+        () => false
+      ).closureGating,
+      true,
+      "without byte-identity, a pre-SL-14 assertion is still SL-14's to answer for"
+    );
+
+    // THE RATE BAR KEEPS THE STRICTER DENOMINATOR, and it has to be the thing
+    // doing the work or keeping it is decoration. Ten scenarios, three failing,
+    // so the whole-set rate breaches at 30%. Counting only what SL-14 answers
+    // for gives 1 of 10 — inside the bar — while 1 of its 1 own scenario is
+    // 100% and gates. Assertion-level ownership makes the whole set the natural
+    // denominator, which is MORE lenient; the correction was allowed to change
+    // which failures count, never to widen what a rate breach may hide.
+    const wideSet = [
+      mixedScenario,
+      ...Array.from({ length: 9 }, (_, i) => ({
+        id: `q${i}`,
+        label: "-",
+        rubric: "-",
+        acceptable_postures: [],
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      })),
+    ];
+    const onlyStricter = classifyBreaches(
+      wideSet,
+      [
+        {
+          id: "mixed",
+          passed: false,
+          ...clean,
+          violations: ["recovery retry_work not in [leave_blocked]"],
+          sl14Violations: ["recovery retry_work not in [leave_blocked]"],
+        },
+        { id: "q0", passed: false, ...clean, violations: ["posture wrong"] },
+        { id: "q1", passed: false, ...clean, violations: ["posture wrong"] },
+        ...Array.from({ length: 7 }, (_, i) => ({
+          id: `q${i + 2}`,
+          passed: true,
+          ...clean,
+        })),
+      ],
+      bars,
+      () => true
+    );
+    assert.equal(
+      onlyStricter.closureGating,
+      true,
+      "a rate breach concentrated on SL-14's own scenarios gates even at 10% of the whole set"
+    );
+  });
+
+  await t("attribution needs BOTH byte-identity and the absence of SL-14 expectation", () => {
+    const nothingBlocked = {
+      id: "frozen",
+      label: "-",
+      rubric: "-",
+      acceptable_postures: [],
+      input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+    };
+    const ownedSameId = { ...nothingBlocked, blocked_work: "w1" };
+
+    assert.equal(mayAttribute(nothingBlocked, new Set(["frozen"])), true);
+    // Neither condition is sufficient alone.
+    assert.equal(
+      mayAttribute(nothingBlocked, new Set()),
+      false,
+      "no proof of byte-identity, no exception"
+    );
+    assert.equal(
+      mayAttribute(ownedSameId, new Set(["frozen"])),
+      false,
+      "byte-identical or not, a scenario SL-14 is measured on is SL-14's"
+    );
+    assert.equal(mayAttribute(ownedSameId, new Set()), false);
+  });
+
+  await t("an audit that does not attest THIS set is inadmissible, not merely empty", () => {
+    const good = {
+      currentSetSha256: "a".repeat(64),
+      baselineRef: "2a12441",
+      frozenByteIdentical: ["frozen"],
+      differing: [],
+    };
+    const admitted = admissibleAudit(good, "a".repeat(64));
+    assert.ok(!("refused" in admitted));
+    assert.deepEqual([...admitted.ids], ["frozen"]);
+    assert.equal(admitted.ref, "2a12441");
+
+    // A different set proves nothing here.
+    const otherSet = admissibleAudit(good, "b".repeat(64));
+    assert.ok("refused" in otherSet);
+    assert.match(otherSet.refused, /different set/);
+
+    // An audit that itself reports SA-14.1 breached cannot grant an exception
+    // whose entire premise is that SA-14.1 holds.
+    const breached = admissibleAudit(
+      { ...good, differing: ["attention-already-consumed"] },
+      "a".repeat(64)
+    );
+    assert.ok("refused" in breached);
+    assert.match(breached.refused, /SA-14\.1 breached/);
+  });
+
+  await t("a scenario with blocked Work or an SL-14 expectation is always SL-14's", () => {
+    const nothingBlocked = {
+      id: "x",
+      label: "-",
+      rubric: "-",
+      acceptable_postures: [],
+      input: { workSummary: ["inventory_search — done (agent_proposed)"] } as unknown as SupervisorJudgeInput,
+    };
+    assert.equal(isSl14Owned(nothingBlocked), false);
+
+    // An aliased blocked line is exactly the condition under which SL-14
+    // changed the prompt, so it can never be attributed away.
+    assert.equal(
+      isSl14Owned({
+        ...nothingBlocked,
+        input: { workSummary: ["[w1] x — blocked (agent_proposed): technical failure"] } as unknown as SupervisorJudgeInput,
+      }),
+      true
+    );
+    // And so is any SL-14 expectation, even with an empty Work list — including
+    // `not_recoverable`, whose whole point is that nothing is blocked.
+    for (const key of [
+      "blocked_work",
+      "acceptable_recovery",
+      "recoverable_aliases",
+      "requires_disposition",
+      "retry_is_blind",
+      "not_recoverable",
+    ] as const) {
+      assert.equal(
+        isSl14Owned({ ...nothingBlocked, [key]: key === "blocked_work" ? "w1" : true } as never),
+        true,
+        `${key} makes a scenario SL-14's`
+      );
+    }
+    assert.equal(
+      isSl14Owned({
+        ...nothingBlocked,
+        input: { workSummary: [], retryExhaustedAliases: ["w1"] } as unknown as SupervisorJudgeInput,
+      }),
+      true,
+      "a declared spent bound is an SL-14 input"
+    );
+  });
+
+  await t("every set's SL-14-owned scenarios are the ones the closure rule gates", () => {
+    // A drift guard with teeth: if a future edit made an SL-14 recovery
+    // scenario look unowned, the rule would quietly stop gating it. Each set's
+    // recovery scenarios are enumerated from the files themselves.
+    for (const file of readdirSync(path.join(__dirname, "eval")).filter((f) =>
+      f.endsWith("-scenarios.json")
+    )) {
+      const suite = JSON.parse(readFileSync(path.join(__dirname, "eval", file), "utf8")) as {
+        scenarios: Array<{ id: string; input: { workSummary?: string[] } }>;
+      };
+      for (const scenario of suite.scenarios) {
+        const showsBlocked = (scenario.input.workSummary ?? []).some((line) =>
+          /^\[w\d+\]/.test(String(line))
+        );
+        if (showsBlocked) {
+          assert.equal(
+            isSl14Owned(scenario as never),
+            true,
+            `${file} / ${scenario.id}: shows blocked Work, so the closure rule must gate it`
+          );
+        }
+      }
+    }
+  });
+
+  await t("a discarded judgment carries WHY into the evidence, and never a stale why", () => {
+    // Holdout 4 lost 10 judgments in 100 calls and its artifact could say only
+    // that they were missing. A shape rule, an incoherence, an unparseable
+    // answer and an unreachable model all arrive as the same null and call for
+    // different repairs, so the reason has to reach the artifact.
+    takeLastDiscardReason();
+    assert.equal(
+      normalizeNextWorkProposal({ posture: "retry_work", rationale: "x" }),
+      null,
+      "a recovery action written into posture is not a judgment"
+    );
+    const scored = scoreScenario(
+      {
+        id: "x",
+        label: "-",
+        rubric: "-",
+        acceptable_postures: ["wait"],
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      },
+      null
+    );
+    assert.match(scored.violations[0] ?? "", /^no judgment was produced — .*posture/);
+
+    // TAKEN, not read: the next scenario to discard nothing must not inherit
+    // this one's reason. Absence of a signal is not a signal.
+    const second = scoreScenario(
+      {
+        id: "y",
+        label: "-",
+        rubric: "-",
+        acceptable_postures: ["wait"],
+        input: { workSummary: [] } as unknown as SupervisorJudgeInput,
+      },
+      null
+    );
+    assert.deepEqual(second.violations, ["no judgment was produced"]);
+  });
+
+  await t("holdouts 4 to 7 are ENTIRELY SL-14-owned, which is why they can test the rule", () => {
+    // Their defining property, asserted rather than described. The corrected
+    // closure rule can attribute a breach away from SL-14 only on a scenario
+    // carrying no SL-14 expectation; if even one situation in these sets were
+    // such a scenario, the holdout would be partly excusable by the very rule
+    // it was frozen to test.
+    for (const file of [
+      "supervisor-holdout-4-scenarios.json",
+      "supervisor-holdout-5-scenarios.json",
+      "supervisor-holdout-6-scenarios.json",
+      "supervisor-holdout-7-scenarios.json",
+      "supervisor-holdout-8-scenarios.json",
+    ]) {
+      const suite = JSON.parse(
+        readFileSync(path.join(__dirname, "eval", file), "utf8")
+      ) as { scenarios: Array<{ id: string }> };
+      assert.ok(suite.scenarios.length >= 10, `${file}: at least ten situations`);
+      for (const scenario of suite.scenarios) {
+        assert.equal(
+          isSl14Owned(scenario as never),
+          true,
+          `${file} / ${scenario.id}: not SL-14-owned, so the closure rule could excuse a breach on it`
+        );
+        // Belt and braces: the exception needs BOTH conditions, and this
+        // asserts the first fails even if the scenario were proven identical.
+        assert.equal(
+          mayAttribute(scenario as never, new Set([scenario.id])),
+          false,
+          `${file} / ${scenario.id}: attributable even when treated as byte-identical`
+        );
+      }
+    }
+  });
+
+  await t("SA-14.3 a spent retry bound is stated to the judge as unavailable, and only then", () => {
+    // The structural repair of 2026-09-16. `planRecovery` already refuses a
+    // second Supervisor retry; this stops the prompt from OFFERING one, which
+    // is availability of the same kind as `outboundAvailable`, not a bound the
+    // model is invited to argue around.
+    const blocked = {
+      wakeReason: "prior_work_settled",
+      objective: "Comprar casa",
+      objectiveCategory: "buy_home",
+      currentFacts: [],
+      recentMessages: [],
+      openCommitments: [],
+      trackedCommitmentKeys: [],
+      humanAnswers: [],
+      postureHistory: [],
+      daysSinceLastInbound: 2,
+      outboundAvailable: false,
+      availableCapabilities: ["inventory_search"],
+      workSummary: [
+        "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+        "[w2] valuation_lookup — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+      ],
+    } satisfies SupervisorJudgeInput;
+
+    const fresh = buildNextWorkPrompt(blocked);
+    assert.ok(
+      !/HAS ALREADY USED its one Supervisor retry/.test(fresh),
+      "an item the Supervisor has never retried must not be told a retry is unavailable"
+    );
+
+    const spent = buildNextWorkPrompt({ ...blocked, retryExhaustedAliases: ["w1"] });
+    assert.ok(
+      /w1 HAS ALREADY USED its one Supervisor retry/.test(spent),
+      "the spent bound must reach the judge"
+    );
+    assert.ok(
+      !/w2 HAS ALREADY USED/.test(spent),
+      "only the exhausted alias is constrained; w2 keeps both dispositions"
+    );
+
+    // An alias the Work list never showed is a constraint about nothing, and
+    // must not appear — the same rule the aliases themselves follow.
+    assert.equal(
+      buildNextWorkPrompt({ ...blocked, retryExhaustedAliases: ["w9"] }),
+      fresh,
+      "a constraint on an undisplayed alias changes nothing"
+    );
+
+    // The guarantee this must not break: a Case with nothing blocked renders
+    // the prompt SL-4's eval measured, whatever this field says.
+    const nothingBlocked = {
+      ...blocked,
+      workSummary: ["inventory_search — done (agent_proposed)"],
+    } satisfies SupervisorJudgeInput;
+    assert.equal(
+      buildNextWorkPrompt({ ...nothingBlocked, retryExhaustedAliases: ["w1"] }),
+      buildNextWorkPrompt(nothingBlocked),
+      "SA-14.1: nothing blocked ⇒ byte-identical, regardless of this field"
+    );
+  });
+
+  await t("an invalid posture is UNGENERATABLE where recovery is offered", () => {
+    // The structural repair of 2026-09-16, after a boolean disposition was
+    // measured and reverted. The mode was never about the disposition's words:
+    // the model wrote `leave_blocked` into `posture` while that was a value,
+    // and `recovery` — the FIELD NAME — once the boolean left no value to
+    // misplace. What the words have in common is that `posture` is a free
+    // string at generation time, and a strict schema is what makes it not one.
+    const withRecovery = nextWorkJsonSchema(true);
+    const properties = withRecovery.properties as Record<string, { enum?: string[] }>;
+    assert.deepEqual(properties.posture.enum, [...PROPOSABLE_POSTURES]);
+    assert.ok(
+      !properties.posture.enum?.some((p) => /retry|leave|recovery/.test(p)),
+      "no posture the sampler may emit can be mistaken for a disposition"
+    );
+    assert.deepEqual(properties.recovery ? "present" : "absent", "present");
+    assert.equal(withRecovery.additionalProperties, false);
+    // Strict structured output requires EVERY property to be required, so a
+    // schema that lists one and omits it from `required` is rejected outright
+    // by the provider — every judgment lost, not one.
+    assert.deepEqual(
+      [...(withRecovery.required as string[])].sort(),
+      Object.keys(properties).sort(),
+      "every property is required, as strict mode demands"
+    );
+
+    // …and nothing is constrained where SL-14 changed nothing (SA-14.1): the
+    // recovery block is absent, and the caller sends no schema at all.
+    assert.equal(
+      (nextWorkJsonSchema(false).properties as Record<string, unknown>).recovery,
+      undefined
+    );
+    assert.deepEqual(recoverableAliases(["inventory_search — done (agent_proposed)"]), []);
+    assert.deepEqual(
+      recoverableAliases([
+        "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+      ]),
+      ["w1"],
+      "the schema is chosen from the same reading of the Work list as the prompt"
+    );
+
+    // The parser is NOT relaxed by the constraint. It still refuses everything
+    // it refused before, so a provider that ignores the schema changes no
+    // verdict — which is the only reason adding it is safe.
+    const base = {
+      posture: "gather_research_reconcile",
+      diagnosis: null,
+      rationale: "x",
+      insufficient_evidence: false,
+      capability_gap: null,
+      proposed_work: [{ work_type: "t", purpose: "p", durable: false }],
+      commitments: [],
+      reconsider_in_hours: null,
+    };
+    const parsed = normalizeNextWorkProposal({
+      ...base,
+      recovery: [
+        { work: "w1", action: "retry_work", reason: "el error no ha vuelto" },
+        { work: "w2", action: "leave_blocked", reason: "replan with proposed_work" },
+      ],
+    });
+    assert.deepEqual(
+      parsed?.recovery?.map((r) => [r.work, r.action]),
+      [
+        ["w1", "retry"],
+        ["w2", "leave"],
+      ],
+      "the wire values map straight to the domain values the executor sees"
+    );
+
+    // The domain vocabulary is NOT the wire vocabulary, and the boolean the
+    // revert removed is not accepted either — a half-reverted prompt naming
+    // one of these would otherwise pass this suite while the judge wrote a
+    // string or a flag the parser refuses.
+    for (const action of ["retry", "leave", "true", "false"]) {
+      assert.equal(
+        normalizeNextWorkProposal({
+          ...base,
+          recovery: [{ work: "w1", action, reason: "r" }],
+        }),
+        null,
+        `a recovery disposition written as ${action} is not a judgment`
+      );
+    }
+    assert.equal(
+      normalizeNextWorkProposal({
+        ...base,
+        recovery: [{ work: "w1", retry: true, reason: "r" }],
+      }),
+      null,
+      "the reverted boolean is not silently still accepted"
+    );
+
+    // The prompt must name the shape it actually parses.
+    const blocked = {
+      wakeReason: "prior_work_settled",
+      objective: "o",
+      objectiveCategory: null,
+      daysSinceLastInbound: 1,
+      outboundAvailable: false,
+      currentFacts: [],
+      recentMessages: [],
+      openCommitments: [],
+      trackedCommitmentKeys: [],
+      humanAnswers: [],
+      postureHistory: [],
+      availableCapabilities: ["inventory_search"],
+      workSummary: [
+        "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+      ],
+    } satisfies SupervisorJudgeInput;
+    const prompt = buildNextWorkPrompt(blocked);
+    assert.match(prompt, /"action":"retry_work\|leave_blocked"/);
+    assert.ok(
+      !/"retry":boolean/.test(prompt),
+      "the prompt names the shape the parser accepts, not the reverted one"
+    );
+  });
+
+  await t("SA-14.5 a withdrawn capability is stated to the judge, and named as a gap", () => {
+    // The second half of the 2026-09-16 repair. In 7 of 100 calls on holdout 4
+    // the judge dispositioned every alias coherently and said in prose that no
+    // internal capability remained, while leaving `capability_gap` null — so
+    // the finding the Case has to carry was never recorded. The executor
+    // already refuses these retries; the judge was being asked to infer the
+    // bound from failure prose.
+    const blocked = {
+      wakeReason: "prior_work_settled",
+      objective: "o",
+      objectiveCategory: null,
+      daysSinceLastInbound: 1,
+      outboundAvailable: false,
+      currentFacts: [],
+      recentMessages: [],
+      openCommitments: [],
+      trackedCommitmentKeys: [],
+      humanAnswers: [],
+      postureHistory: [],
+      availableCapabilities: ["inventory_search"],
+      workSummary: [
+        "[w1] inventory_search — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+        "[w2] appraisal_order — blocked (agent_proposed): technical failure, 3 of 3 attempts used",
+      ],
+    } satisfies SupervisorJudgeInput;
+
+    // TOLD, never inferred. Deriving it from the Work list against
+    // `availableCapabilities` was tried and reverted on evidence: six frozen
+    // scenarios list a blocked item's own work type outside that list while
+    // expecting a retry, so the derivation redefined what they measure. This is
+    // the assertion that keeps it reverted.
+    const silent = buildNextWorkPrompt(blocked);
+    assert.ok(
+      !/NEEDS A CAPABILITY/.test(silent),
+      "w2's type is absent from the capabilities list, and that alone says NOTHING"
+    );
+
+    const told = buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: ["w2"] });
+    assert.match(told, /w2 NEEDS A CAPABILITY THAT IS NO LONGER AVAILABLE/);
+    assert.ok(!/w1 NEEDS A CAPABILITY/.test(told), "only the declared alias is constrained");
+    assert.match(told, /name the missing capability in `capability_gap`/);
+
+    // An alias the Work list never showed is a constraint about nothing.
+    assert.equal(
+      buildNextWorkPrompt({ ...blocked, capabilityGoneAliases: ["w9"] }),
+      silent,
+      "a constraint on an undisplayed alias changes nothing"
+    );
+
+    // SA-14.1 again: nothing blocked ⇒ the prompt SL-4's eval measured.
+    const nothingBlocked = {
+      ...blocked,
+      workSummary: ["appraisal_order — done (agent_proposed)"],
+    } satisfies SupervisorJudgeInput;
+    assert.equal(
+      buildNextWorkPrompt({ ...nothingBlocked, capabilityGoneAliases: ["w1"] }),
+      buildNextWorkPrompt(nothingBlocked),
+      "SA-14.1: nothing blocked ⇒ byte-identical, regardless of this field"
+    );
+  });
+
+  await t("a scenario's declared spent bounds are aliases its own Work list shows", () => {
+    // The drift this prevents: a set claiming a constraint on an alias the judge
+    // never saw would be scoring a situation the prompt never expressed.
+    for (const file of readdirSync(path.join(__dirname, "eval")).filter((f) =>
+      f.endsWith("-scenarios.json")
+    )) {
+      const suite = JSON.parse(readFileSync(path.join(__dirname, "eval", file), "utf8")) as {
+        scenarios: Array<{
+          id: string;
+          input: { workSummary?: string[]; retryExhaustedAliases?: string[] };
+        }>;
+      };
+      for (const scenario of suite.scenarios) {
+        const shown = (scenario.input.workSummary ?? [])
+          .map((line) => /^\[(w\d+)\]/.exec(line)?.[1])
+          .filter((alias): alias is string => alias !== undefined);
+        for (const alias of scenario.input.retryExhaustedAliases ?? []) {
+          assert.ok(
+            shown.includes(alias),
+            `${file} / ${scenario.id}: declares ${alias} retry-exhausted, but its Work list never shows it`
+          );
+        }
+      }
+    }
+  });
+
+  await t("every SL-14 set states the new bars, and their aliases match the prompt", () => {
     // Added with the scorer rather than before it: what it guards is the frozen
     // DATA — which was frozen first (ef1bc5c) — and the one way this evidence
     // could quietly stop meaning anything is the scenario's declared aliases
     // drifting from the aliases its own Work lines actually show. Then the
     // scorer would be measuring a situation the judge never saw.
-    const files = ["supervisor-scenarios.json", "supervisor-holdout-scenarios.json"];
+    const files = [
+      "supervisor-scenarios.json",
+      "supervisor-holdout-scenarios.json",
+      "supervisor-holdout-2-scenarios.json",
+      "supervisor-holdout-3-scenarios.json",
+      "supervisor-holdout-4-scenarios.json",
+      "supervisor-holdout-5-scenarios.json",
+      "supervisor-holdout-6-scenarios.json",
+      "supervisor-holdout-7-scenarios.json",
+      "supervisor-holdout-8-scenarios.json",
+    ];
     const idsPerFile: Array<Set<string>> = [];
 
     for (const file of files) {
@@ -1931,11 +3024,23 @@ async function main(): Promise<void> {
       idsPerFile.push(ids);
     }
 
-    // The holdout is only independent evidence if it is genuinely separate.
-    for (const id of idsPerFile[1]) {
-      assert.ok(!idsPerFile[0].has(id), `holdout scenario ${id} also exists in the main set`);
+    // A holdout is only independent evidence if it is genuinely separate — from
+    // the main set AND from every earlier holdout. Each was observed in turn:
+    // the 2026-09-15 one while diagnosing Q10, and holdout 2 while diagnosing
+    // the posture/recovery vocabulary collision. Each successor exists precisely
+    // to be untainted by the ones before it, so the separation is asserted
+    // pairwise rather than only against the main set.
+    for (let i = 1; i < idsPerFile.length; i += 1) {
+      for (const id of idsPerFile[i]) {
+        for (let j = 0; j < i; j += 1) {
+          assert.ok(
+            !idsPerFile[j].has(id),
+            `${files[i]} scenario ${id} also exists in ${files[j]}`
+          );
+        }
+      }
+      assert.ok(idsPerFile[i].size >= 5, `${files[i]}: a holdout of at least five situations`);
     }
-    assert.ok(idsPerFile[1].size >= 5, "a holdout of at least five situations");
   });
 
   // ────────────────────────────────────────────────────────────────────

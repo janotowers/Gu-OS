@@ -1,0 +1,1026 @@
+{
+  "ranAt": "2026-09-16T18:11:51.987Z",
+  "model": {
+    "source": "the judge that ran each pass (NextWorkJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ],
+    "unattributed": 0
+  },
+  "set": "holdout4",
+  "setFile": "supervisor-holdout-4-scenarios.json",
+  "setSha256": "bba39f4a27583cfe2840c7a9bd5599e44088d8719d1b887d3d3f53db53923fc7",
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "reask_bar": 0,
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0,
+  "scenarios": 10,
+  "runCount": 5,
+  "runsHoldingAllBars": 3,
+  "closureRule": {
+    "what": "Every ratified bar VALUE is unchanged, and `runsHoldingAllBars` keeps its original meaning. A breach gates closure UNLESS the scenario carries no SL-14 acceptance expectation, has no technically blocked Work, and its prompt is PROVEN byte-identical to the judge frozen before SL-14 — in which case it is recorded as the pre-existing SL-4-era Supervisor-quality carry-forward finding. Recorded as a human-governed contract correction, NOT as an accepted deviation.",
+    "identityAudit": "C:\\Users\\janot\\Gu-OS\\docs\\product\\roadmap-increments\\r1-relationship-operations-v1\\evidence\\sl14-sa141-byte-identity-holdout4-2026-09-16-70f5f1e.json",
+    "baselineRef": "2a12441",
+    "provenByteIdentical": [
+      "h4-appraisal-came-back-below-the-asking-price",
+      "h4-waiting-on-the-bank-adjuster-not-technical"
+    ],
+    "sl14OwnedScenarios": [
+      "h4-blocked-preapproval-gateway-timed-out-once",
+      "h4-blocked-same-signature-error-after-the-window-was-spent",
+      "h4-blocked-appraisal-capability-no-longer-listed",
+      "h4-blocked-result-nobody-needs-the-property-is-gone",
+      "h4-blocked-with-an-equivalent-source-available",
+      "h4-four-blocked-items-four-different-dispositions",
+      "h4-blocked-after-the-owner-answered",
+      "h4-blocked-while-contact-is-available",
+      "h4-waiting-on-the-bank-adjuster-not-technical",
+      "h4-appraisal-came-back-below-the-asking-price"
+    ],
+    "runsGatingClosure": 2
+  },
+  "runs": [
+    {
+      "run": 1,
+      "failures": 3,
+      "failureRate": 0.3,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": false,
+      "closureGating": true,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h4-blocked-preapproval-gateway-timed-out-once",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "retry_work would loop because the same bank timeout has recurred across all attempts; wait for a changed condition or another path."
+            }
+          ],
+          "rationale": "The prospect is waiting specifically for the preapproved amount, but the lookup capability has exhausted attempts and the blocker is technical rather than commercial."
+        },
+        {
+          "id": "h4-blocked-same-signature-error-after-the-window-was-spent",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h4-blocked-appraisal-capability-no-longer-listed",
+          "posture": "gather_research_reconcile",
+          "passed": false,
+          "violations": [
+            "expected a capability gap to be named, none was"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with comparable sales because the appraisal provider is unavailable and retrying the same order would loop."
+            }
+          ],
+          "rationale": "El propietario pidió un avalúo formal y la vía de ordenarlo falló definitivamente, mientras sí tengo lectura de comparables para apoyar el precio."
+        },
+        {
+          "id": "h4-blocked-result-nobody-needs-the-property-is-gone",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The photo tour scheduling task already failed 3 times with a technical calendar 500, so another retry would loop; replan with other available work instead."
+            }
+          ],
+          "rationale": "Listing sync shows the house was sold and the advisor already noted it needs another option."
+        },
+        {
+          "id": "h4-blocked-with-an-equivalent-source-available",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The flood_risk_report provider is out of service after repeated failure, so switch to hazard map reconciliation instead of retrying the same path."
+            }
+          ],
+          "rationale": "The prospect's concern is flood safety and the case still needs a usable way to assess it, but the prior report path is blocked by a technical outage."
+        },
+        {
+          "id": "h4-four-blocked-items-four-different-dispositions",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "retry_work no aporta nada nuevo tras el fallo técnico repetido; conviene replantear o esperar otra vía."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "retry_work no aporta nada nuevo tras el fallo del portal; conviene esperar otra vía o gestionar por humano."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "ya agotó sus reintentos y el registro sigue fuera de servicio; la responsabilidad debe pasar a otra vía o a una espera explícita."
+            },
+            {
+              "work": "w4",
+              "action": "leave",
+              "reason": "la cuenta ya no tiene acceso para consultas; hace falta intervención humana o una ruta distinta."
+            }
+          ],
+          "rationale": "El único avance nuevo es que ya existe el certificado; los otros cuatro trabajos quedan bloqueados, y w3 y w4 no pueden resolverse con las capacidades disponibles."
+        },
+        {
+          "id": "h4-blocked-after-the-owner-answered",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "retry",
+              "reason": "Fue el primer bloqueo técnico y no hay evidencia de que el 503 se haya repetido con el mismo trabajo."
+            }
+          ],
+          "rationale": "La aceptación del propietario ya quedó resuelta y el bloqueo actual es un fallo técnico del calendario de inquilinos."
+        },
+        {
+          "id": "h4-blocked-while-contact-is-available",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h4-waiting-on-the-bank-adjuster-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The latest update says the bank’s appraiser will schedule the inspection this week, so progress is currently constrained by that external scheduling step."
+        },
+        {
+          "id": "h4-appraisal-came-back-below-the-asking-price",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La única nueva evidencia útil es que el avalúo quedó abajo del asking price, y puedo verificar comparables con las capacidades disponibles."
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 3,
+      "failureRate": 0.3,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": false,
+      "closureGating": true,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h4-blocked-preapproval-gateway-timed-out-once",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry would loop on the same bank gateway timeout; there is no changed condition or alternate capability, so the responsibility should stay blocked until a different path or human intervention exists."
+            }
+          ],
+          "rationale": "w1 cannot be safely retried after repeated timeouts, and the objective is still viable but blocked by lack of a different available capability."
+        },
+        {
+          "id": "h4-blocked-same-signature-error-after-the-window-was-spent",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "a human or external fix to the signing certificate is needed before retrying; do not loop the same send attempt again"
+            }
+          ],
+          "rationale": "w1 has already failed twice with the same technical certificate rejection, so another retry would loop without new information."
+        },
+        {
+          "id": "h4-blocked-appraisal-capability-no-longer-listed",
+          "posture": "gather_research_reconcile",
+          "passed": false,
+          "violations": [
+            "expected a capability gap to be named, none was"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retrying the same appraisal order is looping because the provider no longer accepts this account; replan with comparable sales evidence instead."
+            }
+          ],
+          "rationale": "The case still needs a price basis and the only blocked work reflects a provider-account failure, not a deal issue."
+        },
+        {
+          "id": "h4-blocked-result-nobody-needs-the-property-is-gone",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retrying the photo tour schedule is not useful because the property is already sold and replacement search is the better path."
+            }
+          ],
+          "rationale": "Listing sync shows the home is sold and the advisor already noted it is time to look for another option."
+        },
+        {
+          "id": "h4-blocked-with-an-equivalent-source-available",
+          "posture": "wait",
+          "passed": false,
+          "violations": [
+            "posture wait not in [work, gather_research_reconcile]",
+            "expected useful work to be proposed, none was"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same technical failure has recurred and another retry would loop; wait for provider recovery or a human to choose a different path."
+            }
+          ],
+          "rationale": "w1 already exhausted attempts with the same provider outage, and no other useful internal work is clearly available."
+        },
+        {
+          "id": "h4-four-blocked-items-four-different-dispositions",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Cambiar de canal o proveedor; el topógrafo devolvió 500 en los 3 intentos usados."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "Ya no es responsabilidad pendiente; el certificado fue obtenido por el asesor en tesorería."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "Usar otra vía o esperar una reapertura explícita; el registro volvió a fallar con el mismo error tras el retry y no admite otra repetición."
+            },
+            {
+              "work": "w4",
+              "action": "leave",
+              "reason": "Requiere otro canal o gestión humana; la comisión ya no acepta consultas de esta cuenta."
+            }
+          ],
+          "rationale": "La única vía útil ahora es pedir al asesor que decida cómo destrabar o sustituir los pendientes, porque las capacidades internas disponibles ya no pueden completar los bloqueos actuales."
+        },
+        {
+          "id": "h4-blocked-after-the-owner-answered",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La lectura del calendario de inquilinos ya recurrió con el mismo fallo técnico; mejor cambiar de camino y usar comparables mientras la vía de calendario queda bloqueada."
+            }
+          ],
+          "rationale": "El propietario aceptó visitas con un día de aviso y la lectura del calendario de inquilinos falló técnicamente tras varios intentos."
+        },
+        {
+          "id": "h4-blocked-while-contact-is-available",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La lectura de comparables ya falló 3 veces por el mismo 502; conviene cambiar de vía y usar inventory_search en lugar de reintentar el mismo índice."
+            }
+          ],
+          "rationale": "El prospecto pidió ver precios de la zona y aún no tenemos comparables útiles por el fallo técnico del índice."
+        },
+        {
+          "id": "h4-waiting-on-the-bank-adjuster-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The latest update says the bank’s valuator will schedule the inspection this week, so progress depends on an external action already expected."
+        },
+        {
+          "id": "h4-appraisal-came-back-below-the-asking-price",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "We have a viable buy-home opportunity and a below-asking appraisal from the ordered appraisal, which makes valuation reconciliation the current constraint."
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 0,
+      "failureRate": 0,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h4-blocked-preapproval-gateway-timed-out-once",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This lookup has already failed three times with the same gateway timeout, so another retry would loop; replan with a different path or human assistance instead."
+            }
+          ],
+          "rationale": "The case is viable, the prospect asked for the preapproved amount, and the lookup has not succeeded after repeated technical failures."
+        },
+        {
+          "id": "h4-blocked-same-signature-error-after-the-window-was-spent",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Retry is not available after the same certificate rejection recurred; keep the signing responsibility blocked while replan/verification is pursued through available internal work."
+            }
+          ],
+          "rationale": "The case is viable and the advisor said the owner wants to sign, but w1 has already recurred with the same technical failure."
+        },
+        {
+          "id": "h4-blocked-appraisal-capability-no-longer-listed",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Ya no puede reintentarse con este proveedor; conviene replanear con comparables internos o pedir intervención humana para otro canal."
+            }
+          ],
+          "rationale": "El propietario pidió un avalúo formal y la vía de pedido falló de forma no recuperable con ese proveedor."
+        },
+        {
+          "id": "h4-blocked-result-nobody-needs-the-property-is-gone",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The photo tour scheduling failed repeatedly with the same technical 500 error, so another retry would loop; switch to a different path instead."
+            }
+          ],
+          "rationale": "Listing sync says the house was sold to another buyer and the advisor already noted a new option is needed."
+        },
+        {
+          "id": "h4-blocked-with-an-equivalent-source-available",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La ruta del proveedor del reporte ya agotó sus 3 intentos y recurre la misma falla; conviene reconducir a un mapa de peligro alternativo en lugar de reintentar."
+            }
+          ],
+          "rationale": "Hay un trabajo pendiente útil para resolver la duda de inundación, pero el proveedor del reporte falló ya 3 veces y otra repetición sería un bucle."
+        },
+        {
+          "id": "h4-four-blocked-items-four-different-dispositions",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with a human or another path; the topographer endpoint failed repeatedly and no new condition is available."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "This responsibility is already met because the certificate was obtained by the advisor."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "Wait for an explicit external recovery path; the public registry has already failed the same way again and retry is looping."
+            },
+            {
+              "work": "w4",
+              "action": "leave",
+              "reason": "Ask a human to decide another path; the available account can no longer query the commission."
+            }
+          ],
+          "rationale": "El asesor ya consiguió el certificado, mientras w1, w3 y w4 siguen bloqueados y w2 quedó satisfecho."
+        },
+        {
+          "id": "h4-blocked-after-the-owner-answered",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La lectura del calendario de rentas falló 3 de 3 veces por 503 y ya no es prudente reintentar sin un cambio de vía; conviene dejarla bloqueada y replanear con otro camino o soporte humano si hace falta."
+            }
+          ],
+          "rationale": "Ya quedó resuelto el permiso del propietario y el bloqueo restante es la disponibilidad de inquilinos."
+        },
+        {
+          "id": "h4-blocked-while-contact-is-available",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La lectura de comparables ya agotó 3 intentos con el mismo 502; conviene replanear con inventario_search en lugar de repetir la misma vía."
+            }
+          ],
+          "rationale": "El prospecto pidió ver precios de la zona y existe capacidad interna de búsqueda de inventario para aportar evidencia útil ahora."
+        },
+        {
+          "id": "h4-waiting-on-the-bank-adjuster-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The latest evidence only confirms the bank is scheduling the valuation inspection this week."
+        },
+        {
+          "id": "h4-appraisal-came-back-below-the-asking-price",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only new fact is a below-asking appraisal on a viable purchase, which creates a valuation discrepancy that can be checked internally."
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 2,
+      "failureRate": 0.2,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h4-blocked-preapproval-gateway-timed-out-once",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h4-blocked-same-signature-error-after-the-window-was-spent",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El envío de firma ya agotó sus reintentos; conviene replanear con una ruta documental distinta o escalar a humano antes de otro intento."
+            }
+          ],
+          "rationale": "El intento de envío de firma ya falló dos veces con el mismo error técnico y el propietario sigue listo para firmar."
+        },
+        {
+          "id": "h4-blocked-appraisal-capability-no-longer-listed",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El mismo proveedor ya falló repetidamente y ya no acepta solicitudes de esta cuenta; conviene replantear con otra vía o intervención humana en lugar de reintentar."
+            }
+          ],
+          "rationale": "El único siguiente paso útil depende de decidir un nuevo camino para obtener el avalúo sustentado."
+        },
+        {
+          "id": "h4-blocked-result-nobody-needs-the-property-is-gone",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The photo tour scheduling task has exhausted retries after a repeated technical failure, so it should stay blocked while a different path is pursued."
+            }
+          ],
+          "rationale": "The listing sync says the house is sold and no other path is yet identified."
+        },
+        {
+          "id": "h4-blocked-with-an-equivalent-source-available",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El proveedor del reporte está fuera de servicio y ya se agotaron los intentos; conviene cambiar a una vía disponible de verificación en mapas de riesgo."
+            }
+          ],
+          "rationale": "El trabajo w1 falló por proveedor fuera de servicio y el objetivo sigue siendo viable con una preocupación explícita por inundaciones."
+        },
+        {
+          "id": "h4-four-blocked-items-four-different-dispositions",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]",
+            "expected a capability gap to be named, none was"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "retry would just repeat a failed topographer call with no new condition; keep it blocked until another path is available"
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "retry would repeat the treasury portal failure with no changed condition; keep it blocked until another path is available"
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "the registry failure has already recurred and retry is exhausted; leave it blocked and carry this responsibility by another path"
+            },
+            {
+              "work": "w4",
+              "action": "leave",
+              "reason": "the commission account is no longer accepted and no alternate capability is available; leave it blocked until a human or new account path exists"
+            }
+          ],
+          "rationale": "The remaining blocked tasks cannot be advanced with available capabilities and no new useful internal action is available."
+        },
+        {
+          "id": "h4-blocked-after-the-owner-answered",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "This same tenant schedule read already failed three times with the same technical 503, so another retry would loop; replan with comparable sales or ask a human if tenant timing becomes essential."
+            }
+          ],
+          "rationale": "Owner approval is settled and the only unfinished work is the blocked tenant schedule read after a 503 that already used all attempts."
+        },
+        {
+          "id": "h4-blocked-while-contact-is-available",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La lectura de comparables ya recurrió con el mismo fallo técnico; conviene replanear con inventario interno en lugar de reintentar el índice 502."
+            }
+          ],
+          "rationale": "El prospecto pidió ver cómo andan los precios por ahí y el trabajo bloqueado sigue pendiente de una fuente interna disponible."
+        },
+        {
+          "id": "h4-waiting-on-the-bank-adjuster-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only update is that the bank said the appraiser will schedule the inspection this week, and the objective remains viable."
+        },
+        {
+          "id": "h4-appraisal-came-back-below-the-asking-price",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only new substantive fact is a below-asking appraisal, which creates a valuation gap that can be checked internally."
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 1,
+      "failureRate": 0.1,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h4-blocked-preapproval-gateway-timed-out-once",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The bank lookup has already failed repeatedly with the same technical timeout, so another retry would loop; use a different path instead."
+            }
+          ],
+          "rationale": "The prospect is waiting on the preapproved amount, but the only available path to get it has failed three times with the bank gateway timing out."
+        },
+        {
+          "id": "h4-blocked-same-signature-error-after-the-window-was-spent",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h4-blocked-appraisal-capability-no-longer-listed",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same provider has already failed repeatedly and no different condition is present; replan around comparable sales instead."
+            }
+          ],
+          "rationale": "The owner asked for a formal appraisal before pricing and the prior appraisal order failed permanently with the current provider."
+        },
+        {
+          "id": "h4-blocked-result-nobody-needs-the-property-is-gone",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The photo-tour scheduling capability already failed three times with the same technical error, so this responsibility should be left blocked while pursuing replacement-home research instead."
+            }
+          ],
+          "rationale": "Listing sync says the house was sold and the advisor said to look for another option."
+        },
+        {
+          "id": "h4-blocked-with-an-equivalent-source-available",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El proveedor del reporte está fuera de servicio; replanificar con hazard_map_read en lugar de reintentar el mismo reporte."
+            }
+          ],
+          "rationale": "La única obra pendiente es w1 y el objetivo sigue viable, pero el proveedor del reporte está fuera de servicio."
+        },
+        {
+          "id": "h4-four-blocked-items-four-different-dispositions",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with a human or alternate provider; the survey endpoint already failed repeatedly with no new condition."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "Stop retrying the treasury portal; the needed certificate is already received from the advisor, so this responsibility is satisfied externally."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "Use another path or explicit wait; the public registry has failed the same way after a prior retry and cannot be retried again."
+            },
+            {
+              "work": "w4",
+              "action": "leave",
+              "reason": "Ask a person to handle the utility feasibility check through a different account or channel; the current account is no longer accepted."
+            }
+          ],
+          "rationale": "La tesorería ya entregó el certificado, pero w1, w3 y w4 están bloqueados o agotados y no hay otra capacidad interna disponible para resolverlos."
+        },
+        {
+          "id": "h4-blocked-after-the-owner-answered",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El acceso al sistema de rentas falló 3 veces con 503; conviene dejarlo bloqueado y avanzar por otra vía si aparece una alternativa."
+            }
+          ],
+          "rationale": "El permiso para visitas ya está resuelto y el intento previo de leer la agenda de inquilinos falló técnicamente, pero sigue siendo la pieza operativa que mejor avanza la venta."
+        },
+        {
+          "id": "h4-blocked-while-contact-is-available",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El fallo 502 ya recurrió y repetir la misma lectura sería un bucle; conviene tomar una ruta alternativa o pedir intervención humana."
+            }
+          ],
+          "rationale": "La comparación de precios sigue siendo útil, pero el acceso a comparables está bloqueado por un fallo técnico ya recurrente."
+        },
+        {
+          "id": "h4-waiting-on-the-bank-adjuster-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The bank valuator is expected to schedule the inspection this week, and no new inbound evidence changes that dependency."
+        },
+        {
+          "id": "h4-appraisal-came-back-below-the-asking-price",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "El avalúo ya llegó por debajo de asking y hay capacidad interna disponible para leer comparables y reconciliar la discrepancia."
+        }
+      ]
+    }
+  ]
+}

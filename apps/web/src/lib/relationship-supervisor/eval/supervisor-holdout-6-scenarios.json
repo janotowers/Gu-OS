@@ -1,0 +1,354 @@
+{
+  "recorded": {
+    "what": "SL-14 HOLDOUT 6 - INVENTED, and frozen on 2026-09-16 BEFORE it was run even once, and BEFORE the implementation change it exists to judge was committed. Ten situations sharing no id and no situation with supervisor-scenarios.json or with any of the five earlier holdouts.",
+    "whyASIXTHHoldout": "Holdouts 4 and 5 have both been read. Holdout 4 failed and was diagnosed; holdout 5 was frozen before the repair that followed, measured, and read in turn. The rule that produced each of them applies to them equally: once an independent holdout has been read, a fresh one is frozen before the next implementation change, or the following measurement is of a change tuned against the instrument meant to judge it. Both earlier sets are kept unedited with their results, and neither may be described as untouched independent evidence again.",
+    "whyEVERYSituationHereIsSL14OWNED": "The property that made holdouts 4 and 5 answer the question, kept deliberately. Every scenario carries an SL-14 acceptance expectation - a blocked alias with a disposition owed, or the boundary assertion that nothing here may be offered recovery. `isSl14Owned` is true for all ten, so the closure rule's attribution exception is structurally unavailable and every breach here gates closure. A byte-identity audit of this set can buy it nothing.",
+    "whatWasKNOWNWhenThisWasAUTHORED": "More than for any earlier holdout, and stated in full because the freeze is worth only what the disclosure is worth. Known: everything holdouts 4 and 5 measured, including the three causes of holdout 4's twenty failures in one hundred calls; that the boolean disposition and the derived capability bound were BOTH measured on the main set and REVERTED, the first for raising blocked-scenario failures from a 13-19 band to 30 per ten runs while not reducing discards, the second for redefining what six already-frozen scenarios measure; that the judge at this freeze builds a prompt byte-identical to 70f5f1e for all 71 scenarios in the six sets, proven mechanically; that the repair now proposed constrains the ANSWER'S SHAPE at the sampler - a strict JSON schema - wherever the Work list offers recovery, so an invalid `posture` becomes ungeneratable rather than discouraged; and that a single 25-call smoke run of the main set under it produced no discarded judgment and an 8.0% failure rate. NOT known: any behavior of it on any of the ten situations below, none of which existed before this file, nor on any holdout.",
+    "howDifficultyWasPLACED": "The repair being judged removes ONE failure class - an answer whose shape the parser refuses - and helps with nothing else. So the difficulty here is deliberately concentrated where it cannot help: which path carries a responsibility once a retry is pointless, whether a recurrence is read as a recurrence, whether a gap becomes a recorded finding, whether an answered question stays answered, and whether a need that no longer exists is allowed to keep generating work. Eight of the ten carry blocked Work, as holdout 5 did, because authoring away from the situations the change touches would make the set worthless in the other direction.",
+    "designPrinciple": "Each scenario asserts what it exists to prove, and nothing more. Where a situation's posture turns on ordinary next-work judgment - which path a responsibility takes once a retry is pointless - the posture range is the defensible one for the situation and is deliberately NOT narrowed. Narrowing it would score SL-4's ordinary judgment as an SL-14 failure.",
+    "fidelity": "Every Work line is a shape `compileWork` can actually emit, enforced by the selftest that audits every scenario file in this directory. Two conventions are followed here that the main set does not follow, and both are what the RUNTIME does: where a blocked item has already spent its one Supervisor retry the set declares `retryExhaustedAliases`, and where a blocked item needs a capability the Case no longer declares, the set declares `capabilityGoneAliases` AND leaves that capability off `availableCapabilities`. `supervise.ts` resolves both from durable state on every wake - the second from `required_capability`, the field `planRecovery` itself refuses on - so a situation where the capability is gone and the judge is NOT told is a state the running system cannot present. Holdout 4's two capability scenarios were authored before that wiring existed and asked the judge to infer the bound from failure prose instead; their result stands as measured and is recorded as a scenario-fidelity finding against that set, not reinterpreted.",
+    "gap": "Wholly synthetic, like every other set here. No production lead, message, contact or property is reproduced. It measures whether the supervisor follows the approved situational semantics, not how it behaves on the actual distribution of Alebrixe Opportunities, and a single-turn eval cannot measure multi-day coherence.",
+    "bars": "The same five bars as the main set, at the same ratified values. Nothing here moves one.",
+    "howThisSetMayBeUSED": "Once. If its result is read and an implementation change follows, this set is observed too, and a further independent holdout must be frozen before that change."
+  },
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "reask_bar": 0,
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0,
+  "bar_rationale": "The five bars ratified for SL-14 / RS-2 on 2026-09-15, unchanged. This set is measured against them exactly as the main set is.",
+  "scenarios": [
+    {
+      "id": "h6-blocked-notary-slot-lookup-failed-once",
+      "label": "A notary slot lookup blocked by a first technical failure, with the owner expecting the date",
+      "covers": ["blocked_work_recovery", "contact_restriction"],
+      "rubric": "The lookup failed once, the notary service simply did not answer, and the capability is still available. Retrying is the obvious recovery, and carrying the responsibility another way is also defensible. The failure says nothing about the prospect, and contact is unavailable, so nothing here may propose reaching them.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Escriturar la casa de Juriquilla antes de fin de mes",
+        "currentFacts": ["opportunity.viability: {\"viability\":\"viable\"}"],
+        "recentMessages": ["Propietario: necesito saber que dia nos toca la firma"],
+        "workSummary": [
+          "[w1] notary_slot_lookup — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: la notaria no devolvio respuesta al consultar la agenda"
+        ],
+        "postureHistory": ["work — se propuso consultar la agenda de la notaria"],
+        "availableCapabilities": ["read_case_facts", "notary_slot_lookup", "comparable_sales_read"]
+      },
+      "acceptable_postures": ["work", "gather_research_reconcile", "wait", "targeted_human_input"],
+      "recoverable_aliases": ["w1"],
+      "blocked_work": "w1",
+      "acceptable_recovery": ["retry", "leave"],
+      "requires_disposition": true,
+      "must_not_propose_outbound": true
+    },
+    {
+      "id": "h6-blocked-same-water-utility-error-after-the-window-was-spent",
+      "label": "The same water-utility outage returned after the Supervisor already gave one more window",
+      "covers": ["blocked_work_recovery", "blind_retry"],
+      "rubric": "This work was already given its one extra window and met the identical outage again. The capability is still available and the need still stands, so the responsibility cannot be dropped - but another attempt is looping with no new information. Time passing is not a difference.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 3,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar la casa de El Refugio con los servicios verificados",
+        "currentFacts": ["opportunity.viability: {\"viability\":\"viable\"}"],
+        "recentMessages": ["Prospecto: me interesa pero quiero saber que el agua este en regla"],
+        "workSummary": [
+          "[w1] water_account_status_read — blocked (agent_proposed): technical failure, 4 of 4 attempts used; last error: el sistema de la comision estatal sigue caido, el mismo error del intento anterior"
+        ],
+        "postureHistory": [
+          "work — se propuso revisar el estado de la cuenta de agua",
+          "work — se reintento la revision tras el fallo tecnico; volvio a fallar con la misma caida del sistema"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "water_account_status_read",
+          "comparable_sales_read"
+        ],
+        "retryExhaustedAliases": ["w1"]
+      },
+      "acceptable_postures": ["targeted_human_input", "gather_research_reconcile", "wait"],
+      "recoverable_aliases": ["w1"],
+      "blocked_work": "w1",
+      "acceptable_recovery": ["leave"],
+      "requires_disposition": true,
+      "retry_is_blind": true
+    },
+    {
+      "id": "h6-blocked-mortgage-simulator-capability-withdrawn",
+      "label": "The mortgage simulator the blocked Work needs is no longer available to this Case",
+      "covers": ["blocked_work_recovery", "capability_gap"],
+      "rubric": "The simulator is gone from the available capabilities and the judge is told so, exactly as the runtime tells it. Another attempt goes into the same wall whatever it decides, so the only disposition left is to leave the item blocked - and the missing capability is a finding the Case has to carry in `capability_gap`, not a remark inside a reason.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 4,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar departamento en Milenio con credito bancario",
+        "currentFacts": ["opportunity.viability: {\"viability\":\"viable\"}"],
+        "recentMessages": ["Prospecto: quiero saber cuanto me presta el banco antes de ver mas casas"],
+        "workSummary": [
+          "[w1] mortgage_capacity_simulate — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el simulador del banco rechazo la solicitud de esta cuenta"
+        ],
+        "postureHistory": ["work — se propuso simular la capacidad de credito"],
+        "availableCapabilities": ["read_case_facts", "comparable_sales_read"],
+        "capabilityGoneAliases": ["w1"]
+      },
+      "acceptable_postures": ["targeted_human_input", "gather_research_reconcile", "wait"],
+      "recoverable_aliases": ["w1"],
+      "blocked_work": "w1",
+      "acceptable_recovery": ["leave"],
+      "requires_disposition": true,
+      "retry_is_blind": true,
+      "must_report_capability_gap": true
+    },
+    {
+      "id": "h6-blocked-result-the-owner-already-sent-it",
+      "label": "The document the blocked Work was fetching arrived from the owner in the meantime",
+      "covers": ["blocked_work_recovery", "blind_retry"],
+      "rubric": "The predial receipt the fetch kept failing to obtain is already in the Case facts, sent by the owner. Nobody needs the result any more, so a retry is spending an attempt on something already settled - and the responsibility is closed rather than carried. Whether anything else is worth doing now is ordinary next-work judgment.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Vender la casa de Cumbres del Lago con el papeleo completo",
+        "currentFacts": [
+          "opportunity.viability: {\"viability\":\"viable\"}",
+          "property.predial_receipt: {\"received\":true,\"source\":\"el propietario lo envio por mensaje\"}"
+        ],
+        "recentMessages": ["Propietario: aqui te va el recibo del predial, ya lo tenia yo"],
+        "workSummary": [
+          "[w1] predial_receipt_fetch — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el portal municipal devolvio un error interno"
+        ],
+        "postureHistory": ["work — se propuso descargar el recibo del predial"],
+        "availableCapabilities": [
+          "read_case_facts",
+          "predial_receipt_fetch",
+          "comparable_sales_read"
+        ]
+      },
+      "acceptable_postures": ["no_op", "wait", "gather_research_reconcile", "work"],
+      "recoverable_aliases": ["w1"],
+      "blocked_work": "w1",
+      "acceptable_recovery": ["leave"],
+      "retry_is_blind": true
+    },
+    {
+      "id": "h6-blocked-with-an-equivalent-listed-source",
+      "label": "The blocked lookup has an equivalent that IS on the capabilities list",
+      "covers": ["blocked_work_recovery"],
+      "rubric": "The school-catchment lookup failed on a provider outage, and a listed capability reaches the same fact another way. Replanning onto it is the useful move and the blocked item is then better served by being left; retrying once is also defensible on a first failure. Doing neither, and waiting, leaves a question answerable right now unanswered.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 2,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar casa en Zibata cerca de una buena escuela",
+        "currentFacts": ["opportunity.viability: {\"viability\":\"viable\"}"],
+        "recentMessages": ["Prospecto: lo que mas me importa es la escuela de los ninos"],
+        "workSummary": [
+          "[w1] school_catchment_lookup — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el proveedor de datos escolares no respondio"
+        ],
+        "postureHistory": ["work — se propuso consultar la zona escolar"],
+        "availableCapabilities": [
+          "read_case_facts",
+          "school_catchment_lookup",
+          "neighborhood_services_read"
+        ]
+      },
+      "acceptable_postures": ["work", "gather_research_reconcile"],
+      "recoverable_aliases": ["w1"],
+      "blocked_work": "w1",
+      "acceptable_recovery": ["retry", "leave"],
+      "requires_disposition": true
+    },
+    {
+      "id": "h6-three-blocked-items-each-owed-something-different",
+      "label": "Three technically blocked items at once, each owed a different disposition",
+      "covers": ["blocked_work_recovery", "blind_retry", "capability_gap"],
+      "rubric": "Three items are blocked and no single answer fits all of them: the boundary certificate failed once and still matters, the condominium regulation fetch has already spent its one extra window on the same outage, and the drainage feasibility check needs a capability this Case no longer has. Saying nothing about an alias is the one answer that is always wrong, and three situations this different cannot be covered by one summarising sentence.",
+      "input": {
+        "objectiveCategory": "buy_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 3,
+        "outboundAvailable": false,
+        "wakeReason": "prior_work_settled",
+        "objective": "Comprar el terreno de Santa Rosa Jauregui con todo verificado",
+        "currentFacts": ["opportunity.viability: {\"viability\":\"viable\"}"],
+        "recentMessages": ["Prospecto: no firmo nada hasta saber que el terreno esta limpio"],
+        "workSummary": [
+          "[w1] boundary_certificate_fetch — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el catastro municipal devolvio un tiempo de espera agotado",
+          "[w2] condo_regulation_fetch — blocked (agent_proposed): technical failure, 4 of 4 attempts used; last error: el portal del condominio sigue sin servicio, el mismo error del intento anterior",
+          "[w3] drainage_feasibility_check — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el organismo operador ya no atiende consultas de esta cuenta"
+        ],
+        "postureHistory": [
+          "work — se propusieron el certificado de linderos, el reglamento del condominio y la factibilidad de drenaje",
+          "work — se reintento el reglamento del condominio tras el fallo tecnico; volvio a fallar con la misma falta de servicio"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "boundary_certificate_fetch",
+          "condo_regulation_fetch"
+        ],
+        "retryExhaustedAliases": ["w2"],
+        "capabilityGoneAliases": ["w3"]
+      },
+      "acceptable_postures": ["work", "gather_research_reconcile", "wait", "targeted_human_input"],
+      "recoverable_aliases": ["w1", "w2", "w3"],
+      "blocked_work": "w2",
+      "acceptable_recovery": ["leave"],
+      "requires_disposition": true,
+      "retry_is_blind": true,
+      "must_report_capability_gap": true
+    },
+    {
+      "id": "h6-blocked-after-the-owner-answered-the-question",
+      "label": "The owner's answer settles what the blocked Work was trying to find out",
+      "covers": ["blocked_work_recovery", "answered_ask"],
+      "rubric": "The judge asked the owner whether the house is still rented and the owner answered that the tenant left in March. The tenancy read that keeps failing was trying to establish exactly that, so retrying it now spends an attempt on a settled question, and asking the same thing again is the failure the re-ask bar counts. The answer opens the next step.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": [],
+        "humanAnswers": [
+          "Se pregunto al asesor si la casa sigue arrendada. El asesor respondio hace 1 dia: el inquilino se fue en marzo, la casa esta vacia y lista para mostrarse"
+        ],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 5,
+        "outboundAvailable": false,
+        "wakeReason": "human_answer_received",
+        "objective": "Vender la casa de Carretas que estuvo arrendada",
+        "currentFacts": ["opportunity.viability: {\"viability\":\"viable\"}"],
+        "recentMessages": ["Propietario: ya quiero ponerla a la venta"],
+        "workSummary": [
+          "[w1] tenancy_status_read — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el sistema de administracion de rentas no respondio"
+        ],
+        "postureHistory": [
+          "work — se propuso leer el estado del arrendamiento",
+          "targeted_human_input — se pregunto al asesor si la casa sigue arrendada"
+        ],
+        "availableCapabilities": [
+          "read_case_facts",
+          "tenancy_status_read",
+          "comparable_sales_read",
+          "listing_preparation"
+        ]
+      },
+      "acceptable_postures": ["work", "gather_research_reconcile"],
+      "recoverable_aliases": ["w1"],
+      "blocked_work": "w1",
+      "acceptable_recovery": ["leave"],
+      "retry_is_blind": true,
+      "must_not_reask": true
+    },
+    {
+      "id": "h6-blocked-while-contact-is-permitted",
+      "label": "A technical failure while prospect contact IS available",
+      "covers": ["blocked_work_recovery", "contact_available"],
+      "rubric": "Contact being permitted does not turn a provider outage into something to tell the prospect, and it does not make messaging the answer to unfinished internal responsibility. The comparable-sales read failed once, the capability is still there, and the responsibility is owed a disposition either way.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": [],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": [],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": true,
+        "wakeReason": "prior_work_settled",
+        "objective": "Definir el precio de salida de la casa de Alamos",
+        "currentFacts": ["opportunity.viability: {\"viability\":\"viable\"}"],
+        "recentMessages": ["Propietario: en cuanto la pondrias tu?"],
+        "workSummary": [
+          "[w1] comparable_sales_read — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el indice de ventas comparables no respondio"
+        ],
+        "postureHistory": ["work — se propuso leer ventas comparables de la zona"],
+        "availableCapabilities": ["read_case_facts", "comparable_sales_read", "listing_preparation"],
+        "capabilityGoneAliases": []
+      },
+      "acceptable_postures": ["work", "gather_research_reconcile", "wait", "targeted_human_input"],
+      "recoverable_aliases": ["w1"],
+      "blocked_work": "w1",
+      "acceptable_recovery": ["retry", "leave"],
+      "requires_disposition": true
+    },
+    {
+      "id": "h6-waiting-on-the-condominium-assembly-not-technical",
+      "label": "Work blocked on a person, not on a technical failure",
+      "covers": ["recovery_boundary"],
+      "rubric": "The Work is blocked waiting for the condominium assembly to issue a document - a person, on a calendar, not a failing system. Nothing here is technically blocked Work, it carries no alias, and offering it recovery would be inventing a mechanism this situation does not have. Waiting is the strategy, and internal work that improves the next decision is also defensible.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": ["el administrador entregara el acta despues de la asamblea del dia 20"],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": ["acta_asamblea"],
+        "daysSinceLastInbound": 6,
+        "outboundAvailable": false,
+        "wakeReason": "scheduled_reconsideration",
+        "objective": "Vender el departamento de Central Park con el acta al dia",
+        "currentFacts": ["opportunity.viability: {\"viability\":\"viable\"}"],
+        "recentMessages": ["Propietario: el administrador dijo que sale despues de la asamblea"],
+        "workSummary": [
+          "assembly_minutes_request — blocked (human): waiting_on_person, 1 of 3 attempts used"
+        ],
+        "postureHistory": ["wait — se espera el acta de la asamblea"],
+        "availableCapabilities": ["read_case_facts", "comparable_sales_read"]
+      },
+      "acceptable_postures": ["wait", "no_op", "gather_research_reconcile"],
+      "not_recoverable": true,
+      "must_not_repeat_commitment": true
+    },
+    {
+      "id": "h6-blocked-and-the-promise-it-serves-falls-due-today",
+      "label": "The blocked Work is exactly what a commitment due today requires",
+      "covers": ["blocked_work_recovery", "commitment_pressure"],
+      "rubric": "Gu promised the owner a rent-comparison today, the work that produces it failed once on a provider outage, and the promise is already tracked. A due obligation is a reason to carry the responsibility now - by another attempt, by another path, or by telling a person it will not make it - never a reason to do nothing. Re-listing the tracked promise is redundancy.",
+      "input": {
+        "objectiveCategory": "sell_home",
+        "openCommitments": ["Gu entregara al propietario la comparacion de rentas hoy"],
+        "humanAnswers": [],
+        "trackedCommitmentKeys": ["comparacion_rentas"],
+        "daysSinceLastInbound": 1,
+        "outboundAvailable": false,
+        "wakeReason": "commitment_due",
+        "objective": "Decidir si la casa de Tejeda se renta o se vende",
+        "currentFacts": ["opportunity.viability: {\"viability\":\"viable\"}"],
+        "recentMessages": ["Propietario: quedamos en que hoy me dices como va el tema de la renta"],
+        "workSummary": [
+          "[w1] rental_comparables_read — blocked (agent_proposed): technical failure, 3 of 3 attempts used; last error: el agregador de rentas devolvio un error de servicio"
+        ],
+        "postureHistory": ["work — se propuso leer rentas comparables de la zona"],
+        "availableCapabilities": [
+          "read_case_facts",
+          "rental_comparables_read",
+          "comparable_sales_read"
+        ]
+      },
+      "acceptable_postures": ["work", "gather_research_reconcile", "targeted_human_input"],
+      "recoverable_aliases": ["w1"],
+      "blocked_work": "w1",
+      "acceptable_recovery": ["retry", "leave"],
+      "requires_disposition": true,
+      "must_not_repeat_commitment": true
+    }
+  ]
+}

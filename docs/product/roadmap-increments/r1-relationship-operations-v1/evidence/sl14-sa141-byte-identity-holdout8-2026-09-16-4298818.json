@@ -1,0 +1,15 @@
+{
+  "ranAt": "2026-09-16T22:51:00.275Z",
+  "what": "SA-14.1 byte-identity audit of apps/web/src/lib/relationship-supervisor/eval/supervisor-holdout-8-scenarios.json. For every scenario in it whose Work list has nothing blocked, the prompt built by the judge frozen at 2a12441 and by the judge as it is now. A scenario listed as identical is one SL-14 is STRUCTURALLY UNABLE to have affected, whatever it scores.",
+  "notWhat": "This is not a measurement and holds no bar. It says what SL-14 could possibly own, not how often anything failed.",
+  "usedBy": "`run-supervisor-eval.ts` reads this through SUPERVISOR_EVAL_IDENTITY_AUDIT as the ONLY admissible proof for the closure rule of 2026-09-16, and refuses it unless `currentSetSha256` matches the set actually being measured.",
+  "baselineRef": "2a12441",
+  "baselineJudgeSha256": "07eace46c97aadbfd8ecabef36e6ab06ca3ea645de7f773ba8be51d54dad7ee1",
+  "auditedSet": "apps/web/src/lib/relationship-supervisor/eval/supervisor-holdout-8-scenarios.json",
+  "currentSetSha256": "665014dcf2104e444ff4b450264e2cc060d84aa517b18f6eeddcbf50d2bb58da",
+  "frozenByteIdentical": [
+    "h8-waiting-on-the-municipal-appointment-not-technical",
+    "h8-waiting-on-the-bank-committee-not-technical"
+  ],
+  "differing": []
+}

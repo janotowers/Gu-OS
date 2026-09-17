@@ -1,0 +1,997 @@
+{
+  "ranAt": "2026-09-16T18:33:16.180Z",
+  "model": {
+    "source": "the judge that ran each pass (NextWorkJudge.modelId)",
+    "ids": [
+      "openai/gpt-5.4-mini"
+    ],
+    "unattributed": 0
+  },
+  "set": "holdout5",
+  "setFile": "supervisor-holdout-5-scenarios.json",
+  "setSha256": "e10b9c2947081c6546f53ee2ea4535785bff4d872b0ccb1c6f6dcf888f8e3f93",
+  "failure_rate_bar": 0.2,
+  "fabricated_work_bar": 0,
+  "reask_bar": 0,
+  "blind_retry_bar": 0,
+  "stranded_failure_bar": 0,
+  "scenarios": 10,
+  "runCount": 5,
+  "runsHoldingAllBars": 2,
+  "closureRule": {
+    "what": "Every ratified bar VALUE is unchanged, and `runsHoldingAllBars` keeps its original meaning. A breach gates closure UNLESS the scenario carries no SL-14 acceptance expectation, has no technically blocked Work, and its prompt is PROVEN byte-identical to the judge frozen before SL-14 — in which case it is recorded as the pre-existing SL-4-era Supervisor-quality carry-forward finding. Recorded as a human-governed contract correction, NOT as an accepted deviation.",
+    "identityAudit": "C:\\Users\\janot\\Gu-OS\\docs\\product\\roadmap-increments\\r1-relationship-operations-v1\\evidence\\sl14-sa141-byte-identity-holdout5-2026-09-16-e345c14.json",
+    "baselineRef": "2a12441",
+    "provenByteIdentical": [
+      "h5-inspection-came-back-with-structural-damage",
+      "h5-waiting-on-the-condo-administrator-not-technical"
+    ],
+    "sl14OwnedScenarios": [
+      "h5-blocked-contract-draft-service-timed-out-once",
+      "h5-blocked-same-cadastral-error-after-the-window-was-spent",
+      "h5-blocked-valuation-capability-withdrawn",
+      "h5-blocked-result-already-obtained-elsewhere",
+      "h5-blocked-with-an-equivalent-listed-source",
+      "h5-three-blocked-items-one-capability-gone",
+      "h5-blocked-after-the-advisor-confirmed-the-budget",
+      "h5-blocked-while-contact-is-permitted",
+      "h5-waiting-on-the-condo-administrator-not-technical",
+      "h5-inspection-came-back-with-structural-damage"
+    ],
+    "runsGatingClosure": 3
+  },
+  "runs": [
+    {
+      "run": 1,
+      "failures": 4,
+      "failureRate": 0.4,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": false,
+      "closureGating": true,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h5-blocked-contract-draft-service-timed-out-once",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced — posture: Invalid enum value. Expected 'no_op' | 'wait' | 'gather_research_reconcile' | 'work' | 'targeted_human_input', received 'recovery'"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h5-blocked-same-cadastral-error-after-the-window-was-spent",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [targeted_human_input, gather_research_reconcile, work, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Use another path or human confirmation instead of repeating the already-recurred cadastral-key rejection."
+            }
+          ],
+          "rationale": "w1 exhausted retries on the same service rejection, and the case facts add no new input that would change the next action."
+        },
+        {
+          "id": "h5-blocked-valuation-capability-withdrawn",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La valuación automática depende de un servicio que ya no está contratado; hay que replanificar con comparables en vez de reintentar la misma vía."
+            }
+          ],
+          "rationale": "El mensaje pendiente pide un valor y la vía automatizada ya no está disponible."
+        },
+        {
+          "id": "h5-blocked-result-already-obtained-elsewhere",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the needed result is already in hand via the notary-delivered certificate, so retrying the failed search would duplicate settled work"
+            }
+          ],
+          "rationale": "The current facts show the certificate of freedom from liens was received from the notary, which removes the need for further lien search work."
+        },
+        {
+          "id": "h5-blocked-with-an-equivalent-listed-source",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced — posture: Invalid enum value. Expected 'no_op' | 'wait' | 'gather_research_reconcile' | 'work' | 'targeted_human_input', received 'recovery'"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h5-three-blocked-items-one-capability-gone",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "replan with proposed_work"
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "replan with proposed_work"
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "capability_gap"
+            }
+          ],
+          "rationale": "El propietario ya entregó el reglamento y los trabajos w1, w2 y w3 siguen bloqueados o agotados."
+        },
+        {
+          "id": "h5-blocked-after-the-advisor-confirmed-the-budget",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The budget-match run has already failed three times with the same 503 engine error, so repeating it would loop without new information; no alternative listed capability is necessary right now."
+            }
+          ],
+          "rationale": "The prospect and advisor have already settled the price limit, so the remaining blocked task has no new useful path."
+        },
+        {
+          "id": "h5-blocked-while-contact-is-permitted",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with human verification because the same amenidades_read failure recurred after 3 attempts; retrying would loop."
+            }
+          ],
+          "rationale": "La única acción útil sería obtener o verificar las amenidades, pero esa capacidad ya agotó sus intentos con error técnico recurrente."
+        },
+        {
+          "id": "h5-waiting-on-the-condo-administrator-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The latest evidence says access will be authorized in a few days and the only blocked work is the authorization confirmation."
+        },
+        {
+          "id": "h5-inspection-came-back-with-structural-damage",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "Hay evidencia nueva y concreta de daño estructural; la siguiente decisión útil depende de valorar su impacto comercial."
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "failures": 2,
+      "failureRate": 0.2,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h5-blocked-contract-draft-service-timed-out-once",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The same document-service timeout already recurred across 3 attempts, so another retry would loop without new information; replan or handle it manually instead."
+            }
+          ],
+          "rationale": "The only actionable blocker is the failed draft-generation work, which now needs a human decision or manual handling because the same technical failure recurred."
+        },
+        {
+          "id": "h5-blocked-same-cadastral-error-after-the-window-was-spent",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with a human-provided correct key or alternate identifier; the same cadastral rejection already recurred, so another retry would loop."
+            }
+          ],
+          "rationale": "The only active work exhausted retries with the same service rejection, and the prospect’s concern is still about verifying the registered parcel."
+        },
+        {
+          "id": "h5-blocked-valuation-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El servicio de valuación automática ya no está contratado, así que no hay capacidad para reintentar esta vía; corresponde usar comparables o confirmación humana."
+            }
+          ],
+          "rationale": "La única vía útil hoy es aclarar el precio con evidencia interna disponible y la valuación automatizada no puede repetirse."
+        },
+        {
+          "id": "h5-blocked-result-already-obtained-elsewhere",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the responsibility is already satisfied by the notary-sent certificate, so rerunning the failed search would be redundant"
+            }
+          ],
+          "rationale": "The objective is already advanced by the received lien certificate and the only unfinished work was a failed technical search."
+        },
+        {
+          "id": "h5-blocked-with-an-equivalent-listed-source",
+          "posture": "targeted_human_input",
+          "passed": false,
+          "violations": [
+            "posture targeted_human_input not in [work, gather_research_reconcile]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The transit-time provider has already failed 3 of 3 attempts, so retrying the same work would loop; replan with a human decision or another path instead."
+            }
+          ],
+          "rationale": "The prospect’s priority is commute time, and the transit_time_report work is blocked after repeated technical failure."
+        },
+        {
+          "id": "h5-three-blocked-items-one-capability-gone",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "replan with proposed_work; el procesador de imágenes ya falló 3 veces y no hay evidencia de cambio técnico"
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "replan with proposed_work; el portal del condominio ya falló 3 veces y no hay evidencia de cambio técnico"
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "capability gap; el servicio de dron ya no está disponible para esta cuenta"
+            }
+          ],
+          "rationale": "El propietario ya entregó el reglamento y el caso sigue viable, pero hay trabajos bloqueados por fallo técnico y una captura interna útil sigue disponible."
+        },
+        {
+          "id": "h5-blocked-after-the-advisor-confirmed-the-budget",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La coincidencia de presupuesto ya falló tres veces por 503 y debe dejarse a otro camino en lugar de repetirla."
+            }
+          ],
+          "rationale": "El asesor confirmó que cuatro millones es el límite y existe un presupuesto viable que aún no se ha reconciliado con opciones concretas."
+        },
+        {
+          "id": "h5-blocked-while-contact-is-permitted",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced — posture: Invalid enum value. Expected 'no_op' | 'wait' | 'gather_research_reconcile' | 'work' | 'targeted_human_input', received 'recovery'"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h5-waiting-on-the-condo-administrator-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The advisor reported that administration will authorize access in a few days, and the only blocked work is awaiting that permission."
+        },
+        {
+          "id": "h5-inspection-came-back-with-structural-damage",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "Hay un hallazgo nuevo y relevante de inspección que aún no se ha interpretado frente a la viabilidad de la oportunidad."
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "failures": 2,
+      "failureRate": 0.2,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": true,
+      "closureGating": false,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h5-blocked-contract-draft-service-timed-out-once",
+          "posture": "work",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El servicio de documentos ya recurrió el mismo fallo y agotó sus intentos; conviene cambiar de vía en lugar de reintentar."
+            }
+          ],
+          "rationale": "La evidencia muestra una solicitud concreta pendiente y un fallo técnico repetido en la redacción del contrato."
+        },
+        {
+          "id": "h5-blocked-same-cadastral-error-after-the-window-was-spent",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El mismo rechazo de clave se repitió en el reintento, así que otro intento sería un bucle; la responsabilidad pasa a otra vía o a esperar una corrección externa."
+            }
+          ],
+          "rationale": "El único trabajo pendiente es w1, cuyo reintento ya se agotó con el mismo error técnico; no hay señal nueva para avanzar ahora."
+        },
+        {
+          "id": "h5-blocked-valuation-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La capacidad de valuación automática ya no está disponible; corresponde replanear con comparables o pedir confirmación humana."
+            }
+          ],
+          "rationale": "El único trabajo bloqueado depende de una capacidad no disponible y la consulta del cliente sigue sin responderse."
+        },
+        {
+          "id": "h5-blocked-result-already-obtained-elsewhere",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the needed lien evidence is already in hand from the notary, so this responsibility is satisfied rather than retry-worthy"
+            }
+          ],
+          "rationale": "The latest fact says the certificate of freedom from liens was received from the notary, which resolves the objective constraint the blocked search was meant to address."
+        },
+        {
+          "id": "h5-blocked-with-an-equivalent-listed-source",
+          "posture": "targeted_human_input",
+          "passed": false,
+          "violations": [
+            "posture targeted_human_input not in [work, gather_research_reconcile]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El fallo del proveedor de tiempos de traslado ya recurrió tras 3 intentos; cambiar de estrategia y escalar a un humano es la vía útil ahora."
+            }
+          ],
+          "rationale": "El único trabajo relevante quedó bloqueado por una falla técnica repetida del reporte de tiempos de traslado."
+        },
+        {
+          "id": "h5-three-blocked-items-one-capability-gone",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replanificar o dejar bloqueado; el procesador de imágenes ya falló 3/3 veces con el mismo 500, así que repetirlo sería un bucle sin nueva información."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "Replanificar o dejar bloqueado; el portal del condominio ya no respondió tras 3 intentos, por lo que otro intento con la misma vía no añade nada."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "La capacidad necesaria ya no está disponible para este caso, así que no corresponde reintentar."
+            }
+          ],
+          "rationale": "Los hechos muestran que el reglamento del condominio ya está en mano y que hay trabajos bloqueados con fallas técnicas o capacidad perdida."
+        },
+        {
+          "id": "h5-blocked-after-the-advisor-confirmed-the-budget",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "budget_match_run",
+              "action": "leave",
+              "reason": "This same technical failure already recurred after three attempts, so another try would loop without new information; keep it blocked and do not retry now."
+            }
+          ],
+          "rationale": "The prospect and advisor have already settled the budget constraint, and the budget match run failed technically after three attempts."
+        },
+        {
+          "id": "h5-blocked-while-contact-is-permitted",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La misma lectura de amenidades ya falló tres veces con el mismo catálogo; cambiar de vía a confirmación humana es mejor que repetirlo."
+            }
+          ],
+          "rationale": "El prospecto preguntó qué tiene el fraccionamiento por dentro y la tarea interna correspondiente quedó bloqueada por fallo técnico tras 3 intentos."
+        },
+        {
+          "id": "h5-waiting-on-the-condo-administrator-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La administracion dijo que autoriza el acceso en unos dias y el acceso sigue siendo el bloqueo actual."
+        },
+        {
+          "id": "h5-inspection-came-back-with-structural-damage",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "Hay evidencia nueva material del inmueble, y puedo avanzar internamente reconciliando esa inspección con comparables para calibrar el siguiente paso."
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "failures": 3,
+      "failureRate": 0.3,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": false,
+      "closureGating": true,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h5-blocked-contract-draft-service-timed-out-once",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced — posture: Invalid enum value. Expected 'no_op' | 'wait' | 'gather_research_reconcile' | 'work' | 'targeted_human_input', received 'recovery'"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h5-blocked-same-cadastral-error-after-the-window-was-spent",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La misma falla se repitió tras el reintento; ahora la responsabilidad pasa a un humano para confirmar la clave correcta o replantear la consulta con otro dato."
+            }
+          ],
+          "rationale": "El único trabajo pendiente es w1 y ya agotó sus intentos con el mismo error técnico."
+        },
+        {
+          "id": "h5-blocked-valuation-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La capacidad de valuación automática ya no está disponible; la responsabilidad debe seguir por comparables manuales o confirmación humana."
+            }
+          ],
+          "rationale": "El trabajo w1 quedó sin capacidad disponible y no puedo ejecutar una valuación automática ni contactar al prospecto ahora."
+        },
+        {
+          "id": "h5-blocked-result-already-obtained-elsewhere",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the searched lien certificate has already been received from the notary, so this responsibility is satisfied and should not be retried"
+            }
+          ],
+          "rationale": "The property.lien_certificate is received and the only blocked work was a technical lien search that is no longer needed."
+        },
+        {
+          "id": "h5-blocked-with-an-equivalent-listed-source",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced — posture: Invalid enum value. Expected 'no_op' | 'wait' | 'gather_research_reconcile' | 'work' | 'targeted_human_input', received 'recovery'"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h5-three-blocked-items-one-capability-gone",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with another path because the image processor has already failed 3 times and no new condition has changed."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "Replan with another path because the condominium portal has already failed 3 times and no new condition has changed."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "The needed capability is no longer available for this case, so another retry would hit the same wall."
+            }
+          ],
+          "rationale": "El propietario ya entregó el reglamento y w3 requiere una capacidad no disponible, mientras w1 y w2 fallaron técnicamente sin resolver el expediente."
+        },
+        {
+          "id": "h5-blocked-after-the-advisor-confirmed-the-budget",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "El mismo motor ya falló repetidamente con el mismo 503 y no hay nada diferente ahora; mejor dejarlo bloqueado que seguir en bucle."
+            }
+          ],
+          "rationale": "La pregunta clave sobre el presupuesto ya fue resuelta por el asesor y el único trabajo pendiente falló técnicamente tras 3 intentos."
+        },
+        {
+          "id": "h5-blocked-while-contact-is-permitted",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "The amenities lookup already failed repeatedly with the same technical error, so another attempt would loop; use a different path instead."
+            }
+          ],
+          "rationale": "The only useful next step is to obtain the fraccionamiento amenities that were previously requested and not yet settled."
+        },
+        {
+          "id": "h5-waiting-on-the-condo-administrator-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The last message says administration will authorize access in a few days, and no new information has arrived."
+        },
+        {
+          "id": "h5-inspection-came-back-with-structural-damage",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "Hay un hallazgo material nuevo que requiere interpretar comparables para estimar si la casa sigue siendo viable."
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "failures": 3,
+      "failureRate": 0.3,
+      "fabrications": 0,
+      "reasks": 0,
+      "blindRetries": 0,
+      "strandedFailures": 0,
+      "held": false,
+      "closureGating": true,
+      "attributedToPreSl14": [],
+      "results": [
+        {
+          "id": "h5-blocked-contract-draft-service-timed-out-once",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Replan with wait because the document service failure has already recurred across three attempts, so retrying the same generation would loop without new information."
+            }
+          ],
+          "rationale": "The latest inbound message creates an expected draft outcome, but the draft work has already failed three times for technical reasons and no alternative internal capability can produce a better result now."
+        },
+        {
+          "id": "h5-blocked-same-cadastral-error-after-the-window-was-spent",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "Ya fue reintentado y falló de la misma forma; la responsabilidad pasa a pedir al advisor la clave o documento correcto para seguir por otra vía."
+            }
+          ],
+          "rationale": "El único trabajo abierto es w1, que falló repetidamente con el mismo rechazo de clave."
+        },
+        {
+          "id": "h5-blocked-valuation-capability-withdrawn",
+          "posture": "targeted_human_input",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La capacidad requerida ya no está disponible; conviene replantear con comparables o escalar a un humano."
+            }
+          ],
+          "rationale": "La única vía pendiente fue bloqueada por una capacidad ya no disponible y no hay nuevo dato comercial."
+        },
+        {
+          "id": "h5-blocked-result-already-obtained-elsewhere",
+          "posture": "no_op",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "the needed document is already received, so this responsibility is met and no further lien search is worth doing"
+            }
+          ],
+          "rationale": "The current evidence shows the required freedom-of-lien certificate is already in hand from the notary."
+        },
+        {
+          "id": "h5-blocked-with-an-equivalent-listed-source",
+          "posture": null,
+          "passed": false,
+          "violations": [
+            "no judgment was produced — posture: Invalid enum value. Expected 'no_op' | 'wait' | 'gather_research_reconcile' | 'work' | 'targeted_human_input', received 'recovery'"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": null
+        },
+        {
+          "id": "h5-three-blocked-items-one-capability-gone",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "retry",
+              "reason": "El fallo fue técnico y la capacidad sigue disponible; no hay evidencia de que el procesador de imágenes siga impedido por la misma causa."
+            },
+            {
+              "work": "w2",
+              "action": "leave",
+              "reason": "El reglamento ya fue entregado por el propietario, así que esta responsabilidad quedó satisfecha y no requiere otro intento."
+            },
+            {
+              "work": "w3",
+              "action": "leave",
+              "reason": "Se requiere una capacidad ya no disponible para esta cuenta, por lo que no procede reintentar."
+            }
+          ],
+          "rationale": "El propietario ya entregó el reglamento y los trabajos bloqueados muestran que una pieza ya está resuelta mientras las fotos siguen fallando y el dron no está disponible."
+        },
+        {
+          "id": "h5-blocked-after-the-advisor-confirmed-the-budget",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La coincidencia por presupuesto ya recurrió con el mismo fallo técnico 503 y no hay cambio material; mejor dejarla y buscar otro camino o detenerla."
+            }
+          ],
+          "rationale": "El dato clave ya fue resuelto por el asesor y el único trabajo pendiente falló tres veces por el mismo motor 503."
+        },
+        {
+          "id": "h5-blocked-while-contact-is-permitted",
+          "posture": "no_op",
+          "passed": false,
+          "violations": [
+            "posture no_op not in [work, gather_research_reconcile, wait, targeted_human_input]"
+          ],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": [
+            {
+              "work": "w1",
+              "action": "leave",
+              "reason": "La misma lectura ya falló repetidamente con 502; conviene dejarlo bloqueado y esperar otra vía o una nueva fuente, no repetir el mismo intento."
+            }
+          ],
+          "rationale": "El intento de obtener el catálogo de amenidades agotó sus 3 intentos y no hay otro trabajo útil disponible con las capacidades dadas."
+        },
+        {
+          "id": "h5-waiting-on-the-condo-administrator-not-technical",
+          "posture": "wait",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "The only current blocker is the administration’s promised access in a few days, and the existing work item is already blocked on that human action."
+        },
+        {
+          "id": "h5-inspection-came-back-with-structural-damage",
+          "posture": "gather_research_reconcile",
+          "passed": true,
+          "violations": [],
+          "fabrication": [],
+          "reask": [],
+          "blindRetry": [],
+          "stranded": [],
+          "recovery": null,
+          "rationale": "La única nueva evidencia es un daño estructural confirmado y no hay más mensajes del prospecto."
+        }
+      ]
+    }
+  ]
+}
