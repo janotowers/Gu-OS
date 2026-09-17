@@ -1,6 +1,6 @@
 # R1 Relationship Operations — Traditional Gu Legacy Source Audit
 
-> **Version:** v0.4  
+> **Version:** v0.5 — §24.3 gains the exact per-path store ordering (verified 2026-09-17), which [ADR-112](../../../adr/ADR-112-cross-repo-integration-events.md) §7 depends on  
 > **Status:** Complete for R1 architecture/Technical-Plan entry — v0.2 full audit (2026-08-28) plus targeted drift revalidation (2026-08-31); source-verified legacy contracts and risks; exact adapter/API/schema mechanics remain Technical Design  
 > **Roadmap Increment:** R1 — Relationship Operations v1  
 > **Audit date:** 2026-08-28 (original full audit)  
@@ -1049,6 +1049,19 @@ Method:
 Four mechanics matter for the contracts:
 
 **Persistence is not atomic, and the code does not try to make it so.** No writer in either language opens a transaction, session or batch for appointment data; every dual-store write is sequential best-effort. The creation path performs Calendar, then Firestore, then Mongo, and checks the two failure flags **after both writes** — so a Firestore failure still leaves the Mongo insert committed and the Calendar event created. The reschedule path is more asymmetric still: its Firestore update sits inside a swallowed `try/except` and a missing Firestore document is a logged warning, not an error, while Mongo is always attempted. This confirms §11.2 and §11.3 and sharpens them: **Firestore is genuinely optional on the update paths, not merely occasionally unlucky.**
+
+**The exact store ordering per path — verified 2026-09-17 against `src/guv3/gu/agents/prospect/appointment_assistant/nodes/tools.py` @ `gcp/main`, because the C1 event contract turns out to depend on it.** Whether Mongo is written *last* decides whether the secondary outcomes are already known when the canonical mutation commits:
+
+| Path | Ordering | Mongo last? |
+|---|---|---|
+| `appointment_generator` (creation) | Calendar → Firestore → Mongo | **yes** |
+| `cancel_appointment` | Firestore appointment delete → Firestore `propertiesShown` delete → Calendar delete → Mongo tombstone | **yes** |
+| `update_appointment` (prospect reschedule) | Firestore → **Mongo** → Calendar → **Mongo again** | **no** |
+| The nine Mongo-only writers | Mongo alone | trivially |
+
+So **thirteen of the fourteen writers put the canonical Mongo write last or write nothing else**, and exactly one — the prospect-side reschedule — commits Mongo while its Calendar outcome is still unknown. That path then issues a *second* `update_one` on the appointment after the Calendar call, to set `rescheduled`, `owner_notified` and the status resets. **The logical reschedule is therefore not one Mongo write but two, with a Calendar effect between them**, which is why [ADR-112](../../../adr/ADR-112-cross-repo-integration-events.md) §7 cannot treat "the canonical mutation committed" as "the event is complete", and why that second write is where it lands finalization.
+
+**A related latent defect on that same path, recorded as observation rather than repaired here.** `update_appointment` refreshes `args["google_event_id"]` from the Calendar response *after* both Mongo updates have been composed, and neither update writes that field. If the Calendar API ever returned a different event id on update, nothing would persist it and Mongo would silently keep the stale one. Today the call patches the existing event in place and normally returns the same id, so this is a latent rather than active fault — but it is the same orphan-Calendar family as §11.4 and belongs to Traditional Gu, not to a Gu OS contract.
 
 **Cancellation makes the two stores describe different sets of appointments.** The Firestore document is deleted; Mongo retains a tombstone. Any read contract must therefore treat presence/absence per store as information, not as an error to be smoothed over.
 
