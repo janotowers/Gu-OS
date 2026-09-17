@@ -43,6 +43,17 @@ The **READY Horizon** is the amount of genuinely READY work maintained ahead of 
 
 **C1, C2 and C6 are owned by the Traditional Gu team, not by this one**, so advancing them is a human action and not readiness work an agent can perform. That is the boundary, and it is the same one SL-12's closure reached. **What the loop produced instead of a READY Slice is the request itself**, stated precisely enough to be acted on: [`cross-repo-contract-requests.md`](cross-repo-contract-requests.md) derives the concrete per-contract ask from the Technical Plan, TD-5, TD-3, TD-13 and the legacy-source audit, records what this team does when each contract lands, and names the one decision that blocks two of the three — **TD-13 `LegacyServiceAuth` is fully specified and still TENTATIVE, and both C1 and C2 authenticate through it.** That document owns no truth and ratifies nothing. **Two governed questions are also outstanding and neither blocks a Slice today:** §8 Q11, which must be dispositioned before R1 graduation, and §8 Q6.
 
+**Graduation evidence evaluated 2026-09-16, and R1 does not graduate — for reasons that have nothing to do with either open question** (Methodology §17.2, §12.3 case G). The roadmap's declared outcome for R1 is that *in a pilot brokerage, Gu can keep opportunities alive across sessions/events and multiple advisor assignments, choose/execute allowed next work, route/escalate to the correct human, and link progression to visit request/attended-visit evidence without manual pipeline operation* ([`gu-os-evolution-roadmap.md`](../../../roadmap/gu-os-evolution-roadmap.md) §4). Against that, **a Slice backlog is not empty here and emptiness would not be graduation anyway**:
+
+- **choosing** next work situationally is delivered and evidenced — SL-4, the Cycle 3 repair, SL-14 — and so is **routing and escalating to the correct human**, through SL-7 and SL-12's Portfolio;
+- **executing** allowed next work reaches nothing outside Gu OS: every stage to date is **shadow**, and the first prospect-facing effect is SL-9;
+- **event-driven** liveness is still the interim polling adapter, because SL-5 needs C1;
+- **multi-advisor authority** is unresolved in the running system, because SL-6 needs C2 advisory;
+- **visit-progression evidence** — the outcome the roadmap names first among equals — is SL-8, behind SL-5's C1;
+- *without manual pipeline operation* is therefore not reached, and is not close.
+
+**Eight Slices of declared outcome are unbuilt, and each is blocked on C1, C2 or C6.** The missing evidence is not additional verification of what exists; it is those Slices. **So §8 Q11 stays an input to graduation and is not dispositioned now**, which is the question this evaluation was run to answer: it is a real finding that must be settled before R1 graduates, and nothing about it is on the critical path to anything currently possible. **The increment-level blocker and the horizon-level blocker are the same one**, which is why this evaluation changes no plan and adds no work — it establishes that the boundary is genuine rather than a gap in this team's sequencing.
+
 *The v1.36 state, preserved as it was recorded:*
 
 - **How SL-14 entered.** It entered the horizon by a route other than replenishment. The Accountable's disposition of SL-4's carry-forward finding (option 2, 2026-09-15) created it inside already-approved R1 intent, and it was elaborated to READY the same day (§4, §9). It was **Planned into Cycle 3 as order 6** the same day (§5); a Planned Slice stays in the horizon until it is Done.
