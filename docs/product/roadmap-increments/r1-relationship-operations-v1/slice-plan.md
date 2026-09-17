@@ -41,7 +41,7 @@ The **READY Horizon** is the amount of genuinely READY work maintained ahead of 
 - SL-5 waits on C1, SL-6 on C2 advisory, SL-9 on the C6 hard gate;
 - SL-8 and SL-8b wait behind SL-5's C1, and SL-13 behind SL-9.
 
-**C1, C2 and C6 are owned by the Traditional Gu team, not by this one**, so advancing them is a human action and not readiness work an agent can perform. That is the boundary, and it is the same one SL-12's closure reached. **Two governed questions are also outstanding and neither blocks a Slice today:** §8 Q11, which must be dispositioned before R1 graduation, and §8 Q6.
+**C1, C2 and C6 are owned by the Traditional Gu team, not by this one**, so advancing them is a human action and not readiness work an agent can perform. That is the boundary, and it is the same one SL-12's closure reached. **What the loop produced instead of a READY Slice is the request itself**, stated precisely enough to be acted on: [`cross-repo-contract-requests.md`](cross-repo-contract-requests.md) derives the concrete per-contract ask from the Technical Plan, TD-5, TD-3, TD-13 and the legacy-source audit, records what this team does when each contract lands, and names the one decision that blocks two of the three — **TD-13 `LegacyServiceAuth` is fully specified and still TENTATIVE, and both C1 and C2 authenticate through it.** That document owns no truth and ratifies nothing. **Two governed questions are also outstanding and neither blocks a Slice today:** §8 Q11, which must be dispositioned before R1 graduation, and §8 Q6.
 
 *The v1.36 state, preserved as it was recorded:*
 

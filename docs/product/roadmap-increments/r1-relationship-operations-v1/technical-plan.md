@@ -235,6 +235,8 @@ NL conversational authoring is a later slice; R1 starts with the seeded Recommen
 
 All C-contracts authenticate per **TD-13** (per-service, per-purpose signed requests), not shared static bearers.
 
+**The ask derived from this table, addressed to the other team, is [`cross-repo-contract-requests.md`](cross-repo-contract-requests.md)** — created 2026-09-16 when SL-14's closure left the READY Horizon empty and every remaining Slice waiting on C1, C2 or C6. It covers those three only, **owns no truth and ratifies nothing**: each requirement names the row or TD above that owns it, and where the two disagree this table wins. It also records the decision that blocks two of the three — **TD-13 is fully specified and still TENTATIVE**, and C1 and C2 both authenticate through it, so asking for either against an unratified scheme asks for it to be built twice.
+
 **C5, and what it is not (v1.6).** C5 previously read "Alebrixe entries in legacy whitelists; staging/test numbers — SL-2+", which conflated two concerns with different timing and over-stated when either binds. Targeted revalidation against current legacy source (provenance in Appendix C) separates them:
 
 - **Pilot processing/routing enablement — the C5 row above.** Current legacy source permits the pilot's Gu to keep processing when the owner is admitted by the WBA compatibility path **or** when the Gu number is itself a WhatsApp Business origin; the required *operational condition* is that the pilot is in a correct processing state, and this plan deliberately does **not** prescribe which of those paths delivers it. The same mechanism is what must later suppress legacy replies when Gu OS takes authority, so the consuming Slice re-verifies the concrete gate rather than inheriting this sentence.
