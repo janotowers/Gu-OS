@@ -1187,7 +1187,7 @@ Hoy no existe una Ingestion Layer **general** dentro de Gu OS — eso sigue sien
 - Binding manual de `organization_id`.
 - **`source_events` (era forward):** un inbox de eventos de origen con `dedup_key` unico por Organizacion, y claim con fencing y expiracion (`pending` / `processing` / `completed` / `failed`). Es admision acotada a Relationship Operations, con `organization_policies` como politica de admision **versionada**, no un conector generico.
 - **Legacy gateway (R1 SL-1):** lecturas **acotadas por capacidad** contra Traditional Gu, con allowlist de colecciones en codigo, chequeo de binding por Organizacion en cada lectura y provenance. No es ingesta masiva: no hay capacidad que devuelva un documento crudo ni que acepte un nombre de coleccion, y ninguna llega a una escritura.
-- **LegacyServiceAuth inbound (R1 SL-6):** `POST /api/legacy/authority` autentica por HMAC-SHA256 (ADR-111), purpose `authority-read`. La Organizacion sale de la clave. El body se hashea en crudo. La respuesta es advisory y no escribe `runtime_authority`. `/api/legacy/events` no existe todavia.
+- **LegacyServiceAuth inbound (R1 SL-6):** `POST /api/legacy/authority` autentica por HMAC-SHA256 (ADR-111), purpose `authority-read`. La Organizacion sale de la clave. El body se hashea en crudo. La respuesta es advisory y no escribe `runtime_authority`. `/api/legacy/events` no existe todavia. El oraculo de equivalencia observa la ventana de reanudacion legacy; no es politica de Gu OS.
 
 Ambas piezas son **acotadas por diseno** y no reemplazan el `SourceConnector` generico descrito abajo.
 
