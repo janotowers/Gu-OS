@@ -30,8 +30,11 @@
  *   SA-15.6  incompatible / cross-Organization bindings fail closed;
  *   SA-15.8  only the admitted path creates a Contact; deferred / rejected /
  *            inert paths do not;
+ *   SA-15.5  a new identity carries the required evidence basis; reserved
+ *            provenance cannot be overridden; reuse does not rewrite it;
  *   SA-15.9  historical backfill uses the same primitive, then the governed
- *            conversation-binding helper.
+ *            conversation-binding helper, only after proving governed
+ *            admission and only with the opaque lead id as the GU-thread ref.
  *
  * Plus the shared-baseline correlation-coverage check (Technical Plan §7 (a)),
  * which applies from SL-2 onward.
@@ -75,6 +78,7 @@ import {
   type AdmissionProposal,
 } from "@agents/types";
 import { LegacyReadRefusal } from "../legacy-gateway/errors";
+import { resolveInteractionAuthority } from "../relationship-authority/resolve";
 import { runAdmission, applyPolicyToProposal } from "./admit";
 import { deriveDedupKey, latestInboundMessage } from "./ingest";
 import { createFakeDb, type FakeDb } from "../relationship-testing/fake-db";
@@ -1828,6 +1832,12 @@ async function testCrossOrganizationBindingFailsClosed(): Promise<void> {
       resolveOrCreateContactForLegacyLead(db.client, {
         organizationId: PILOT_ORG,
         legacyLeadId: PILOT_LEAD,
+        provenance: {
+          basis: "admission",
+          source_event_id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          case_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          provisional_materialization: true,
+        },
       }),
     (error: unknown) =>
       error instanceof LegacyLeadContactError &&
@@ -1852,20 +1862,23 @@ async function testHistoricalBackfillUsesSamePrimitive(): Promise<void> {
   const first = await backfillAdmittedLegacyLeadIdentity(db.client, {
     organizationId: PILOT_ORG,
     caseId,
-    externalConversationRef: "wamid.HBg-pilot-opaque",
   });
   assert.equal(first.contactId, contactId, "SA-15.9: backfill reuses the primitive");
   assert.equal(first.conversationBinding.contact_id, contactId);
+  assert.equal(first.conversationBinding.provider, "whatsapp_business");
+  assert.equal(first.conversationBinding.thread_kind, "gu");
   assert.equal(
     first.conversationBinding.external_conversation_ref,
-    "wamid.HBg-pilot-opaque"
+    PILOT_LEAD,
+    "SL-15 historical repair stores the opaque lead id the C2 resolver looks up"
   );
   assert.equal((db.tables.external_conversation_bindings ?? []).length, 1);
+  const stored = legacyLeadBindings(db)[0].provenance_jsonb as Record<string, unknown>;
+  assert.equal(stored.basis, "admission", "SA-15.5: reuse does not rewrite provenance");
 
   const again = await backfillAdmittedLegacyLeadIdentity(db.client, {
     organizationId: PILOT_ORG,
     caseId,
-    externalConversationRef: "wamid.HBg-pilot-opaque",
   });
   assert.equal(again.conversationBinding.id, first.conversationBinding.id);
   assert.equal((db.tables.contacts ?? []).length, 1);
@@ -1883,7 +1896,6 @@ async function testBackfillAmbiguousCaseMappingFailsClosed(): Promise<void> {
       backfillAdmittedLegacyLeadIdentity(db.client, {
         organizationId: PILOT_ORG,
         caseId,
-        externalConversationRef: "wamid.HBg-ambiguous",
       }),
     (error: unknown) =>
       error instanceof LegacyLeadContactError &&
@@ -1894,6 +1906,85 @@ async function testBackfillAmbiguousCaseMappingFailsClosed(): Promise<void> {
     0,
     "SA-15.9: ambiguous Case mapping writes no conversation binding"
   );
+}
+
+async function testManualLeadOpportunityCannotMintIdentity(): Promise<void> {
+  const db = harness();
+  db.tables.operational_cases.push({
+    id: "manual-lead-opportunity",
+    organization_id: PILOT_ORG,
+    case_type: "lead_opportunity",
+    context_jsonb: { legacy_lead_id: PILOT_LEAD },
+  });
+
+  await assert.rejects(
+    () =>
+      backfillAdmittedLegacyLeadIdentity(db.client, {
+        organizationId: PILOT_ORG,
+        caseId: "manual-lead-opportunity",
+      }),
+    (error: unknown) =>
+      error instanceof LegacyLeadContactError &&
+      error.code === "not_governed_admission"
+  );
+  assertNoPilotContact(db, "constructed Case + legacy_lead_id is not Q18 admission");
+  assert.equal(
+    (db.tables.external_conversation_bindings ?? []).length,
+    0,
+    "constructed Case writes no conversation binding"
+  );
+}
+
+async function testBackfillLeadRefResolvesSameCase(): Promise<void> {
+  const db = harness();
+  const admitted = await runAdmission(request(db));
+  assert.equal(admitted.status, "evaluated");
+  if (admitted.status !== "evaluated") return;
+  const caseId = admitted.outcome.case_id as string;
+
+  await backfillAdmittedLegacyLeadIdentity(db.client, {
+    organizationId: PILOT_ORG,
+    caseId,
+  });
+
+  const resolved = await resolveInteractionAuthority({
+    ctx: { db: db.client, organizationId: PILOT_ORG, actorUserId: ADVISOR },
+    refs: { legacyLeadId: PILOT_LEAD },
+    readCurrent: async () => ({
+      value: {
+        legacyLeadId: PILOT_LEAD,
+        leadTakeoverActive: false,
+        lastOwnerInteractionAt: "2026-09-17T18:00:00.000Z",
+        numberKillSwitchActive: false,
+        guNumberRef: "5215500000003",
+      },
+      provenance: {
+        sourceSystem: "traditional_gu",
+        store: "mongo",
+        sourcePath: "gu2.users",
+        externalId: PILOT_LEAD,
+        capability: "legacy_conversation_authority_get",
+        adapter: "bootstrap_direct",
+        organizationId: PILOT_ORG,
+        bindingState: "unbound",
+        freshness: {
+          readAt: "2026-09-18T00:00:00.000Z",
+          sourceUpdatedAt: "2026-09-17T18:00:00.000Z",
+          ageSeconds: 21600,
+          sourceUpdatedAtField: "last_owner_interaction_wba",
+        },
+      },
+      observedOwnerRef: OWNER_UID,
+    }),
+  });
+
+  assert.equal(
+    resolved.caseId,
+    caseId,
+    "C2 Lead-ref reverse map must resolve the backfilled Case without a supplied caseId"
+  );
+  assert.equal(resolved.externalConversationRef, PILOT_LEAD);
+  assert.equal(resolved.conversationAuthority, "gu");
 }
 
 function testAdmissionDoesNotParseLegacyLeadId(): void {
@@ -2233,7 +2324,9 @@ const tests: Array<[string, () => void | Promise<void>]> = [
   ["SA-15.6 an incompatible binding fails closed", testIncompatibleBindingFailsClosed],
   ["SA-15.6 a cross-Organization binding fails closed", testCrossOrganizationBindingFailsClosed],
   ["SA-15.8 / SA-15.9 historical backfill uses the same primitive", testHistoricalBackfillUsesSamePrimitive],
+  ["SA-15.9 a constructed lead_opportunity cannot mint identity", testManualLeadOpportunityCannotMintIdentity],
   ["SA-15.9 ambiguous Case mapping fails closed", testBackfillAmbiguousCaseMappingFailsClosed],
+  ["SA-15.9 backfill Lead-ref maps to the same Case for C2", testBackfillLeadRefResolvesSameCase],
   ["the proposal carries no decision field", testProposalCarriesNoDecision],
   ["an unknown category normalizes to other", testUnknownCategoryNormalizes],
   ["policy application is pure and testable", testPurePolicyApplication],

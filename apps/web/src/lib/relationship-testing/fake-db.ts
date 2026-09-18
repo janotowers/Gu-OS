@@ -19,7 +19,10 @@
  * Test-only. Not exported from any module index.
  */
 import { randomUUID } from "node:crypto";
-import type { DbClient } from "@agents/db";
+import {
+  requireCreateIdentityProvenance,
+  type DbClient,
+} from "@agents/db";
 
 type Row = Record<string, unknown>;
 
@@ -264,11 +267,14 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
     if (matches.length > 1) raiseIdentity("ambiguous_binding");
     if (matches.length === 1) return compatibleContactId(matches[0], organizationId);
 
+    let callerProvenance: Record<string, unknown>;
+    try {
+      callerProvenance = requireCreateIdentityProvenance(args.p_provenance);
+    } catch {
+      raiseIdentity("missing_provenance");
+    }
+
     const now = new Date().toISOString();
-    const callerProvenance =
-      args.p_provenance && typeof args.p_provenance === "object"
-        ? (args.p_provenance as Record<string, unknown>)
-        : {};
     const contact: Row = {
       id: randomUUID(),
       organization_id: organizationId,

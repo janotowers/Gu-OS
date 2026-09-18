@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import type { DbClient } from "../client";
 import {
   attachExternalConversationBinding,
+  ConversationBindingConflictError,
   endConversationBinding,
   findActiveConversationBinding,
   listActiveGuConversationBindingsByRef,
@@ -88,6 +89,8 @@ function fakeDb(tables: Record<string, Row[]>): { db: DbClient } {
 const ORG = "11111111-1111-1111-1111-111111111111";
 const CASE = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
 const CONTACT = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+const OTHER_CONTACT = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+const CHANNEL = "ffffffff-ffff-ffff-ffff-ffffffffffff";
 
 function attachArgs(
   overrides: Partial<Parameters<typeof attachExternalConversationBinding>[1]> = {}
@@ -200,6 +203,152 @@ async function testIdempotentAttachAndList(): Promise<void> {
   assert.equal(afterEnd, null);
 
   console.log("  ok  attach is idempotent; end frees the active triple");
+}
+
+function raceAttachDb(winner: Row): { db: DbClient } {
+  let lookups = 0;
+  function builder() {
+    const self: Record<string, unknown> = {
+      select: () => self,
+      eq: () => self,
+      maybeSingle: async () => {
+        lookups += 1;
+        return lookups === 1
+          ? { data: null, error: null }
+          : { data: winner, error: null };
+      },
+      insert: () => self,
+      single: async () => ({
+        data: null,
+        error: { code: "23505", message: "duplicate key value" },
+      }),
+    };
+    return self;
+  }
+  return { db: { from: () => builder() } as unknown as DbClient };
+}
+
+async function testSemanticMismatchFailsClosed(): Promise<void> {
+  {
+    const { db } = fakeDb({ external_conversation_bindings: [] });
+    const first = await attachExternalConversationBinding(db, attachArgs());
+    const reused = await attachExternalConversationBinding(db, attachArgs());
+    assert.equal(reused.id, first.id, "same Contact + same gu thread reuses");
+  }
+
+  {
+    const { db } = fakeDb({
+      external_conversation_bindings: [
+        {
+          id: "bind-other-contact",
+          organization_id: ORG,
+          case_id: CASE,
+          contact_id: OTHER_CONTACT,
+          provider: "whatsapp_business",
+          external_conversation_ref: "lead-opaque-1",
+          thread_kind: "gu",
+          status: "active",
+          gu_channel_identity_binding_id: null,
+        },
+      ],
+    });
+    await assert.rejects(
+      () => attachExternalConversationBinding(db, attachArgs()),
+      (error: unknown) =>
+        error instanceof ConversationBindingConflictError &&
+        error.reason === "contact_mismatch"
+    );
+  }
+
+  {
+    const { db } = fakeDb({
+      external_conversation_bindings: [
+        {
+          id: "bind-wa",
+          organization_id: ORG,
+          case_id: CASE,
+          contact_id: CONTACT,
+          provider: "whatsapp_business",
+          external_conversation_ref: "lead-opaque-1",
+          thread_kind: "advisor_wa",
+          status: "active",
+          gu_channel_identity_binding_id: null,
+        },
+      ],
+    });
+    await assert.rejects(
+      () => attachExternalConversationBinding(db, attachArgs({ threadKind: "gu" })),
+      (error: unknown) =>
+        error instanceof ConversationBindingConflictError &&
+        error.reason === "thread_kind_mismatch"
+    );
+  }
+
+  {
+    const { db } = fakeDb({
+      external_conversation_bindings: [
+        {
+          id: "bind-channel",
+          organization_id: ORG,
+          case_id: CASE,
+          contact_id: CONTACT,
+          provider: "whatsapp_business",
+          external_conversation_ref: "lead-opaque-1",
+          thread_kind: "gu",
+          status: "active",
+          gu_channel_identity_binding_id: CHANNEL,
+        },
+      ],
+    });
+    await assert.rejects(
+      () => attachExternalConversationBinding(db, attachArgs()),
+      (error: unknown) =>
+        error instanceof ConversationBindingConflictError &&
+        error.reason === "channel_identity_mismatch"
+    );
+  }
+
+  {
+    const { db } = raceAttachDb({
+      id: "race-contact",
+      organization_id: ORG,
+      case_id: CASE,
+      contact_id: OTHER_CONTACT,
+      provider: "whatsapp_business",
+      external_conversation_ref: "lead-opaque-1",
+      thread_kind: "gu",
+      status: "active",
+      gu_channel_identity_binding_id: null,
+    });
+    await assert.rejects(
+      () => attachExternalConversationBinding(db, attachArgs()),
+      (error: unknown) =>
+        error instanceof ConversationBindingConflictError &&
+        error.reason === "contact_mismatch"
+    );
+  }
+
+  {
+    const { db } = raceAttachDb({
+      id: "race-wa",
+      organization_id: ORG,
+      case_id: CASE,
+      contact_id: CONTACT,
+      provider: "whatsapp_business",
+      external_conversation_ref: "lead-opaque-1",
+      thread_kind: "advisor_wa",
+      status: "active",
+      gu_channel_identity_binding_id: null,
+    });
+    await assert.rejects(
+      () => attachExternalConversationBinding(db, attachArgs({ threadKind: "gu" })),
+      (error: unknown) =>
+        error instanceof ConversationBindingConflictError &&
+        error.reason === "thread_kind_mismatch"
+    );
+  }
+
+  console.log("  ok  semantic mismatch and incompatible race winners fail closed");
 }
 
 async function testReverseMapIgnoresAdvisorWa(): Promise<void> {
@@ -374,6 +523,7 @@ async function main(): Promise<void> {
   console.log("external conversation bindings selftest");
   await testOpaqueRefAndAdvisorWaRefusal();
   await testIdempotentAttachAndList();
+  await testSemanticMismatchFailsClosed();
   await testReverseMapIgnoresAdvisorWa();
   await testUpdateAuthorityOnGuThread();
   await testMigrationSourceMatchesContract();

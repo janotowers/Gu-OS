@@ -2719,10 +2719,21 @@ async function main(): Promise<void> {
     // ---------------------------------------------------------------
     console.log("\nSL-15 resolve_or_create_contact_for_legacy_lead — SA-15.6 / SA-15.7 / SA-15.11");
 
+    const requiredProvenance = (
+      organizationId: string,
+      extras: Record<string, unknown> = {}
+    ) => ({
+      basis: "admission",
+      source_event_id: randomUUID(),
+      case_id: organizationId === f.orgB ? f.orgCaseB : f.orgCaseA,
+      provisional_materialization: true,
+      ...extras,
+    });
+
     const resolveLead = async (
       organizationId: string,
       leadId: string,
-      provenance: Record<string, unknown> = {}
+      provenance: Record<string, unknown> = requiredProvenance(organizationId)
     ) =>
       (
         await client.query<{ resolve_or_create_contact_for_legacy_lead: string }>(
@@ -2756,8 +2767,16 @@ async function main(): Promise<void> {
     });
 
     await t("service_role creates one Contact + typed binding atomically and reuses it", async () => {
-      const first = await resolveLead(f.orgA, "lead-reuse", { basis: "admission" });
-      const second = await resolveLead(f.orgA, "lead-reuse", { basis: "retry" });
+      const first = await resolveLead(
+        f.orgA,
+        "lead-reuse",
+        requiredProvenance(f.orgA, { basis: "admission" })
+      );
+      const second = await resolveLead(
+        f.orgA,
+        "lead-reuse",
+        requiredProvenance(f.orgA, { basis: "historical_backfill" })
+      );
       assert.equal(second, first);
 
       const { rows } = await client.query<{
@@ -2841,21 +2860,91 @@ async function main(): Promise<void> {
       assert.equal(after, before, "no second Contact is minted");
     });
 
+    await t("a new identity without SA-15.5 provenance fails closed", async () => {
+      const empty = await errorCode(() =>
+        client.query(
+          "select public.resolve_or_create_contact_for_legacy_lead($1, $2)",
+          [f.orgA, "lead-empty-provenance"]
+        )
+      );
+      assert.equal(empty, RAISE_EXCEPTION);
+      const array = await errorCode(() =>
+        resolveLead(f.orgA, "lead-array-provenance", [1, 2] as unknown as Record<string, unknown>)
+      );
+      assert.equal(array, RAISE_EXCEPTION);
+      const partial = await errorCode(() =>
+        resolveLead(f.orgA, "lead-partial-provenance", { basis: "admission" })
+      );
+      assert.equal(partial, RAISE_EXCEPTION);
+      const { rows } = await client.query<{ n: string }>(
+        `select count(*)::text as n from public.external_identity_bindings
+          where binding_kind = 'legacy_lead'
+            and external_id in ('lead-empty-provenance', 'lead-array-provenance', 'lead-partial-provenance')`
+      );
+      assert.equal(rows[0].n, "0", "no identity is minted without the evidence basis");
+    });
+
+    await t("reserved provenance fields cannot be overridden on create", async () => {
+      await resolveLead(
+        f.orgA,
+        "lead-reserved",
+        requiredProvenance(f.orgA, {
+          source: "attacker",
+          source_system: "forged",
+          binding_kind: "forged",
+          opaque_legacy_lead_ref: "forged-lead",
+          organization_id: f.orgB,
+          extra: "kept",
+        })
+      );
+      const { rows } = await client.query<{
+        source: string | null;
+        source_system: string | null;
+        binding_kind: string | null;
+        opaque: string | null;
+        organization_id: string | null;
+        extra: string | null;
+        basis: string | null;
+        provisional: string | null;
+      }>(
+        `select
+           provenance_jsonb ->> 'source' as source,
+           provenance_jsonb ->> 'source_system' as source_system,
+           provenance_jsonb ->> 'binding_kind' as binding_kind,
+           provenance_jsonb ->> 'opaque_legacy_lead_ref' as opaque,
+           provenance_jsonb ->> 'organization_id' as organization_id,
+           provenance_jsonb ->> 'extra' as extra,
+           provenance_jsonb ->> 'basis' as basis,
+           provenance_jsonb ->> 'provisional_materialization' as provisional
+         from public.external_identity_bindings
+         where binding_kind = 'legacy_lead' and external_id = 'lead-reserved'`
+      );
+      assert.equal(rows[0].source, "resolve_or_create_contact_for_legacy_lead");
+      assert.equal(rows[0].source_system, "traditional_gu");
+      assert.equal(rows[0].binding_kind, "legacy_lead");
+      assert.equal(rows[0].opaque, "lead-reserved");
+      assert.equal(rows[0].organization_id, f.orgA);
+      assert.equal(rows[0].extra, "kept");
+      assert.equal(rows[0].basis, "admission");
+      assert.equal(rows[0].provisional, "true");
+    });
+
     await t("concurrent resolve-or-create runs converge on one Contact", async () => {
       const other = new Client({ connectionString: url });
       await other.connect();
+      const raceProvenance = JSON.stringify(requiredProvenance(f.orgA));
       try {
         await client.query("begin");
         const winner = (
           await client.query<{ resolve_or_create_contact_for_legacy_lead: string }>(
-            "select public.resolve_or_create_contact_for_legacy_lead($1, $2)",
-            [f.orgA, "lead-race"]
+            "select public.resolve_or_create_contact_for_legacy_lead($1, $2, $3::jsonb)",
+            [f.orgA, "lead-race", raceProvenance]
           )
         ).rows[0].resolve_or_create_contact_for_legacy_lead;
 
         const contender = other.query<{ resolve_or_create_contact_for_legacy_lead: string }>(
-          "select public.resolve_or_create_contact_for_legacy_lead($1, $2)",
-          [f.orgA, "lead-race"]
+          "select public.resolve_or_create_contact_for_legacy_lead($1, $2, $3::jsonb)",
+          [f.orgA, "lead-race", raceProvenance]
         );
         await new Promise((r) => setTimeout(r, 250));
         await client.query("commit");

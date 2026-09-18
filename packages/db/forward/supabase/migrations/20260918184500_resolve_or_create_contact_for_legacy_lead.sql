@@ -49,6 +49,7 @@ declare
   v_binding_ref    uuid;
   v_contact_org    uuid;
   v_match_count    integer;
+  v_caller         jsonb;
   v_provenance     jsonb;
 begin
   if p_organization_id is null then
@@ -122,14 +123,46 @@ begin
     return v_binding_ref;
   end if;
 
+  -- SA-15.5: a NEW provisional identity cannot be created without the
+  -- evidence basis. Reserved fields are derived here and cannot be
+  -- overridden by caller content. Reuse above does not rewrite provenance.
+  if p_provenance is null
+     or jsonb_typeof(p_provenance) is distinct from 'object' then
+    raise exception
+      'resolve_or_create_contact_for_legacy_lead: missing_provenance'
+      using errcode = 'P0001';
+  end if;
+
+  v_caller := p_provenance
+    - 'source'
+    - 'source_system'
+    - 'binding_kind'
+    - 'opaque_legacy_lead_ref'
+    - 'organization_id';
+
+  if coalesce(v_caller->>'basis', '') not in ('admission', 'historical_backfill')
+     or jsonb_typeof(v_caller->'source_event_id') is distinct from 'string'
+     or btrim(v_caller->>'source_event_id') = ''
+     or jsonb_typeof(v_caller->'case_id') is distinct from 'string'
+     or btrim(v_caller->>'case_id') = ''
+     or (v_caller->'provisional_materialization') is distinct from 'true'::jsonb
+  then
+    raise exception
+      'resolve_or_create_contact_for_legacy_lead: missing_provenance'
+      using errcode = 'P0001';
+  end if;
+
   v_provenance := jsonb_strip_nulls(
-    coalesce(p_provenance, '{}'::jsonb)
+    v_caller
     || jsonb_build_object(
       'source', 'resolve_or_create_contact_for_legacy_lead',
       'source_system', 'traditional_gu',
       'binding_kind', 'legacy_lead',
       'opaque_legacy_lead_ref', v_legacy_lead_id,
-      'organization_id', p_organization_id
+      'organization_id', p_organization_id,
+      'source_event_id', btrim(v_caller->>'source_event_id'),
+      'case_id', btrim(v_caller->>'case_id'),
+      'provisional_materialization', true
     )
   );
 
@@ -212,7 +245,7 @@ end;
 $$;
 
 comment on function public.resolve_or_create_contact_for_legacy_lead(uuid, text, jsonb) is
-  'Idempotent resolve-or-create of one provisional Contact for one opaque Traditional Gu legacy_lead id inside one Organization. The lead id is compared whole and never parsed. Concurrent and retried calls converge on the existing typed binding; incompatible, ambiguous or cross-Organization bindings fail closed. Contact + binding are one transaction so a crash cannot leave an orphan Contact. SECURITY INVOKER; EXECUTE restricted to service_role.';
+  'Idempotent resolve-or-create of one provisional Contact for one opaque Traditional Gu legacy_lead id inside one Organization. The lead id is compared whole and never parsed. Concurrent and retried calls converge on the existing typed binding; incompatible, ambiguous or cross-Organization bindings fail closed. A new identity requires SA-15.5 provenance (object; admission or historical_backfill basis; source_event_id; case_id; provisional_materialization). Reserved provenance fields are derived and cannot be overridden; reuse does not rewrite provenance. Contact + binding are one transaction so a crash cannot leave an orphan Contact. SECURITY INVOKER; EXECUTE restricted to service_role.';
 
 revoke execute on function public.resolve_or_create_contact_for_legacy_lead(uuid, text, jsonb) from public;
 revoke execute on function public.resolve_or_create_contact_for_legacy_lead(uuid, text, jsonb) from anon;
