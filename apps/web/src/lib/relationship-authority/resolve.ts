@@ -18,8 +18,7 @@ import type {
   InteractionAuthorityRefs,
   InteractionAuthorityResolution,
   InteractionConversationVerdict,
-  LegacyConversationAuthority,
-  LegacyReadResult,
+  LegacyConversationAuthorityRead,
   RuntimeAuthority,
 } from "@agents/types";
 import {
@@ -33,11 +32,7 @@ import { readLegacyConversationAuthority } from "../legacy-gateway";
 
 export type ReadCurrentConversationAuthority = (
   legacyLeadId: string
-) => Promise<
-  LegacyReadResult<LegacyConversationAuthority> & {
-    observedOwnerRef?: string | null;
-  }
->;
+) => Promise<LegacyConversationAuthorityRead>;
 
 export interface ResolveInteractionAuthorityInput {
   ctx: GatewayCallerContext;
@@ -88,6 +83,7 @@ function emptyResolution(
   return {
     organizationId,
     caseId: null,
+    externalConversationRef: null,
     runtimeAuthority: null,
     runtimeAuthorityReadFailed: false,
     bindingReadFailed: false,
@@ -246,6 +242,7 @@ export async function resolveInteractionAuthority(
       ? await observeCurrentOwner(readCurrent, suppliedLeadId)
       : { observedOwnerRef: null, provenance: null };
     return emptyResolution(organizationId, {
+      externalConversationRef: suppliedLeadId,
       runtimeAuthority,
       runtimeAuthorityReadFailed,
       bindingReadFailed: true,
@@ -263,6 +260,7 @@ export async function resolveInteractionAuthority(
       : { observedOwnerRef: null, provenance: null };
     return emptyResolution(organizationId, {
       caseId: mappingConflict.caseId,
+      externalConversationRef: leadForOwner,
       runtimeAuthority,
       runtimeAuthorityReadFailed,
       observedOwnerRef: observed.observedOwnerRef,
@@ -276,6 +274,7 @@ export async function resolveInteractionAuthority(
   if (!resolvedLeadId) {
     return emptyResolution(organizationId, {
       caseId: resolvedCaseId,
+      externalConversationRef: resolvedLeadId ?? suppliedLeadId,
       runtimeAuthority,
       runtimeAuthorityReadFailed,
       conversationAuthority: "unknown",
@@ -302,6 +301,7 @@ export async function resolveInteractionAuthority(
     return {
       organizationId,
       caseId: resolvedCaseId,
+      externalConversationRef: resolvedLeadId,
       runtimeAuthority,
       runtimeAuthorityReadFailed,
       bindingReadFailed: false,
@@ -322,6 +322,7 @@ export async function resolveInteractionAuthority(
       const conflicting = error.reason === "pairing_ambiguous";
       return emptyResolution(organizationId, {
         caseId: resolvedCaseId,
+        externalConversationRef: resolvedLeadId,
         runtimeAuthority,
         runtimeAuthorityReadFailed,
         conversationAuthority: conflicting ? "conflicting" : "unknown",
@@ -331,6 +332,7 @@ export async function resolveInteractionAuthority(
     }
     return emptyResolution(organizationId, {
       caseId: resolvedCaseId,
+      externalConversationRef: resolvedLeadId,
       runtimeAuthority,
       runtimeAuthorityReadFailed,
       conversationAuthority: "unknown",

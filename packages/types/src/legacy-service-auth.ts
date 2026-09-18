@@ -18,6 +18,11 @@ export type LegacyServiceAuthPurpose =
 
 export const LEGACY_SERVICE_AUTH_FRESHNESS_SECONDS = 300;
 
+/** Declared C2 caller. Not taken from the payload. */
+export const LEGACY_SERVICE_AUTH_C2_SERVICE = "traditional_gu";
+/** Declared C2 source system. Not taken from the payload. */
+export const LEGACY_SERVICE_AUTH_C2_SOURCE_SYSTEM = "traditional_gu";
+
 /** Same JSON body for every 401. Unknown key is indistinguishable from bad HMAC. */
 export const LEGACY_SERVICE_AUTH_UNAUTHORIZED_BODY = {
   error: "unauthorized",

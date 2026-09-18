@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AuthorityResolution, InteractionAuthorityResolution } from "@agents/types";
-import type { DbClient } from "@agents/db";
+import { AuthorityResolutionIdentityConflict, type DbClient } from "@agents/db";
 import {
   persistFailSafeAuthorityResolution,
   recordAuthorityResolutionObservation,
@@ -19,7 +19,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const ORG = "11111111-1111-1111-1111-111111111111";
 const CASE_ID = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
+const OTHER_CASE = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 const LEAD = "5215500000001521550000000252155000000003";
+const LEAD_B = "5215500000001521550000000252155000000004";
 
 type Row = Record<string, unknown>;
 
@@ -31,6 +33,17 @@ function fakeDb(tables: Record<string, Row[]>): {
   const writes: Array<{ table: string; values: Row }> = [];
   function builder(table: string) {
     let rows = (tables[table] ?? []).slice();
+    let pendingUpdate: Row | null = null;
+    const applyUpdate = () => {
+      if (!pendingUpdate) return;
+      const patch = pendingUpdate;
+      pendingUpdate = null;
+      for (const row of rows) {
+        Object.assign(row, patch);
+        const live = (tables[table] ?? []).find((item) => item.id === row.id);
+        if (live) Object.assign(live, patch);
+      }
+    };
     const self: Record<string, unknown> = {
       select: () => self,
       in: () => self,
@@ -74,16 +87,21 @@ function fakeDb(tables: Record<string, Row[]>): {
       },
       update: (values: Row) => {
         writes.push({ table, values });
-        for (const row of tables[table] ?? []) {
-          if (row.resolved_at == null) Object.assign(row, values);
-        }
-        rows = (tables[table] ?? []).filter((row) => row.resolved_at != null);
+        pendingUpdate = values;
         return self;
       },
-      single: async () => ({ data: rows[0] ?? null, error: null }),
-      maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
-      then: (resolve: (v: { data: Row[]; error: null }) => unknown) =>
-        resolve({ data: rows, error: null }),
+      single: async () => {
+        applyUpdate();
+        return { data: rows[0] ?? null, error: null };
+      },
+      maybeSingle: async () => {
+        applyUpdate();
+        return { data: rows[0] ?? null, error: null };
+      },
+      then: (resolve: (v: { data: Row[]; error: null }) => unknown) => {
+        applyUpdate();
+        return resolve({ data: rows, error: null });
+      },
     };
     return self;
   }
@@ -100,6 +118,7 @@ function failSafe(
   return {
     organizationId: ORG,
     caseId: CASE_ID,
+    externalConversationRef: LEAD,
     runtimeAuthority: "legacy",
     runtimeAuthorityReadFailed: false,
     bindingReadFailed: false,
@@ -378,6 +397,213 @@ function testPersistSourceWritesNoRuntimeAuthority(): void {
   console.log("  ok  persist writes authority_resolutions only");
 }
 
+function caseSnapshot(resolutions: AuthorityResolution[]) {
+  return buildCaseSnapshots({
+    organizationId: ORG,
+    cases: [
+      {
+        id: CASE_ID,
+        user_id: "user-1",
+        case_type_id: "type-1",
+        case_type: "lead_opportunity",
+        status: "active",
+        current_step: null,
+        assigned_to_user_id: null,
+        external_contact_jsonb: {},
+        next_action_at: null,
+        due_at: null,
+        context_jsonb: {},
+        version: 1,
+        workflow_definition_id: null,
+        workflow_definition_version: null,
+        organization_id: ORG,
+        runtime_authority: "legacy",
+        created_at: "2026-09-01T00:00:00.000Z",
+        updated_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+    facts: [],
+    subjects: [],
+    events: [],
+    approvals: [],
+    work: [],
+    authorityResolutions: resolutions,
+  })[0];
+}
+
+function openRow(
+  id: string,
+  ref: string,
+  extras: Partial<AuthorityResolution> = {}
+): AuthorityResolution {
+  return {
+    id,
+    organization_id: ORG,
+    case_id: CASE_ID,
+    external_conversation_ref: ref,
+    state: "unknown",
+    detected_at: "2026-09-18T02:10:00.000Z",
+    fail_safe_reason: "read_failure",
+    provenance_jsonb: {},
+    runtime_authority_observed: "legacy",
+    provider_message_id: `${id}-wamid`,
+    resolved_at: null,
+    resolved_as: null,
+    created_at: "2026-09-18T02:10:00.000Z",
+    ...extras,
+  };
+}
+
+async function testConfidentClosesOnlyMatchingConversation(): Promise<void> {
+  const { db, tables } = fakeDb({
+    authority_resolutions: [
+      { ...openRow("open-a", LEAD) },
+      { ...openRow("open-b", LEAD_B) },
+    ],
+  });
+  await recordAuthorityResolutionObservation({
+    db,
+    resolution: {
+      ...failSafe("unknown"),
+      conversationAuthority: "gu",
+      humanActive: false,
+      externalConversationRef: LEAD_B,
+    },
+    caseId: CASE_ID,
+    legacyLeadId: LEAD_B,
+    detectedAt: "2026-09-18T02:20:00.000Z",
+  });
+  const rowA = tables.authority_resolutions?.find((row) => row.id === "open-a");
+  const rowB = tables.authority_resolutions?.find((row) => row.id === "open-b");
+  assert.equal(rowB?.resolved_as, "gu");
+  assert.equal(rowA?.resolved_at, null);
+  const snapshot = caseSnapshot(
+    tables.authority_resolutions as unknown as AuthorityResolution[]
+  );
+  assert.equal(snapshot.authority_conflict?.resolution_id, "open-a");
+  const items = evaluateMustSurface(snapshot, new Date("2026-09-18T03:00:00.000Z"));
+  assert.equal(items.some((item) => item.predicate === "authority_conflict"), true);
+  console.log("  ok  confident B closes B only; A remains unresolved and surfaces");
+}
+
+async function testReopenAfterConfidentThenUnknown(): Promise<void> {
+  const { db, tables } = fakeDb({ authority_resolutions: [] });
+  const first = await persistFailSafeAuthorityResolution({
+    db,
+    resolution: failSafe("unknown"),
+    caseId: CASE_ID,
+    legacyLeadId: LEAD,
+    providerMessageId: "wamid-reopen",
+    detectedAt: "2026-09-18T02:10:00.000Z",
+  });
+  await recordAuthorityResolutionObservation({
+    db,
+    resolution: {
+      ...failSafe("unknown"),
+      conversationAuthority: "gu",
+      humanActive: false,
+    },
+    caseId: CASE_ID,
+    legacyLeadId: LEAD,
+    detectedAt: "2026-09-18T02:20:00.000Z",
+  });
+  const reopened = await persistFailSafeAuthorityResolution({
+    db,
+    resolution: failSafe("unknown"),
+    caseId: CASE_ID,
+    legacyLeadId: LEAD,
+    providerMessageId: "wamid-reopen",
+    detectedAt: "2026-09-18T02:30:00.000Z",
+  });
+  assert.equal(reopened?.id, first?.id);
+  assert.equal(tables.authority_resolutions?.length, 1);
+  assert.equal(tables.authority_resolutions?.[0]?.resolved_at, null);
+  assert.equal(tables.authority_resolutions?.[0]?.state, "unknown");
+  const history = (tables.authority_resolutions?.[0]?.provenance_jsonb as { history?: unknown[] })
+    ?.history;
+  assert.equal(Array.isArray(history) && history.length >= 1, true);
+  const snapshot = caseSnapshot(
+    tables.authority_resolutions as unknown as AuthorityResolution[]
+  );
+  assert.equal(snapshot.authority_conflict?.resolution_id, first?.id);
+  console.log("  ok  unknown then confident then unknown again reopens the same row");
+}
+
+async function testUnknownThenConflictingUpdatesInPlace(): Promise<void> {
+  const { db, tables } = fakeDb({ authority_resolutions: [] });
+  const first = await persistFailSafeAuthorityResolution({
+    db,
+    resolution: failSafe("unknown"),
+    caseId: CASE_ID,
+    legacyLeadId: LEAD,
+    providerMessageId: "wamid-state-change",
+    detectedAt: "2026-09-18T02:10:00.000Z",
+  });
+  const second = await persistFailSafeAuthorityResolution({
+    db,
+    resolution: failSafe("conflicting"),
+    caseId: CASE_ID,
+    legacyLeadId: LEAD,
+    providerMessageId: "wamid-state-change",
+    detectedAt: "2026-09-18T02:11:00.000Z",
+  });
+  assert.equal(second?.id, first?.id);
+  assert.equal(tables.authority_resolutions?.length, 1);
+  assert.equal(tables.authority_resolutions?.[0]?.state, "conflicting");
+  assert.equal(tables.authority_resolutions?.[0]?.resolved_at, null);
+  console.log("  ok  unknown then conflicting on retry updates the same open row");
+}
+
+async function testSameProviderDifferentLeadFailsClosed(): Promise<void> {
+  const { db } = fakeDb({ authority_resolutions: [] });
+  await persistFailSafeAuthorityResolution({
+    db,
+    resolution: failSafe("unknown"),
+    caseId: CASE_ID,
+    legacyLeadId: LEAD,
+    providerMessageId: "wamid-lead-conflict",
+    detectedAt: "2026-09-18T02:10:00.000Z",
+  });
+  await assert.rejects(
+    () =>
+      persistFailSafeAuthorityResolution({
+        db,
+        resolution: { ...failSafe("unknown"), externalConversationRef: LEAD_B },
+        caseId: CASE_ID,
+        legacyLeadId: LEAD_B,
+        providerMessageId: "wamid-lead-conflict",
+        detectedAt: "2026-09-18T02:11:00.000Z",
+      }),
+    (error: unknown) => error instanceof AuthorityResolutionIdentityConflict
+  );
+  console.log("  ok  same provider_message_id + different Lead fails closed");
+}
+
+async function testSameProviderDifferentCaseFailsClosed(): Promise<void> {
+  const { db } = fakeDb({ authority_resolutions: [] });
+  await persistFailSafeAuthorityResolution({
+    db,
+    resolution: failSafe("unknown"),
+    caseId: CASE_ID,
+    legacyLeadId: LEAD,
+    providerMessageId: "wamid-case-conflict",
+    detectedAt: "2026-09-18T02:10:00.000Z",
+  });
+  await assert.rejects(
+    () =>
+      persistFailSafeAuthorityResolution({
+        db,
+        resolution: { ...failSafe("unknown"), caseId: OTHER_CASE },
+        caseId: OTHER_CASE,
+        legacyLeadId: LEAD,
+        providerMessageId: "wamid-case-conflict",
+        detectedAt: "2026-09-18T02:11:00.000Z",
+      }),
+    (error: unknown) => error instanceof AuthorityResolutionIdentityConflict
+  );
+  console.log("  ok  same provider_message_id + different Case fails closed");
+}
+
 async function main(): Promise<void> {
   console.log("authority resolution persist selftest");
   await testPersistWritesRow();
@@ -386,6 +612,11 @@ async function main(): Promise<void> {
   await testRetryDoesNotDuplicateIncident();
   await testConfidentClosesUnresolvedIncident();
   await testConflictingThenHumanActiveCloses();
+  await testConfidentClosesOnlyMatchingConversation();
+  await testReopenAfterConfidentThenUnknown();
+  await testUnknownThenConflictingUpdatesInPlace();
+  await testSameProviderDifferentLeadFailsClosed();
+  await testSameProviderDifferentCaseFailsClosed();
   testPersistSourceWritesNoRuntimeAuthority();
   console.log("authority resolution persist selftest ok");
 }

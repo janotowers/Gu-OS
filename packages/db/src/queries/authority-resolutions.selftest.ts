@@ -8,6 +8,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DbClient } from "../client";
 import {
+  AuthorityResolutionIdentityConflict,
   closeUnresolvedAuthorityResolutions,
   findAuthorityResolutionByProviderMessageId,
   insertAuthorityResolution,
@@ -17,6 +18,9 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ORG = "11111111-1111-1111-1111-111111111111";
 const CASE_ID = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
+const OTHER_CASE = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+const LEAD_A = "lead-opaque-a";
+const LEAD_B = "lead-opaque-b";
 
 type Row = Record<string, unknown>;
 
@@ -180,6 +184,127 @@ async function testConfidentStateRefused(): Promise<void> {
   console.log("  ok  confident states cannot be inserted");
 }
 
+async function testCloseScopedByCaseAndConversation(): Promise<void> {
+  const db = fakeDb({
+    authority_resolutions: [
+      {
+        id: "open-a",
+        organization_id: ORG,
+        case_id: CASE_ID,
+        external_conversation_ref: LEAD_A,
+        state: "unknown",
+        resolved_at: null,
+        resolved_as: null,
+      },
+      {
+        id: "open-b",
+        organization_id: ORG,
+        case_id: CASE_ID,
+        external_conversation_ref: LEAD_B,
+        state: "unknown",
+        resolved_at: null,
+        resolved_as: null,
+      },
+    ],
+  });
+  const closed = await closeUnresolvedAuthorityResolutions(db, {
+    organizationId: ORG,
+    caseId: CASE_ID,
+    externalConversationRef: LEAD_B,
+    resolvedAt: "2026-09-18T02:20:00.000Z",
+    resolvedAs: "gu",
+  });
+  assert.equal(closed, 1);
+  const listed = await listAuthorityResolutionsForCases(db, {
+    organizationId: ORG,
+    caseIds: [CASE_ID],
+  });
+  const rowA = listed.find((row) => row.id === "open-a");
+  const rowB = listed.find((row) => row.id === "open-b");
+  assert.equal(rowA?.resolved_at, null);
+  assert.equal(rowB?.resolved_as, "gu");
+  console.log("  ok  closeUnresolved scopes by Case AND conversation ref");
+}
+
+async function testReopenAndIdentityConflicts(): Promise<void> {
+  const db = fakeDb({ authority_resolutions: [] });
+  const first = await insertAuthorityResolution(db, {
+    organizationId: ORG,
+    caseId: CASE_ID,
+    externalConversationRef: LEAD_A,
+    state: "unknown",
+    detectedAt: "2026-09-18T02:10:00.000Z",
+    providerMessageId: "wamid-transitions",
+    provenance: { step: "open" },
+  });
+  await closeUnresolvedAuthorityResolutions(db, {
+    organizationId: ORG,
+    caseId: CASE_ID,
+    externalConversationRef: LEAD_A,
+    resolvedAt: "2026-09-18T02:20:00.000Z",
+    resolvedAs: "gu",
+  });
+  const reopened = await insertAuthorityResolution(db, {
+    organizationId: ORG,
+    caseId: CASE_ID,
+    externalConversationRef: LEAD_A,
+    state: "unknown",
+    detectedAt: "2026-09-18T02:30:00.000Z",
+    providerMessageId: "wamid-transitions",
+    provenance: { step: "reopen" },
+  });
+  assert.equal(reopened.id, first.id);
+  assert.equal(reopened.resolved_at, null);
+  assert.equal(Array.isArray(reopened.provenance_jsonb.history), true);
+
+  const conflicting = await insertAuthorityResolution(db, {
+    organizationId: ORG,
+    caseId: CASE_ID,
+    externalConversationRef: LEAD_A,
+    state: "conflicting",
+    detectedAt: "2026-09-18T02:31:00.000Z",
+    providerMessageId: "wamid-transitions",
+  });
+  assert.equal(conflicting.id, first.id);
+  assert.equal(conflicting.state, "conflicting");
+
+  await assert.rejects(
+    () =>
+      insertAuthorityResolution(db, {
+        organizationId: ORG,
+        caseId: CASE_ID,
+        externalConversationRef: LEAD_B,
+        state: "unknown",
+        detectedAt: "2026-09-18T02:32:00.000Z",
+        providerMessageId: "wamid-transitions",
+      }),
+    (error: unknown) => error instanceof AuthorityResolutionIdentityConflict
+  );
+
+  const other = fakeDb({ authority_resolutions: [] });
+  await insertAuthorityResolution(other, {
+    organizationId: ORG,
+    caseId: CASE_ID,
+    externalConversationRef: LEAD_A,
+    state: "unknown",
+    detectedAt: "2026-09-18T02:10:00.000Z",
+    providerMessageId: "wamid-case-conflict",
+  });
+  await assert.rejects(
+    () =>
+      insertAuthorityResolution(other, {
+        organizationId: ORG,
+        caseId: OTHER_CASE,
+        externalConversationRef: LEAD_A,
+        state: "unknown",
+        detectedAt: "2026-09-18T02:11:00.000Z",
+        providerMessageId: "wamid-case-conflict",
+      }),
+    (error: unknown) => error instanceof AuthorityResolutionIdentityConflict
+  );
+  console.log("  ok  reopen, unknown→conflicting, and identity conflicts");
+}
+
 async function testMigrationSource(): Promise<void> {
   const sql = await fs.readFile(
     path.resolve(
@@ -215,6 +340,8 @@ async function main(): Promise<void> {
   await testInsertAndList();
   await testProviderMessageIdIsIdempotent();
   await testCloseUnresolved();
+  await testCloseScopedByCaseAndConversation();
+  await testReopenAndIdentityConflicts();
   await testConfidentStateRefused();
   await testMigrationSource();
   console.log("authority resolutions selftest ok");

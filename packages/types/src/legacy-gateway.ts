@@ -132,10 +132,14 @@ export interface LegacyReadProvenance {
 export interface LegacyReadResult<T> {
   value: T;
   provenance: LegacyReadProvenance;
-  /**
-   * Server-observed Traditional Gu owner/source of the read record.
-   * Authorization evidence for ADR-111 §6, not a capability semantic field.
-   */
+}
+
+/**
+ * C2 authorization envelope. `observedOwnerRef` is ADR-111 §6 evidence,
+ * not a SA-6.4 semantic field and not part of the generic gateway result.
+ */
+export interface LegacyConversationAuthorityRead
+  extends LegacyReadResult<LegacyConversationAuthority> {
   observedOwnerRef?: string | null;
 }
 

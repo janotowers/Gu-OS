@@ -5,7 +5,9 @@
  * Logging is not persistence. Confident `gu` / `human_active` answers are
  * not incidents and are not inserted. A retry of one C2 logical request
  * (same Organization + provider_message_id) does not insert a second row.
- * This function never writes `runtime_authority`.
+ * A later fail-safe evaluation of that same identity reopens the row so
+ * the current fail-safe is what surfaces. This function never writes
+ * `runtime_authority`.
  */
 import {
   closeUnresolvedAuthorityResolutions,
@@ -36,7 +38,8 @@ export async function persistFailSafeAuthorityResolution(params: {
   return insertAuthorityResolution(params.db, {
     organizationId: resolution.organizationId,
     caseId: params.caseId ?? resolution.caseId ?? null,
-    externalConversationRef: params.legacyLeadId ?? null,
+    externalConversationRef:
+      params.legacyLeadId ?? resolution.externalConversationRef ?? null,
     state: resolution.conversationAuthority,
     detectedAt: params.detectedAt ?? new Date().toISOString(),
     failSafeReason: resolution.failSafeReason,
@@ -71,7 +74,8 @@ export async function recordAuthorityResolutionObservation(params: {
     await closeUnresolvedAuthorityResolutions(params.db, {
       organizationId: resolution.organizationId,
       caseId,
-      externalConversationRef: params.legacyLeadId ?? null,
+      externalConversationRef:
+        params.legacyLeadId ?? resolution.externalConversationRef ?? null,
       resolvedAt: detectedAt,
       resolvedAs: resolution.conversationAuthority,
     });

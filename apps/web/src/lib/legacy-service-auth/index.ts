@@ -9,6 +9,7 @@ export {
   HEADER_KEY_ID,
   HEADER_SIGNATURE,
   HEADER_TIMESTAMP,
+  KEY_ID_RE,
   parseAuthHeaders,
 } from "./headers";
 export {

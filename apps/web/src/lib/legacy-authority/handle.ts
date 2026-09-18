@@ -3,10 +3,12 @@
  *
  * Authenticates per ADR-111, resolves Organization from the key, answers
  * who holds the conversation, and persists fail-safe incidents
- * idempotently on `provider_message_id`. The answer is advisory: it
- * writes no runtime_authority and suppresses no reply.
+ * idempotently on `provider_message_id`. Returning C2 data and recording
+ * an internal fail-safe about a bound Case are distinct. The answer is
+ * advisory: it writes no runtime_authority and suppresses no reply.
  */
 import type { DbClient } from "@agents/db";
+import { AuthorityResolutionIdentityConflict } from "@agents/db";
 import type {
   ConversationThreadKind,
   InteractionAuthorityResolution,
@@ -14,7 +16,11 @@ import type {
   LegacyAuthorityResponseBody,
   LegacyServiceAuthKey,
 } from "@agents/types";
-import { LEGACY_SERVICE_AUTH_UNAUTHORIZED_BODY } from "@agents/types";
+import {
+  LEGACY_SERVICE_AUTH_C2_SERVICE,
+  LEGACY_SERVICE_AUTH_C2_SOURCE_SYSTEM,
+  LEGACY_SERVICE_AUTH_UNAUTHORIZED_BODY,
+} from "@agents/types";
 import {
   recordAuthorityResolutionObservation,
   resolveInteractionAuthority,
@@ -23,13 +29,17 @@ import {
 import {
   AUTHORITY_READ_MAX_BODY_BYTES,
   HEADER_KEY_ID,
+  KEY_ID_RE,
   assertObservedOwnerInScope,
   contentEncodingOf,
   readSignedRawBody,
   requestTarget,
   verifyLegacyServiceAuth,
 } from "../legacy-service-auth";
-import { rateLimit } from "../public-rate-limit";
+import {
+  classifyC2PresentedKeyId,
+  rateLimit,
+} from "../public-rate-limit";
 
 const THREAD_KINDS = new Set<ConversationThreadKind>(["gu", "advisor_wa"]);
 const AUTHORITY_READ_RATE_MAX = 120;
@@ -166,11 +176,48 @@ function toResponse(
   };
 }
 
+function isFailSafe(resolution: InteractionAuthorityResolution): boolean {
+  return (
+    resolution.conversationAuthority === "unknown" ||
+    resolution.conversationAuthority === "conflicting"
+  );
+}
+
+/**
+ * Returning C2 data requires an observed owner inside the key scope.
+ * Recording an internal fail-safe is allowed only for a Case bound by
+ * a server-side active `gu` mapping when owner observation failed.
+ * An out-of-scope observed owner, or an unmapped Lead with no owner,
+ * never persists — a valid key must not fabricate incidents.
+ */
+function persistPolicy(
+  resolution: InteractionAuthorityResolution,
+  scoped: { ok: boolean }
+): { mayReturnC2: boolean; mayPersistFailSafe: boolean } {
+  const mayReturnC2 = scoped.ok;
+  const observed = resolution.observedOwnerRef?.trim() || null;
+  const boundCaseId = resolution.caseId?.trim() || null;
+  const outOfScopeOwner = Boolean(observed) && !scoped.ok;
+  const ownerUnavailable = !observed;
+  const mayPersistFailSafe =
+    isFailSafe(resolution) &&
+    !outOfScopeOwner &&
+    (mayReturnC2 || Boolean(boundCaseId && ownerUnavailable));
+  return { mayReturnC2, mayPersistFailSafe };
+}
+
 export async function handleLegacyAuthorityRequest(
   deps: HandleLegacyAuthorityDeps
 ): Promise<Response> {
   const audit = deps.audit ?? defaultAudit;
-  const keyId = presentedKeyId(deps.request.headers);
+  const presented = presentedKeyId(deps.request.headers);
+  const wellFormed = presented !== null && KEY_ID_RE.test(presented);
+  const known = wellFormed && deps.lookupKey(presented) !== null;
+  const classified = classifyC2PresentedKeyId({
+    presented,
+    wellFormed,
+    known,
+  });
   const limit =
     deps.rateLimit ??
     ((bucketKey: string) =>
@@ -179,11 +226,11 @@ export async function handleLegacyAuthorityRequest(
         AUTHORITY_READ_RATE_MAX,
         AUTHORITY_READ_RATE_WINDOW_MS
       ));
-  const limited = limit(keyId ?? "missing-key-id");
+  const limited = limit(classified.bucketKey);
   if (!limited.ok) {
     audit({
       event: "legacy_service_auth",
-      key_id: keyId,
+      key_id: classified.auditKeyId,
       purpose: "authority-read",
       outcome: "rejected",
       status: 429,
@@ -198,7 +245,7 @@ export async function handleLegacyAuthorityRequest(
   if (deps.request.method !== "POST") {
     audit({
       event: "legacy_service_auth",
-      key_id: keyId,
+      key_id: classified.auditKeyId,
       purpose: "authority-read",
       outcome: "rejected",
       status: 405,
@@ -212,7 +259,7 @@ export async function handleLegacyAuthorityRequest(
     const status = raw.status === 413 ? 413 : 401;
     audit({
       event: "legacy_service_auth",
-      key_id: keyId,
+      key_id: classified.auditKeyId,
       purpose: "authority-read",
       outcome: "rejected",
       status,
@@ -237,6 +284,8 @@ export async function handleLegacyAuthorityRequest(
     contentEncoding: contentEncodingOf(deps.request.headers),
     nowSeconds: deps.nowSeconds ?? Math.floor(Date.now() / 1000),
     requiredPurpose: "authority-read",
+    requiredService: LEGACY_SERVICE_AUTH_C2_SERVICE,
+    requiredSourceSystem: LEGACY_SERVICE_AUTH_C2_SOURCE_SYSTEM,
     maxBodyBytes: AUTHORITY_READ_MAX_BODY_BYTES,
     lookupKey: deps.lookupKey,
     organizationClaim,
@@ -246,7 +295,7 @@ export async function handleLegacyAuthorityRequest(
   if (!verified.ok) {
     audit({
       event: "legacy_service_auth",
-      key_id: keyId,
+      key_id: classified.auditKeyId,
       purpose: "authority-read",
       outcome: "rejected",
       status: verified.status,
@@ -257,10 +306,11 @@ export async function handleLegacyAuthorityRequest(
     return json(403, { error: "forbidden", reason: verified.reason });
   }
 
+  const verifiedKeyId = verified.key.keyId;
   if (!parsed.ok) {
     audit({
       event: "legacy_service_auth",
-      key_id: verified.key.keyId,
+      key_id: verifiedKeyId,
       purpose: "authority-read",
       outcome: "rejected",
       status: 400,
@@ -270,41 +320,81 @@ export async function handleLegacyAuthorityRequest(
   }
 
   const organizationId = verified.key.organizationId;
-  const resolution = await resolveInteractionAuthority({
-    ctx: { db: deps.db, organizationId },
-    refs: {
-      legacyLeadId: parsed.body.legacy_lead_id,
-      caseId: parsed.body.case_id,
-      threadKind: parsed.body.thread_kind,
-    },
-    readCurrent: deps.readCurrent,
-  });
+  const body = parsed.body;
+  let resolution: InteractionAuthorityResolution;
+  try {
+    resolution = await resolveInteractionAuthority({
+      ctx: { db: deps.db, organizationId },
+      refs: {
+        legacyLeadId: body.legacy_lead_id,
+        caseId: body.case_id,
+        threadKind: body.thread_kind,
+      },
+      readCurrent: deps.readCurrent,
+    });
+  } catch {
+    audit({
+      event: "legacy_service_auth",
+      key_id: verifiedKeyId,
+      purpose: "authority-read",
+      outcome: "rejected",
+      status: 500,
+      reason: "internal_error",
+    });
+    return json(500, { error: "internal_error" });
+  }
 
   const scoped = assertObservedOwnerInScope({
     key: verified.key,
     observedOwnerRef: resolution.observedOwnerRef,
     claimedOwnerRef: ownerClaim,
   });
-  if (!scoped.ok) {
-    audit({
-      event: "legacy_service_auth",
-      key_id: verified.key.keyId,
-      purpose: "authority-read",
-      outcome: "rejected",
-      status: scoped.status,
-      reason: scoped.reason,
-    });
-    return json(403, { error: "forbidden", reason: scoped.reason });
+  const { mayReturnC2, mayPersistFailSafe } = persistPolicy(resolution, scoped);
+  const providerMessageId = body.provider_message_id?.trim() || null;
+  const persist = deps.persist ?? recordAuthorityResolutionObservation;
+
+  async function persistObservation(): Promise<Response | null> {
+    try {
+      await persist({
+        db: deps.db,
+        resolution,
+        caseId: resolution.caseId,
+        legacyLeadId:
+          resolution.externalConversationRef ?? body.legacy_lead_id ?? null,
+        providerMessageId,
+      });
+      return null;
+    } catch (error) {
+      if (error instanceof AuthorityResolutionIdentityConflict) {
+        audit({
+          event: "legacy_service_auth",
+          key_id: verifiedKeyId,
+          purpose: "authority-read",
+          outcome: "rejected",
+          status: 409,
+          reason: "logical_identity_conflict",
+        });
+        return json(409, {
+          error: "conflict",
+          reason: "logical_identity_conflict",
+        });
+      }
+      audit({
+        event: "legacy_service_auth",
+        key_id: verifiedKeyId,
+        purpose: "authority-read",
+        outcome: "rejected",
+        status: 500,
+        reason: "persist_failed",
+      });
+      return json(500, { error: "internal_error" });
+    }
   }
 
-  const failSafe =
-    resolution.conversationAuthority === "unknown" ||
-    resolution.conversationAuthority === "conflicting";
-  const providerMessageId = parsed.body.provider_message_id?.trim() || null;
-  if (failSafe && !providerMessageId) {
+  if (mayPersistFailSafe && !providerMessageId) {
     audit({
       event: "legacy_service_auth",
-      key_id: verified.key.keyId,
+      key_id: verifiedKeyId,
       purpose: "authority-read",
       outcome: "rejected",
       status: 400,
@@ -313,18 +403,29 @@ export async function handleLegacyAuthorityRequest(
     return json(400, { error: "invalid_body", reason: "provider_message_id_required" });
   }
 
-  const persist = deps.persist ?? recordAuthorityResolutionObservation;
-  await persist({
-    db: deps.db,
-    resolution,
-    caseId: resolution.caseId,
-    legacyLeadId: parsed.body.legacy_lead_id ?? null,
-    providerMessageId,
-  });
+  if (!mayReturnC2) {
+    if (mayPersistFailSafe) {
+      const failed = await persistObservation();
+      if (failed) return failed;
+    }
+    const reason = scoped.ok ? "source_scope_mismatch" : scoped.reason;
+    audit({
+      event: "legacy_service_auth",
+      key_id: verifiedKeyId,
+      purpose: "authority-read",
+      outcome: "rejected",
+      status: 403,
+      reason,
+    });
+    return json(403, { error: "forbidden", reason });
+  }
+
+  const failed = await persistObservation();
+  if (failed) return failed;
 
   audit({
     event: "legacy_service_auth",
-    key_id: verified.key.keyId,
+    key_id: verifiedKeyId,
     purpose: "authority-read",
     outcome: "accepted",
     status: 200,

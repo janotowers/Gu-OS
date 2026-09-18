@@ -18,7 +18,7 @@ import type { DbClient } from "@agents/db";
 import type {
   InteractionAuthorityResolution,
   LegacyConversationAuthority,
-  LegacyReadResult,
+  LegacyConversationAuthorityRead,
 } from "@agents/types";
 import { LegacyReadRefusal } from "../legacy-gateway/errors";
 import { resolveInteractionAuthority } from "./resolve";
@@ -86,7 +86,7 @@ function fakeDb(
 
 function currentResult(
   overrides: Partial<LegacyConversationAuthority> = {}
-): LegacyReadResult<LegacyConversationAuthority> {
+): LegacyConversationAuthorityRead {
   return {
     value: {
       legacyLeadId: LEAD,

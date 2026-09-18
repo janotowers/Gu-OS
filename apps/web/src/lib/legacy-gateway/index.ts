@@ -11,11 +11,11 @@
  * functions exist to reach systems a browser must never reach directly.
  */
 import type {
-  LegacyConversationAuthority,
   LegacyDealAppointments,
   LegacyLeadContext,
   LegacyPropertyDetails,
   LegacyReadResult,
+  LegacyConversationAuthorityRead,
   LegacyRecentMessages,
 } from "@agents/types";
 import {
@@ -141,7 +141,7 @@ export async function readLegacyPropertyDetails(
 export async function readLegacyConversationAuthority(
   ctx: GatewayCallerContext,
   legacyLeadId: string
-): Promise<LegacyReadResult<LegacyConversationAuthority>> {
+): Promise<LegacyConversationAuthorityRead> {
   const readers = await resolveLegacySourceReaders({
     db: ctx.db,
     organizationId: ctx.organizationId,

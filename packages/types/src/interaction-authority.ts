@@ -54,6 +54,11 @@ export interface InteractionAuthorityResolution {
    * Case when it is a consistent assertion. Null when unmapped.
    */
   caseId: string | null;
+  /**
+   * Opaque external conversation ref the resolver actually used (the
+   * Lead, once mapped). Null when no conversation identity was resolved.
+   */
+  externalConversationRef: string | null;
   /** Read from the Case when one is in-org. Never written by the resolver. */
   runtimeAuthority: RuntimeAuthority | null;
   /** True when the Case runtime-authority read threw. Runtime stays null. */

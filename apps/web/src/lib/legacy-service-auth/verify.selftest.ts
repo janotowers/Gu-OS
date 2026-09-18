@@ -307,6 +307,45 @@ function testMalformedHeadersAndEncoding(): void {
   console.log("  ok  malformed headers, Content-Encoding and oversize are rejected");
 }
 
+function testServiceAndSourceSystemAreBindings(): void {
+  const vector = fixture.vectors[0];
+  const accepted = verifyVector(vector, {
+    requiredService: "traditional_gu",
+    requiredSourceSystem: "traditional_gu",
+  });
+  const wrongService = verifyVector(vector, {
+    requiredService: "traditional_gu",
+    lookupKey: lookupFromMap(
+      new Map([[vector.key_id, keyFor(vector, { service: "other_service" })]])
+    ),
+  });
+  const wrongSource = verifyVector(vector, {
+    requiredSourceSystem: "traditional_gu",
+    lookupKey: lookupFromMap(
+      new Map([
+        [
+          vector.key_id,
+          keyFor(vector, {
+            legacySourceScope: { sourceSystem: "other_source", ownerRefs: [OWNER] },
+          }),
+        ],
+      ])
+    ),
+  });
+  assert.equal(accepted.ok, true);
+  assert.equal(wrongService.ok, false);
+  if (!wrongService.ok) {
+    assert.equal(wrongService.status, 403);
+    assert.equal(wrongService.reason, "service_mismatch");
+  }
+  assert.equal(wrongSource.ok, false);
+  if (!wrongSource.ok) {
+    assert.equal(wrongSource.status, 403);
+    assert.equal(wrongSource.reason, "source_scope_mismatch");
+  }
+  console.log("  ok  service and sourceSystem are authorization bindings");
+}
+
 function testAlteredPathAndBody(): void {
   const vector = fixture.vectors[0];
   const pathChanged = verifyVector(vector, { path: `${vector.path}/x` });
@@ -345,6 +384,7 @@ function main(): void {
   testStaleAndFutureTimestamps();
   testWrongSecretAndUnknownKey();
   testWrongPurposeAndOrgAndScope();
+  testServiceAndSourceSystemAreBindings();
   testRotationAndRevocation();
   testMalformedHeadersAndEncoding();
   testAlteredPathAndBody();

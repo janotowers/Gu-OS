@@ -28,6 +28,7 @@ import type {
   LegacyMessageThread,
   LegacyPropertyDetails,
   LegacyReadResult,
+  LegacyConversationAuthorityRead,
   LegacyRecentMessages,
 } from "@agents/types";
 import {
@@ -819,7 +820,7 @@ export async function propertyGetDetails(
  */
 export async function legacyConversationAuthorityGet(
   input: CapabilityInput & { legacyLeadId: string }
-): Promise<LegacyReadResult<LegacyConversationAuthority>> {
+): Promise<LegacyConversationAuthorityRead> {
   const capability = "legacy_conversation_authority_get" as const;
   const { legacyLeadId } = input;
 

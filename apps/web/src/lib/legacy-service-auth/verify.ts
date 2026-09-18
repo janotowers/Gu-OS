@@ -25,6 +25,7 @@ export type VerifyResult =
         | "authentication_failed"
         | "purpose_mismatch"
         | "organization_mismatch"
+        | "service_mismatch"
         | "source_scope_mismatch"
         | "payload_too_large";
     };
@@ -38,6 +39,10 @@ export interface VerifyLegacyServiceAuthInput {
   contentEncoding?: string | null;
   nowSeconds: number;
   requiredPurpose: LegacyServiceAuthPurpose;
+  /** Declared caller for this endpoint. C2 is Traditional Gu, not a payload claim. */
+  requiredService?: string;
+  /** Declared source system for this endpoint. Not a payload claim. */
+  requiredSourceSystem?: string;
   maxBodyBytes: number;
   lookupKey: (keyId: string) => LegacyServiceAuthKey | null;
   organizationClaim?: string | null;
@@ -105,6 +110,19 @@ export function verifyLegacyServiceAuth(
 
   if (key.purpose !== input.requiredPurpose) {
     return { ok: false, status: 403, reason: "purpose_mismatch" };
+  }
+
+  const requiredService = input.requiredService?.trim();
+  if (requiredService && key.service !== requiredService) {
+    return { ok: false, status: 403, reason: "service_mismatch" };
+  }
+
+  const requiredSourceSystem = input.requiredSourceSystem?.trim();
+  if (
+    requiredSourceSystem &&
+    key.legacySourceScope.sourceSystem !== requiredSourceSystem
+  ) {
+    return { ok: false, status: 403, reason: "source_scope_mismatch" };
   }
 
   const organizationClaim = input.organizationClaim?.trim() || null;
