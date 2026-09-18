@@ -383,7 +383,7 @@ async function testPendingApproval(): Promise<void> {
 
   await t("live wiring records the producer gap instead of emulating it", () => {
     assert.equal(MUST_SURFACE_WIRING.pending_approval.wiring, "rule_only");
-    assert.equal(MUST_SURFACE_WIRING.authority_conflict.wiring, "rule_only");
+    assert.equal(MUST_SURFACE_WIRING.authority_conflict.wiring, "live");
     assert.equal(MUST_SURFACE_WIRING.unknown_outcome_effect.wiring, "rule_only");
     assert.deepEqual([...MUST_SURFACE_PREDICATES].sort(), Object.keys(MUST_SURFACE_WIRING).sort());
   });

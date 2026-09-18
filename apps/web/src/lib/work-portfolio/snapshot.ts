@@ -8,11 +8,11 @@
  *  - **there is no presentation state in it.** A person's snooze, hide, pin or
  *    seen marker has no field to live in, so the predicates cannot read it even
  *    by accident — TD-9's hard guard, first half;
- *  - **the three predicates without a producer are typed inputs, not queries.**
- *    `approval_requests`, `authority_conflict` and `effect_operations` are
- *    always empty from the live wiring (Slice Plan SL-7, D4: no rows, no
- *    placeholder data). Their rules are proven with typed fixtures, and the
- *    Slice that introduces each producer fills the input — SL-9, SL-6, SL-9.
+ *  - **the remaining predicates without a producer are typed inputs, not queries.**
+ *    `approval_requests` and `effect_operations` are always empty from the
+ *    live wiring (Slice Plan SL-7, D4). `authority_conflict` is live as of
+ *    SL-6: assembled from durable `authority_resolutions` rows. The remaining
+ *    empty inputs stay typed fixtures until SL-9.
  *
  * `approval_decisions` IS live: `case_approvals` exists and every surface
  * records decisions there, which is what makes "decided in Telegram ⇒ the web
@@ -37,6 +37,7 @@ import {
   type WorkItem,
   type WorkItemOrigin,
   type WorkItemStatus,
+  type AuthorityResolution,
 } from "@agents/types";
 
 export interface PortfolioCase {
@@ -130,7 +131,7 @@ export interface PortfolioApprovalDecision {
   superseded_by: string | null;
 }
 
-/** TD-3's fail-safe incident. **No producer before SL-6.** */
+/** TD-3's fail-safe incident. Produced by SL-6 `authority_resolutions`. */
 export interface PortfolioAuthorityConflict {
   resolution_id: string;
   state: "unknown" | "conflicting";
@@ -259,6 +260,21 @@ function toWork(row: WorkItem): PortfolioWork {
   };
 }
 
+function latestAuthorityConflict(
+  rows: readonly AuthorityResolution[]
+): PortfolioAuthorityConflict | null {
+  if (rows.length === 0) return null;
+  const latest = [...rows].sort((a, b) =>
+    Date.parse(b.detected_at) - Date.parse(a.detected_at)
+  )[0];
+  if (!latest) return null;
+  return {
+    resolution_id: latest.id,
+    state: latest.state,
+    detected_at: latest.detected_at,
+  };
+}
+
 function toPortfolioCase(row: OperationalCase): PortfolioCase | null {
   if (!row.organization_id) return null;
   return {
@@ -291,6 +307,7 @@ export function buildCaseSnapshots(input: {
   events: readonly OperationalCaseEvent[];
   approvals: readonly CaseApproval[];
   work: readonly WorkItem[];
+  authorityResolutions?: readonly AuthorityResolution[];
 }): PortfolioCaseSnapshot[] {
   const byCase = <T extends { case_id: string | null }>(rows: readonly T[]) => {
     const grouped = new Map<string, T[]>();
@@ -307,6 +324,7 @@ export function buildCaseSnapshots(input: {
   const events = byCase(input.events);
   const approvals = byCase(input.approvals);
   const work = byCase(input.work);
+  const resolutions = byCase(input.authorityResolutions ?? []);
 
   const snapshots: PortfolioCaseSnapshot[] = [];
   for (const row of input.cases) {
@@ -349,7 +367,7 @@ export function buildCaseSnapshots(input: {
         evidence_hash: approval.evidence_hash,
         superseded_by: approval.superseded_by,
       })),
-      authority_conflict: null,
+      authority_conflict: latestAuthorityConflict(resolutions.get(row.id) ?? []),
       effect_operations: [],
     });
   }

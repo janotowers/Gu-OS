@@ -26,6 +26,7 @@ import {
   OPPORTUNITY_CLOSURE_FACT_KEY,
   SUPERVISOR_RECONSIDERED_EVENT_KIND,
   SUPERVISOR_SETTLED_EVENT_KIND,
+  type AuthorityResolution,
   type CaseApproval,
   type CaseFact,
   type CaseSubject,
@@ -34,6 +35,7 @@ import {
   type PortfolioPresentationState,
   type WorkItem,
 } from "@agents/types";
+import { listAuthorityResolutionsForCases } from "./authority-resolutions";
 
 /**
  * How many Cases one Portfolio read projects. An ordinary engineering bound
@@ -158,6 +160,17 @@ export async function listPortfolioCaseApprovals(
   return readChunked<CaseApproval>(caseIds, (chunk) =>
     userDb.from("case_approvals").select("*").in("case_id", chunk)
   );
+}
+
+/**
+ * Latest-first fail-safe authority resolutions of the authorized Cases.
+ * Read with the actor JWT; RLS is the org membership check.
+ */
+export async function listPortfolioAuthorityResolutions(
+  userDb: DbClient,
+  params: { organizationId: string; caseIds: readonly string[] }
+): Promise<AuthorityResolution[]> {
+  return listAuthorityResolutionsForCases(userDb, params);
 }
 
 // ============================================================

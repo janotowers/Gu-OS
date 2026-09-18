@@ -20,6 +20,7 @@
 import {
   getActiveMembership,
   isRelationshipOpsEnabled,
+  listPortfolioAuthorityResolutions,
   listPortfolioCaseApprovals,
   listPortfolioCases,
   listPortfolioCommitmentSubjects,
@@ -79,17 +80,28 @@ export async function loadWorkPortfolio(params: {
   const ids = cases.map((row) => row.id);
 
   // ── 4. Evidence of exactly those Cases.
-  const [facts, subjects, events, approvals, presentation] = await Promise.all([
-    listPortfolioCurrentFacts(userDb, ids),
-    listPortfolioCommitmentSubjects(userDb, ids),
-    listPortfolioSupervisorEvents(userDb, ids),
-    listPortfolioCaseApprovals(userDb, ids),
-    listPortfolioPresentationState(userDb, { userId: actorUserId, organizationId }),
-  ]);
+  const [facts, subjects, events, approvals, presentation, authorityResolutions] =
+    await Promise.all([
+      listPortfolioCurrentFacts(userDb, ids),
+      listPortfolioCommitmentSubjects(userDb, ids),
+      listPortfolioSupervisorEvents(userDb, ids),
+      listPortfolioCaseApprovals(userDb, ids),
+      listPortfolioPresentationState(userDb, { userId: actorUserId, organizationId }),
+      listPortfolioAuthorityResolutions(userDb, { organizationId, caseIds: ids }),
+    ]);
   const work = ids.length > 0 ? await listPortfolioWorkItems(serviceDb, ids) : [];
 
   // ── 5. The pure projection.
-  const snapshots = buildCaseSnapshots({ organizationId, cases, facts, subjects, events, approvals, work });
+  const snapshots = buildCaseSnapshots({
+    organizationId,
+    cases,
+    facts,
+    subjects,
+    events,
+    approvals,
+    work,
+    authorityResolutions,
+  });
   const portfolio = buildWorkPortfolio({
     actor: { userId: actorUserId, role: membership.role },
     snapshots,

@@ -1142,6 +1142,7 @@ export * from "./relationship-admission";
 export * from "./source-events";
 export * from "./conversation-bindings";
 export * from "./interaction-authority";
+export * from "./authority-resolutions";
 export * from "./case-subjects";
 export * from "./relationship-supervisor";
 export * from "./human-interaction";

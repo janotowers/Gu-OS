@@ -240,6 +240,7 @@ No confundir tres autoridades:
 | Configuracion y secretos de Organizacion | flags, credenciales de tool, politica de admision | Organizacion | `organization_feature_flags`, `organization_tool_secrets`, `organization_policies` | **Hoy.** `organization_tool_secrets` no tiene lectura para `authenticated` |
 | Identidad externa vinculada | clave legacy, numero de WhatsApp, lead legacy | Organizacion | `external_identity_bindings` | **Hoy.** Solo service role; una referencia tipada por fila |
 | Conversacion externa vinculada | thread Gu o `advisor_wa`, ref opaca | Organizacion / Caso / contacto | `external_conversation_bindings` | **Hoy (schema SL-6).** Solo service role; autoridad de conversacion null por CHECK en `advisor_wa` |
+| Resolucion de autoridad fail-safe | `unknown` / `conflicting` | Organizacion / Caso | `authority_resolutions` | **Hoy (schema SL-6).** Miembros leen; solo service role escribe. No escribe `runtime_authority` |
 | Datos operativos | leads, propiedades, mensajes, deals | Organizacion externa | BigQuery replica Firebase/Mongo | Consultado por `bigquery_run_query` |
 | Brain Layer futuro | pages, links, signals del negocio | Usuario hoy; organizacion cuando exista modelo org | `brain_*` previsto | Debe evolucionar a org/memberships |
 

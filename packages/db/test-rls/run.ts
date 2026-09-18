@@ -2607,6 +2607,67 @@ async function main(): Promise<void> {
       assert.equal(code, FK_VIOLATION);
     });
 
+    await t("org members can read their Organization's authority_resolutions", async () => {
+      await asRole(client, service, async () => {
+        await client.query(
+          `insert into public.authority_resolutions
+             (organization_id, case_id, external_conversation_ref, state, detected_at)
+           values ($1, $2, 'lead-opaque', 'unknown', now())`,
+          [f.orgA, f.orgCaseA]
+        );
+      });
+      const memberCount = await asRole(client, authed(f.creatorA), async () =>
+        (await client.query("select id from public.authority_resolutions")).rowCount
+      );
+      const otherCount = await asRole(client, authed(f.memberB), async () =>
+        (await client.query("select id from public.authority_resolutions")).rowCount
+      );
+      assert.ok((memberCount ?? 0) >= 1);
+      assert.equal(otherCount, 0);
+    });
+
+    await t("an authenticated member cannot insert an authority_resolution", async () => {
+      const code = await asRole(client, authed(f.creatorA), () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.authority_resolutions
+               (organization_id, case_id, state, detected_at)
+             values ($1, $2, 'unknown', now())`,
+            [f.orgA, f.orgCaseA]
+          )
+        )
+      );
+      assert.equal(code, RLS_VIOLATION);
+    });
+
+    await t("a confident conversation state is rejected by CHECK", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.authority_resolutions
+               (organization_id, case_id, state, detected_at)
+             values ($1, $2, 'human_active', now())`,
+            [f.orgA, f.orgCaseA]
+          )
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
+    });
+
+    await t("a Case from another Organization cannot own a resolution (composite FK)", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.authority_resolutions
+               (organization_id, case_id, state, detected_at)
+             values ($1, $2, 'unknown', now())`,
+            [f.orgA, f.orgCaseB]
+          )
+        )
+      );
+      assert.equal(code, FK_VIOLATION);
+    });
+
     await t("an empty external_conversation_ref is rejected", async () => {
       const code = await asRole(client, service, () =>
         errorCode(() =>

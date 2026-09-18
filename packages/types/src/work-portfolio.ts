@@ -51,7 +51,7 @@ export const MUST_SURFACE_WIRING: Record<
   pending_approval: { wiring: "rule_only", producer: "SL-9" },
   blocked_on_human: { wiring: "live", producer: "SL-4 settlements + Work Plane" },
   due_commitment: { wiring: "live", producer: "SL-4 commitment subjects" },
-  authority_conflict: { wiring: "rule_only", producer: "SL-6" },
+  authority_conflict: { wiring: "live", producer: "SL-6 authority_resolutions" },
   unknown_outcome_effect: { wiring: "rule_only", producer: "SL-9" },
   stalled: { wiring: "live", producer: "positive case first reachable at SL-11" },
 };

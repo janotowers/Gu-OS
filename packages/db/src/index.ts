@@ -34,6 +34,7 @@ export * from "./queries/organization-feature-flags";
 export * from "./queries/organization-tool-secrets";
 export * from "./queries/external-identity-bindings";
 export * from "./queries/external-conversation-bindings";
+export * from "./queries/authority-resolutions";
 export * from "./queries/contacts";
 export * from "./queries/case-relationships";
 export * from "./queries/opportunity-closure";
