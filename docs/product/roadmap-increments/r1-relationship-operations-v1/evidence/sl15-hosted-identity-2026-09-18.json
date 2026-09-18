@@ -1,0 +1,88 @@
+{
+  "slice": "SL-15",
+  "ranAt": "2026-09-18T20:40:39.708Z",
+  "productSha": "12ed79ec05f5228a243695a026889f28e18280af",
+  "verifierSha": "04b14d46019d3609763ea0a7648249f4f48bb22d",
+  "guOsEnvironment": "staging",
+  "projectRef": "wdtjqlbsxwiijasicint",
+  "organizationDigest": "sha256:eab41f21d4c319b6",
+  "caseDigest": "sha256:e0207649dd597c74",
+  "leadDigest": "sha256:29ee6eeedebe3f5f",
+  "sourceEventDigest": "sha256:c3e9cd5b9734180e",
+  "contactDigest": "sha256:fce944065c96a3a0",
+  "conversationBindingDigest": "sha256:d964f2ff89491a12",
+  "helper": "backfillAdmittedLegacyLeadIdentity",
+  "traditionalGuWrites": 0,
+  "traditionalGuClientsOpened": 0,
+  "environmentMutations": "none — this procedure never writes Traditional Gu or feature flags",
+  "checks": [
+    {
+      "assertion": "preflight",
+      "label": "the Organization resolves in the declared Gu OS environment",
+      "ok": true,
+      "detail": "status=active"
+    },
+    {
+      "assertion": "SA-15.9",
+      "label": "the named Case is an already-admitted real lead_opportunity under the governed-admission gate",
+      "ok": true,
+      "detail": "lead=sha256:29ee6eeedebe3f5f source_event=sha256:c3e9cd5b9734180e"
+    },
+    {
+      "assertion": "SA-15.9",
+      "label": "the named Case is a governed-admitted real lead_opportunity",
+      "ok": true,
+      "detail": "case=sha256:e0207649dd597c74 lead=sha256:29ee6eeedebe3f5f"
+    },
+    {
+      "assertion": "SA-15.2/SA-15.3",
+      "label": "exactly one traditional_gu / legacy_lead binding exists for the opaque lead",
+      "ok": true,
+      "detail": "bindings=1"
+    },
+    {
+      "assertion": "SA-15.3",
+      "label": "one Organization-scoped Contact exists for that binding",
+      "ok": true,
+      "detail": "contact=sha256:fce944065c96a3a0"
+    },
+    {
+      "assertion": "SA-15.5",
+      "label": "the identity binding carries the required SA-15.5 provenance",
+      "ok": true,
+      "detail": "SA-15.5 satisfied"
+    },
+    {
+      "assertion": "SA-15.9",
+      "label": "one whatsapp_business / gu conversation binding exists under the opaque lead ref",
+      "ok": true,
+      "detail": "gu_bindings=1"
+    },
+    {
+      "assertion": "SA-15.9",
+      "label": "the C2 Lead-ref reverse map sees exactly that Case binding",
+      "ok": true,
+      "detail": "lead_ref_bindings=1"
+    },
+    {
+      "assertion": "SA-15.2/SA-15.7",
+      "label": "retry converges without another Contact or duplicate binding",
+      "ok": true,
+      "detail": "contact_same=true binding_same=true"
+    },
+    {
+      "assertion": "SA-15.11",
+      "label": "Organization containment holds for the Contact and both bindings",
+      "ok": true,
+      "detail": "all observed rows stay in the named Organization"
+    },
+    {
+      "assertion": "SA-15.10",
+      "label": "zero Traditional Gu writes occurred",
+      "ok": true,
+      "detail": "traditional_gu_writes=0"
+    }
+  ],
+  "passed": 11,
+  "total": 11
+}
