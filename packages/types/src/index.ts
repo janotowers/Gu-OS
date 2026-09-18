@@ -1141,6 +1141,7 @@ export * from "./organization-policies";
 export * from "./relationship-admission";
 export * from "./source-events";
 export * from "./conversation-bindings";
+export * from "./interaction-authority";
 export * from "./case-subjects";
 export * from "./relationship-supervisor";
 export * from "./human-interaction";
