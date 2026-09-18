@@ -1,0 +1,713 @@
+/**
+ * Local selftests for the SL-6 T7-1 hosted-authority evidence harness.
+ *
+ * These prove the evaluator and runner contracts without staging, legacy
+ * credentials, network, or product-state mutation.
+ */
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { AuthorityResolution, OperationalCase } from "@agents/types";
+import {
+  AUTO_SELECT_FLAGS,
+  SL6_CANONICAL_BINDING_HELPER,
+  SL6_EXPECTED_STAGING_PRODUCT_SHA,
+  SL6_HOSTED_ENVIRONMENT,
+  SL6_PRODUCT_SHA_DELIVERY_WORKFLOW,
+  SL6_PRODUCT_SHA_PROVENANCE,
+  SL6_STAGING_PROJECT_REF,
+  bindingIdentityDigest,
+  buildDurableEvidence,
+  evaluateEvidenceHygiene,
+  evaluateEvidencePins,
+  evaluateFailSafePersistAdmission,
+  evaluateFrozenMemberPins,
+  evaluateIndependentEquivalence,
+  evaluateOracleIndependenceSources,
+  evaluatePortfolioAuthorityConflictReadback,
+  evaluateProductShaProvenance,
+  evaluateRequiredRs2Satisfaction,
+  evaluateRs2Items,
+  evaluateSl6EvaluatorSourceContract,
+  evaluateSl6HostedSafetyGate,
+  evaluateSl6VerifierSourceContract,
+  evaluateSourcePlacementObservation,
+  evaluateTrackedTreeMatchesHead,
+  evaluateVerifierSha,
+  evidenceDigest,
+  frozenConversationSetDigest,
+  parseFrozenConversationManifest,
+  parseSl6AuthorityArgs,
+  productSourceForContract,
+  type FrozenConversationMember,
+  type PersistAdmissionInput,
+  type ProductAuthorityObservation,
+} from "./sl6-authority-evidence";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = join(HERE, "..", "..");
+const ORG = "11111111-1111-1111-1111-111111111111";
+const CASE_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+const CASE_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+const LEAD_A = "synthetic-lead-alpha";
+const LEAD_B = "synthetic-lead-bravo";
+const VERIFIER_SHA = "83ee7899779a05355299570563a1b3ad2f2fb385";
+const OTHER_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+function member(
+  caseId: string,
+  lead: string,
+  overrides: Partial<FrozenConversationMember> = {}
+): FrozenConversationMember {
+  const observed = {
+    organizationId: ORG,
+    caseId,
+    opaqueLeadRef: lead,
+    provider: "whatsapp_business",
+    threadKind: "gu",
+    status: "active",
+  };
+  return {
+    organizationId: ORG,
+    caseId,
+    opaqueLeadRef: lead,
+    expectedOrganizationDigest: evidenceDigest(ORG),
+    expectedCaseDigest: evidenceDigest(caseId),
+    expectedLeadDigest: evidenceDigest(lead),
+    expectedBindingDigest: bindingIdentityDigest(observed),
+    ...overrides,
+  };
+}
+
+function frozenSet() {
+  return {
+    version: 1 as const,
+    organizationId: ORG,
+    members: [member(CASE_A, LEAD_A), member(CASE_B, LEAD_B)],
+  };
+}
+
+function discoverArgv(overrides: string[] = []): string[] {
+  return [
+    "--phase",
+    "discover",
+    "--env-file",
+    ".env.staging.local",
+    "--env",
+    SL6_HOSTED_ENVIRONMENT,
+    "--legacy-env",
+    "stage",
+    "--organization",
+    ORG,
+    "--case-id",
+    CASE_A,
+    ...overrides,
+  ];
+}
+
+function evidenceArgv(overrides: string[] = []): string[] {
+  return [
+    "--phase",
+    "evidence",
+    "--env-file",
+    ".env.staging.local",
+    "--env",
+    SL6_HOSTED_ENVIRONMENT,
+    "--legacy-env",
+    "stage",
+    "--organization",
+    ORG,
+    "--conversations-file",
+    "operator-local-conversations.json",
+    "--product-sha",
+    SL6_EXPECTED_STAGING_PRODUCT_SHA,
+    ...overrides,
+  ];
+}
+
+function product(
+  overrides: Partial<ProductAuthorityObservation> = {}
+): ProductAuthorityObservation {
+  return {
+    conversationAuthority: "gu",
+    humanActive: false,
+    observedOwnerRef: "synthetic-owner",
+    answeredFrom: "legacy_conversation_authority_get",
+    failSafeReason: null,
+    ...overrides,
+  };
+}
+
+function persistInput(
+  overrides: Partial<PersistAdmissionInput> = {}
+): PersistAdmissionInput {
+  return {
+    phase: "evidence",
+    productVerdict: "unknown",
+    frozenMember: true,
+    observedOwnerRef: "synthetic-owner",
+    acknowledgeDurableWrite: true,
+    acknowledgeFailSafePersist: true,
+    ...overrides,
+  };
+}
+
+function operationalCase(caseId = CASE_A): OperationalCase {
+  return {
+    id: caseId,
+    user_id: "00000000-0000-0000-0000-000000000001",
+    case_type_id: "lead_opportunity",
+    case_type: "lead_opportunity",
+    status: "active",
+    current_step: null,
+    assigned_to_user_id: null,
+    external_contact_jsonb: {},
+    next_action_at: null,
+    due_at: null,
+    context_jsonb: {},
+    version: 1,
+    workflow_definition_id: null,
+    workflow_definition_version: null,
+    organization_id: ORG,
+    runtime_authority: "legacy",
+    created_at: "2026-09-18T00:00:00.000Z",
+    updated_at: "2026-09-18T00:00:00.000Z",
+  };
+}
+
+function resolutionRow(state: "unknown" | "conflicting"): AuthorityResolution {
+  return {
+    id: "resolution-synthetic-1",
+    organization_id: ORG,
+    case_id: CASE_A,
+    external_conversation_ref: LEAD_A,
+    state,
+    detected_at: "2026-09-18T12:00:00.000Z",
+    fail_safe_reason: "synthetic",
+    provenance_jsonb: {},
+    runtime_authority_observed: "legacy",
+    provider_message_id: null,
+    resolved_at: null,
+    resolved_as: null,
+    created_at: "2026-09-18T12:00:00.000Z",
+  };
+}
+
+function testPhaseSafety(): void {
+  const discover = parseSl6AuthorityArgs(discoverArgv());
+  assert.equal(discover.ok, true);
+  assert.equal(discover.phase, "discover");
+  assert.deepEqual(discover.inventoryCaseIds, [CASE_A]);
+  assert.equal(
+    evaluateFailSafePersistAdmission(persistInput({ phase: "discover" })).admitted,
+    false
+  );
+
+  const missingManifest = parseSl6AuthorityArgs([
+    "--phase",
+    "evidence",
+    "--organization",
+    ORG,
+  ]);
+  assert.equal(missingManifest.ok, false);
+  assert.match(missingManifest.reason, /conversations-file/);
+
+  for (const flag of AUTO_SELECT_FLAGS) {
+    const parsed = parseSl6AuthorityArgs(evidenceArgv([flag]));
+    assert.equal(parsed.ok, false, flag);
+    assert.match(parsed.reason, /never auto-selects/);
+  }
+
+  const mixed = parseSl6AuthorityArgs(evidenceArgv(["--case-id", CASE_A]));
+  assert.equal(mixed.ok, false);
+  console.log("  ok  phase safety: discover cannot persist; evidence requires frozen set; auto-select refused");
+}
+
+function testManifest(): void {
+  const parsed = parseFrozenConversationManifest(frozenSet());
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) throw new Error(parsed.reason);
+  assert.equal(parsed.manifest.members.length, 2);
+  const first = parsed.manifest.members[0];
+  const pins = evaluateFrozenMemberPins(first, {
+    organizationId: ORG,
+    caseId: CASE_A,
+    opaqueLeadRef: LEAD_A,
+    provider: "whatsapp_business",
+    threadKind: "gu",
+    status: "active",
+  });
+  assert.equal(pins.ok, true);
+  assert.equal(frozenConversationSetDigest(parsed.manifest.members), frozenConversationSetDigest(parsed.manifest.members));
+
+  assert.equal(parseFrozenConversationManifest(null).ok, false);
+  assert.equal(parseFrozenConversationManifest({ version: 1, organizationId: ORG, members: [] }).ok, false);
+  assert.equal(
+    parseFrozenConversationManifest({
+      version: 1,
+      organizationId: ORG,
+      members: [member(CASE_A, LEAD_A), member(CASE_A, LEAD_B)],
+    }).ok,
+    false
+  );
+  assert.equal(
+    parseFrozenConversationManifest({
+      version: 1,
+      organizationId: ORG,
+      members: [{ ...member(CASE_A, LEAD_A), organizationId: CASE_B }],
+    }).ok,
+    false
+  );
+  const changed = evaluateFrozenMemberPins(first, {
+    organizationId: ORG,
+    caseId: CASE_A,
+    opaqueLeadRef: LEAD_A,
+    provider: "whatsapp_business",
+    threadKind: "gu",
+    status: "ended",
+  });
+  assert.equal(changed.ok, false);
+  assert.match(changed.reason, /digest\/pin changed/);
+  console.log("  ok  manifest: valid synthetic set accepted; malformed/duplicate/changed pin rejected");
+}
+
+function testOracleIndependence(): void {
+  const takeoverFalse = {
+    leadTakeoverActive: false,
+    lastOwnerInteractionAt: null,
+    numberKillSwitchActive: false,
+    observedAt: "2026-09-18T12:00:00.000Z",
+  };
+  const productSaysHuman = product({
+    conversationAuthority: "human_active",
+    humanActive: true,
+  });
+  const result = evaluateIndependentEquivalence({
+    id: "synthetic",
+    product: productSaysHuman,
+    oracleInputs: takeoverFalse,
+  });
+  assert.equal(result.oracle.humanActive, false);
+  assert.equal(result.equivalence.agreed, false);
+  assert.equal(result.equivalence.resolverHumanActive, true);
+  assert.equal(result.equivalence.oracleHumanActive, false);
+
+  const aligned = evaluateIndependentEquivalence({
+    id: "aligned",
+    product: product(),
+    oracleInputs: takeoverFalse,
+  });
+  assert.equal(aligned.equivalence.agreed, true);
+  console.log("  ok  oracle independence: product verdict does not become oracle input");
+}
+
+function testPersistenceGating(): void {
+  assert.equal(evaluateFailSafePersistAdmission(persistInput()).admitted, true);
+  assert.equal(
+    evaluateFailSafePersistAdmission(persistInput({ productVerdict: "gu" })).admitted,
+    false
+  );
+  assert.equal(
+    evaluateFailSafePersistAdmission(
+      persistInput({ productVerdict: "human_active" })
+    ).admitted,
+    false
+  );
+  assert.equal(
+    evaluateFailSafePersistAdmission(persistInput({ phase: "discover" })).admitted,
+    false
+  );
+  assert.equal(
+    evaluateFailSafePersistAdmission(persistInput({ frozenMember: false })).admitted,
+    false
+  );
+  assert.equal(
+    evaluateFailSafePersistAdmission(persistInput({ observedOwnerRef: null })).admitted,
+    false
+  );
+  assert.equal(
+    evaluateFailSafePersistAdmission(
+      persistInput({ acknowledgeDurableWrite: false })
+    ).admitted,
+    false
+  );
+  assert.equal(
+    evaluateFailSafePersistAdmission(
+      persistInput({ acknowledgeFailSafePersist: false })
+    ).admitted,
+    false
+  );
+  assert.equal(
+    evaluateFailSafePersistAdmission(persistInput({ productVerdict: "conflicting" }))
+      .admitted,
+    true
+  );
+  console.log("  ok  persist gate: unknown/conflicting+requirements admit; agreement/takeover/discover/acks refuse");
+}
+
+function testPortfolioReadback(): void {
+  const ok = evaluatePortfolioAuthorityConflictReadback({
+    persistHelperReturnedId: "helper-return-is-not-proof",
+    caseRow: operationalCase(),
+    readBackResolutions: [resolutionRow("unknown")],
+    now: new Date("2026-09-18T13:00:00.000Z"),
+  });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.usedPersistReturnValueAlone, false);
+  assert.equal(ok.mustSurfaceAuthorityConflict, true);
+
+  const helperOnly = evaluatePortfolioAuthorityConflictReadback({
+    persistHelperReturnedId: "helper-return-is-not-proof",
+    caseRow: operationalCase(),
+    readBackResolutions: [],
+    now: new Date("2026-09-18T13:00:00.000Z"),
+  });
+  assert.equal(helperOnly.ok, false);
+  assert.match(helperOnly.reason, /not Portfolio proof/);
+  console.log("  ok  Portfolio proof is persisted-state read-back, not the persist helper return");
+}
+
+function testRs2Semantics(): void {
+  const allRequired = evaluateRs2Items({
+    namedEquivalenceRecords: 2,
+    unexplainedMissingEquivalence: false,
+    takeoverHumanActiveObserved: true,
+    unknownOrConflictingPersistedAndSurfaced: true,
+    containmentHolds: true,
+  });
+  const allOk = evaluateRequiredRs2Satisfaction({
+    executionCompleted: true,
+    items: allRequired,
+  });
+  assert.equal(allOk.requiredRs2FullySatisfied, true);
+  assert.equal(allOk.sliceDoneClaim, "not_claimed");
+
+  const noTakeover = evaluateRs2Items({
+    namedEquivalenceRecords: 2,
+    unexplainedMissingEquivalence: false,
+    takeoverHumanActiveObserved: false,
+    unknownOrConflictingPersistedAndSurfaced: true,
+    containmentHolds: true,
+  });
+  assert.equal(
+    noTakeover.find((item) => item.id === "rs2_2_takeover_variation")?.status,
+    "CONDITIONED_UNAVAILABLE"
+  );
+  assert.match(
+    noTakeover.find((item) => item.id === "rs2_2_takeover_variation")?.detail ?? "",
+    /must not be overstated/
+  );
+  assert.equal(
+    evaluateRequiredRs2Satisfaction({ executionCompleted: true, items: noTakeover })
+      .requiredRs2FullySatisfied,
+    true
+  );
+
+  const unmet3 = evaluateRs2Items({
+    namedEquivalenceRecords: 2,
+    unexplainedMissingEquivalence: false,
+    takeoverHumanActiveObserved: true,
+    unknownOrConflictingPersistedAndSurfaced: false,
+    containmentHolds: true,
+  });
+  const unmet3Overall = evaluateRequiredRs2Satisfaction({
+    executionCompleted: true,
+    items: unmet3,
+  });
+  assert.equal(
+    unmet3.find((item) => item.id === "rs2_3_unknown_conflicting")?.status,
+    "UNMET"
+  );
+  assert.equal(unmet3Overall.requiredRs2FullySatisfied, false);
+  assert.match(unmet3Overall.reason, /item #3/);
+
+  const unmet1 = evaluateRequiredRs2Satisfaction({
+    executionCompleted: true,
+    items: evaluateRs2Items({
+      namedEquivalenceRecords: 0,
+      unexplainedMissingEquivalence: true,
+      takeoverHumanActiveObserved: true,
+      unknownOrConflictingPersistedAndSurfaced: true,
+      containmentHolds: true,
+    }),
+  });
+  assert.equal(unmet1.requiredRs2FullySatisfied, false);
+
+  const unmet4 = evaluateRequiredRs2Satisfaction({
+    executionCompleted: true,
+    items: evaluateRs2Items({
+      namedEquivalenceRecords: 1,
+      unexplainedMissingEquivalence: false,
+      takeoverHumanActiveObserved: true,
+      unknownOrConflictingPersistedAndSurfaced: true,
+      containmentHolds: false,
+    }),
+  });
+  assert.equal(unmet4.requiredRs2FullySatisfied, false);
+
+  const incomplete = evaluateRequiredRs2Satisfaction({
+    executionCompleted: false,
+    items: allRequired,
+  });
+  assert.equal(incomplete.requiredRs2FullySatisfied, false);
+  console.log("  ok  RS-2: completed run != PASS; #3 UNMET cannot fully satisfy; #2 is availability-conditioned");
+}
+
+function testHygieneAndArtifact(): void {
+  const evidence = buildDurableEvidence({
+    ranAt: "2026-09-18T14:00:00.000Z",
+    productSha: SL6_EXPECTED_STAGING_PRODUCT_SHA,
+    verifierSha: VERIFIER_SHA,
+    guOsEnvironment: SL6_HOSTED_ENVIRONMENT,
+    projectRef: SL6_STAGING_PROJECT_REF,
+    legacyEnvironment: "stage",
+    frozenConversationSetDigest: frozenConversationSetDigest(frozenSet().members),
+    conversations: [
+      {
+        organizationDigest: evidenceDigest(ORG),
+        caseDigest: evidenceDigest(CASE_A),
+        leadDigest: evidenceDigest(LEAD_A),
+        bindingDigest: member(CASE_A, LEAD_A).expectedBindingDigest,
+        productVerdict: "unknown",
+        oracleVerdict: null,
+        oracleReason: "lead_takeover_not_boolean",
+        agreed: true,
+        takeoverHumanActiveObserved: false,
+        unknownOrConflictingObserved: true,
+        persistenceAdmitted: true,
+        persistenceExercised: true,
+        portfolioMustSurfaceAuthorityConflict: true,
+        sourcePath: "gu2.users",
+        adapter: "bootstrap_direct",
+      },
+    ],
+    observedPlacement: ["gu2.users"],
+    runtimeAuthorityMutated: false,
+    checks: [{ assertion: "SA-6.9", label: "equivalence recorded", ok: true }],
+    executionCompleted: true,
+    namedEquivalenceRecords: 1,
+    unexplainedMissingEquivalence: false,
+    takeoverHumanActiveObserved: false,
+    unknownOrConflictingPersistedAndSurfaced: true,
+  });
+  const hygiene = evaluateEvidenceHygiene(evidence);
+  assert.equal(hygiene.ok, true);
+  const serialized = JSON.stringify(evidence);
+  assert.equal(serialized.includes(LEAD_A), false);
+  assert.equal(serialized.includes(CASE_A), false);
+  assert.equal(serialized.includes("password"), false);
+  assert.equal(evidence.rs2.sliceDoneClaim, "not_claimed");
+  assert.equal(evidence.sourcePlacement.conclusion, "not_concluded");
+  assert.equal(evidence.containment.traditionalGuWrites.basis, "structural");
+  assert.equal(evaluateEvidenceHygiene({ password: "secret" }).ok, false);
+  console.log("  ok  hygiene: durable evidence uses digests and omits prohibited raw data");
+}
+
+function testProvenance(): void {
+  assert.equal(evaluateVerifierSha("abc").ok, false);
+  assert.equal(evaluateVerifierSha(VERIFIER_SHA).ok, true);
+  const pinOk = evaluateProductShaProvenance({
+    declaredProductSha: SL6_EXPECTED_STAGING_PRODUCT_SHA,
+    observedLatestRelevantDeliverySha: SL6_EXPECTED_STAGING_PRODUCT_SHA,
+    deliveryWorkflowId: SL6_PRODUCT_SHA_DELIVERY_WORKFLOW,
+  });
+  assert.equal(pinOk.ok, true);
+  assert.equal(pinOk.hostedEvidenceReady, true);
+  assert.equal(pinOk.provenanceClassification, SL6_PRODUCT_SHA_PROVENANCE);
+  assert.notEqual(pinOk.productSha, VERIFIER_SHA);
+
+  const newer = evaluateProductShaProvenance({
+    declaredProductSha: SL6_EXPECTED_STAGING_PRODUCT_SHA,
+    observedLatestRelevantDeliverySha: OTHER_SHA,
+    deliveryWorkflowId: SL6_PRODUCT_SHA_DELIVERY_WORKFLOW,
+  });
+  assert.equal(newer.ok, false);
+  assert.equal(newer.deliveryObservation, "newer_than_expected_pin");
+
+  const wrongPin = evaluateProductShaProvenance({
+    declaredProductSha: OTHER_SHA,
+    observedLatestRelevantDeliverySha: OTHER_SHA,
+    deliveryWorkflowId: SL6_PRODUCT_SHA_DELIVERY_WORKFLOW,
+  });
+  assert.equal(wrongPin.ok, false);
+
+  const pins = evaluateEvidencePins({
+    productSha: SL6_EXPECTED_STAGING_PRODUCT_SHA,
+    verifierSha: VERIFIER_SHA,
+    environment: SL6_HOSTED_ENVIRONMENT,
+    projectRef: SL6_STAGING_PROJECT_REF,
+    ranAt: "2026-09-18T14:00:00.000Z",
+    productShaProvenance: SL6_PRODUCT_SHA_PROVENANCE,
+  });
+  assert.equal(pins.ok, true);
+  assert.equal(
+    evaluateEvidencePins({
+      productSha: SL6_EXPECTED_STAGING_PRODUCT_SHA,
+      verifierSha: "short",
+      environment: SL6_HOSTED_ENVIRONMENT,
+      projectRef: SL6_STAGING_PROJECT_REF,
+      ranAt: "2026-09-18T14:00:00.000Z",
+      productShaProvenance: SL6_PRODUCT_SHA_PROVENANCE,
+    }).ok,
+    false
+  );
+  console.log("  ok  provenance: full verifier SHA required; product/verifier distinct; newer delivery fails closed");
+}
+
+function testHostedSafetyGate(): void {
+  const happy = evaluateSl6HostedSafetyGate({
+    argv: evidenceArgv(["--acknowledge-durable-write", "--acknowledge-fail-safe-persist"]),
+    targetName: SL6_HOSTED_ENVIRONMENT,
+    targetProjectRef: SL6_STAGING_PROJECT_REF,
+  });
+  assert.equal(happy.ok, true);
+
+  assert.equal(
+    evaluateSl6HostedSafetyGate({
+      argv: evidenceArgv(),
+      targetName: "production",
+      targetProjectRef: SL6_STAGING_PROJECT_REF,
+    }).ok,
+    false
+  );
+  assert.equal(
+    evaluateSl6HostedSafetyGate({
+      argv: evidenceArgv(),
+      targetName: SL6_HOSTED_ENVIRONMENT,
+      targetProjectRef: "aaaaaaaaaaaaaaaaaaaa",
+    }).ok,
+    false
+  );
+  const noLegacy = evaluateSl6HostedSafetyGate({
+    argv: [
+      "--phase",
+      "evidence",
+      "--env",
+      SL6_HOSTED_ENVIRONMENT,
+      "--organization",
+      ORG,
+      "--conversations-file",
+      "x.json",
+    ],
+    targetName: SL6_HOSTED_ENVIRONMENT,
+    targetProjectRef: SL6_STAGING_PROJECT_REF,
+  });
+  assert.equal(noLegacy.ok, false);
+  assert.match(noLegacy.reason, /legacy-env/);
+
+  const prodLegacy = evaluateSl6HostedSafetyGate({
+    argv: evidenceArgv().map((arg) => (arg === "stage" ? "prod" : arg)),
+    targetName: SL6_HOSTED_ENVIRONMENT,
+    targetProjectRef: SL6_STAGING_PROJECT_REF,
+  });
+  assert.equal(prodLegacy.ok, false);
+
+  const discoverNoCases = evaluateSl6HostedSafetyGate({
+    argv: [
+      "--phase",
+      "discover",
+      "--env",
+      SL6_HOSTED_ENVIRONMENT,
+      "--legacy-env",
+      "stage",
+      "--organization",
+      ORG,
+    ],
+    targetName: SL6_HOSTED_ENVIRONMENT,
+    targetProjectRef: SL6_STAGING_PROJECT_REF,
+  });
+  assert.equal(discoverNoCases.ok, false);
+  console.log("  ok  hosted safety gate: staging-only, expected ref, explicit legacy-env, no auto-select");
+}
+
+function testSourceContractsAndBinding(): void {
+  const evaluatorSource = readFileSync(join(HERE, "sl6-authority-evidence.ts"), "utf8");
+  const runnerSource = readFileSync(join(REPO, "scripts", "verify-sl6-authority.ts"), "utf8");
+  const oracleSource = readFileSync(
+    join(REPO, "apps", "web", "src", "lib", "authority-equivalence", "oracle.ts"),
+    "utf8"
+  );
+  const resolverSource = readFileSync(
+    join(REPO, "apps", "web", "src", "lib", "relationship-authority", "resolve.ts"),
+    "utf8"
+  );
+
+  const evaluatorChecks = evaluateSl6EvaluatorSourceContract(evaluatorSource);
+  assert.ok(
+    evaluatorChecks.every((check) => check.ok),
+    evaluatorChecks.filter((check) => !check.ok).map((check) => check.label).join("; ")
+  );
+  const runnerChecks = evaluateSl6VerifierSourceContract(runnerSource);
+  assert.ok(
+    runnerChecks.every((check) => check.ok),
+    runnerChecks.filter((check) => !check.ok).map((check) => check.label).join("; ")
+  );
+  const independence = evaluateOracleIndependenceSources({
+    evaluatorSource,
+    runnerSource,
+    oracleSource,
+    resolverSource,
+  });
+  assert.ok(
+    independence.every((check) => check.ok),
+    independence.filter((check) => !check.ok).map((check) => check.label).join("; ")
+  );
+
+  assert.equal(
+    /attachExternalConversationBinding\s*\(/.test(evaluatorSource),
+    false
+  );
+  assert.equal(/attachExternalConversationBinding\s*\(/.test(runnerSource), false);
+  assert.equal(/backfillAdmittedLegacyLeadIdentity\s*\(/.test(runnerSource), false);
+  assert.equal(SL6_CANONICAL_BINDING_HELPER, "backfillAdmittedLegacyLeadIdentity");
+  console.log("  ok  source contracts: oracle independence, gated clients, no second attach caller");
+}
+
+function testPlacementAndTree(): void {
+  const placement = evaluateSourcePlacementObservation({ observedPlacement: null });
+  assert.equal(placement.conclusion, "not_concluded");
+  assert.deepEqual(placement.configuredAllowlist, ["gu2.users", "gu2.gunumbers"]);
+  assert.deepEqual(placement.comparisonPaths, ["bot.users"]);
+  assert.equal(
+    evaluateTrackedTreeMatchesHead({ unstagedStatus: 1, stagedStatus: 0 }).ok,
+    false
+  );
+  assert.equal(
+    evaluateTrackedTreeMatchesHead({ unstagedStatus: 0, stagedStatus: 0 }).ok,
+    true
+  );
+  console.log("  ok  placement is not concluded before discovery; dirty tree fails the guard");
+}
+
+function testHostedLeakageSurface(): void {
+  const evaluatorSource = productSourceForContract(
+    readFileSync(join(HERE, "sl6-authority-evidence.ts"), "utf8")
+  );
+  const selftestSource = readFileSync(join(HERE, "sl6-authority-evidence.selftest.ts"), "utf8");
+  assert.equal(/from\s+["']@supabase\/supabase-js["']/.test(evaluatorSource), false);
+  assert.equal(/from\s+["']@supabase\/supabase-js["']/.test(selftestSource), false);
+  assert.equal(/from\s+["']mongodb["']/.test(selftestSource), false);
+  assert.equal(/from\s+["']@google-cloud\/firestore["']/.test(selftestSource), false);
+  assert.equal(/process\.env\.[A-Z0-9_]+/.test(selftestSource), false);
+  console.log("  ok  local selftests do not construct hosted clients or require real credentials");
+}
+
+function main(): void {
+  console.log("sl6 authority evidence selftest");
+  testPhaseSafety();
+  testManifest();
+  testOracleIndependence();
+  testPersistenceGating();
+  testPortfolioReadback();
+  testRs2Semantics();
+  testHygieneAndArtifact();
+  testProvenance();
+  testHostedSafetyGate();
+  testSourceContractsAndBinding();
+  testPlacementAndTree();
+  testHostedLeakageSurface();
+  console.log("sl6 authority evidence selftest: ok");
+}
+
+main();
