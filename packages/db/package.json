@@ -17,6 +17,7 @@
     "test:durable-tasks": "tsx src/queries/durable-tasks.selftest.ts",
     "test:attachments": "tsx src/queries/attachments.selftest.ts",
     "test:organizations": "tsx src/queries/organizations.selftest.ts",
+    "test:legacy-lead-contact": "tsx src/queries/legacy-lead-contact.selftest.ts",
     "test:external-conversation-bindings": "tsx src/queries/external-conversation-bindings.selftest.ts",
     "test:authority-resolutions": "tsx src/queries/authority-resolutions.selftest.ts",
     "test:operational-cases": "tsx src/queries/operational-cases.selftest.ts",

@@ -357,12 +357,17 @@ async function testAttachHelperHasNoRuntimeProducer(): Promise<void> {
   }
 
   for (const root of roots) await walk(root);
+  // SL-15 historical/pilot backfill is the only governed non-test caller.
+  // Future admission still does not attach a conversation binding. T7 is
+  // still not a caller.
   assert.deepEqual(
     callers,
-    [],
-    `no runtime producer may be invented: ${callers.join(", ")}`
+    ["packages/db/src/queries/legacy-lead-contact.ts"],
+    `only SL-15 backfill may call attachExternalConversationBinding; found: ${callers.join(", ")}`
   );
-  console.log("  ok  attachExternalConversationBinding has no non-test runtime caller");
+  console.log(
+    "  ok  attachExternalConversationBinding has exactly one non-test caller (SL-15 backfill)"
+  );
 }
 
 async function main(): Promise<void> {

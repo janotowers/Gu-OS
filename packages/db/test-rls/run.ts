@@ -7,7 +7,8 @@
  * SL-7 `portfolio_presentation_state` and the Work Portfolio read paths; SL-12
  * the chat tool's Organization resolution and the ranking kill switch; Cycle 3
  * order 5 `tool_calls` as read-own and not user-writable; SL-6
- * `external_conversation_bindings` and `authority_resolutions`.
+ * `external_conversation_bindings` and `authority_resolutions`; SL-15
+ * `resolve_or_create_contact_for_legacy_lead`.
  *
  * Technical Plan §8: "Cross-tenant negative suite (two-orgs fixture, read and
  * write paths) required from SL-0 and gating every multi-seat surface."
@@ -2713,6 +2714,182 @@ async function main(): Promise<void> {
         )
       );
       assert.equal(code, FK_VIOLATION);
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-15 resolve_or_create_contact_for_legacy_lead — SA-15.6 / SA-15.7 / SA-15.11");
+
+    const resolveLead = async (
+      organizationId: string,
+      leadId: string,
+      provenance: Record<string, unknown> = {}
+    ) =>
+      (
+        await client.query<{ resolve_or_create_contact_for_legacy_lead: string }>(
+          "select public.resolve_or_create_contact_for_legacy_lead($1, $2, $3::jsonb)",
+          [organizationId, leadId, JSON.stringify(provenance)]
+        )
+      ).rows[0].resolve_or_create_contact_for_legacy_lead;
+
+    await t("resolve_or_create_contact_for_legacy_lead is SECURITY INVOKER, service_role only", async () => {
+      const meta = await fnMeta("resolve_or_create_contact_for_legacy_lead");
+      assert.equal(meta.prosecdef, false, "must NOT be SECURITY DEFINER");
+      assert.equal(meta.public_exec, false);
+      assert.equal(meta.authenticated_exec, false);
+      assert.equal(meta.service_exec, true);
+      assert.ok(
+        (meta.proconfig ?? []).some((c) => c.startsWith("search_path=")),
+        "must pin search_path"
+      );
+    });
+
+    await t("an authenticated JWT cannot execute resolve_or_create_contact_for_legacy_lead", async () => {
+      const code = await errorCode(() =>
+        asRole(client, authed(f.creatorA), () =>
+          client.query(
+            "select public.resolve_or_create_contact_for_legacy_lead($1, $2)",
+            [f.orgA, "lead-denied"]
+          )
+        )
+      );
+      assert.equal(code, RLS_VIOLATION);
+    });
+
+    await t("service_role creates one Contact + typed binding atomically and reuses it", async () => {
+      const first = await resolveLead(f.orgA, "lead-reuse", { basis: "admission" });
+      const second = await resolveLead(f.orgA, "lead-reuse", { basis: "retry" });
+      assert.equal(second, first);
+
+      const { rows } = await client.query<{
+        n_contacts: string;
+        n_bindings: string;
+        basis: string | null;
+        opaque: string | null;
+      }>(
+        `select
+           (select count(*)::text from public.contacts where organization_id = $1) as n_contacts,
+           (select count(*)::text from public.external_identity_bindings
+             where binding_kind = 'legacy_lead' and external_id = 'lead-reuse') as n_bindings,
+           (select provenance_jsonb ->> 'basis' from public.external_identity_bindings
+             where binding_kind = 'legacy_lead' and external_id = 'lead-reuse') as basis,
+           (select provenance_jsonb ->> 'opaque_legacy_lead_ref'
+              from public.external_identity_bindings
+             where binding_kind = 'legacy_lead' and external_id = 'lead-reuse') as opaque`,
+        [f.orgA]
+      );
+      assert.ok(Number(rows[0].n_contacts) >= 1);
+      assert.equal(rows[0].n_bindings, "1");
+      assert.equal(rows[0].basis, "admission", "reuse must not rewrite provenance");
+      assert.equal(rows[0].opaque, "lead-reuse");
+    });
+
+    await t("the opaque lead id is stored whole and only trimmed", async () => {
+      const id = await resolveLead(
+        f.orgA,
+        "  5215500000001521550000000252155000000003  "
+      );
+      const { rows } = await client.query<{ external_id: string }>(
+        `select external_id from public.external_identity_bindings
+          where ref_contact_id = $1 and binding_kind = 'legacy_lead'`,
+        [id]
+      );
+      assert.equal(rows[0].external_id, "5215500000001521550000000252155000000003");
+    });
+
+    await t("two different opaque lead ids are never merged", async () => {
+      const a = await resolveLead(f.orgA, "lead-one");
+      const b = await resolveLead(f.orgA, "lead-two");
+      assert.notEqual(a, b);
+    });
+
+    await t("a cross-Organization existing binding fails closed", async () => {
+      await resolveLead(f.orgA, "lead-cross");
+      const code = await errorCode(() => resolveLead(f.orgB, "lead-cross"));
+      assert.equal(code, RAISE_EXCEPTION);
+      const { rows } = await client.query<{ n: string }>(
+        `select count(*)::text as n from public.contacts where organization_id = $1
+          and id in (
+            select ref_contact_id from public.external_identity_bindings
+             where external_id = 'lead-cross'
+          )`,
+        [f.orgB]
+      );
+      assert.equal(rows[0].n, "0", "no Contact is created in the requesting Organization");
+    });
+
+    await t("an incompatible existing binding fails closed", async () => {
+      await client.query(
+        `insert into public.external_identity_bindings
+           (organization_id, source_system, binding_kind, external_id, ref_case_id)
+         values ($1, 'traditional_gu', 'legacy_lead', 'lead-incompatible', $2)`,
+        [f.orgA, f.orgCaseA]
+      );
+      const before = (
+        await client.query<{ n: string }>(
+          "select count(*)::text as n from public.contacts where organization_id = $1",
+          [f.orgA]
+        )
+      ).rows[0].n;
+      const code = await errorCode(() => resolveLead(f.orgA, "lead-incompatible"));
+      assert.equal(code, RAISE_EXCEPTION);
+      const after = (
+        await client.query<{ n: string }>(
+          "select count(*)::text as n from public.contacts where organization_id = $1",
+          [f.orgA]
+        )
+      ).rows[0].n;
+      assert.equal(after, before, "no second Contact is minted");
+    });
+
+    await t("concurrent resolve-or-create runs converge on one Contact", async () => {
+      const other = new Client({ connectionString: url });
+      await other.connect();
+      try {
+        await client.query("begin");
+        const winner = (
+          await client.query<{ resolve_or_create_contact_for_legacy_lead: string }>(
+            "select public.resolve_or_create_contact_for_legacy_lead($1, $2)",
+            [f.orgA, "lead-race"]
+          )
+        ).rows[0].resolve_or_create_contact_for_legacy_lead;
+
+        const contender = other.query<{ resolve_or_create_contact_for_legacy_lead: string }>(
+          "select public.resolve_or_create_contact_for_legacy_lead($1, $2)",
+          [f.orgA, "lead-race"]
+        );
+        await new Promise((r) => setTimeout(r, 250));
+        await client.query("commit");
+
+        const loser = (await contender).rows[0].resolve_or_create_contact_for_legacy_lead;
+        assert.equal(loser, winner);
+
+        const { rows } = await client.query<{ n: string }>(
+          `select count(*)::text as n from public.external_identity_bindings
+            where binding_kind = 'legacy_lead' and external_id = 'lead-race'`
+        );
+        assert.equal(rows[0].n, "1", "no orphan Contact or duplicate binding");
+      } finally {
+        await other.end();
+      }
+    });
+
+    await t("org A members cannot read org B contacts created by the primitive", async () => {
+      const contactB = await resolveLead(f.orgB, "lead-tenant-b");
+      const visible = await asRole(client, authed(f.creatorA), async () =>
+        (
+          await client.query("select id from public.contacts where id = $1", [contactB])
+        ).rowCount
+      );
+      assert.equal(visible, 0, "SA-15.11: cross-tenant Contact is invisible");
+      const bindings = await asRole(client, authed(f.creatorA), async () =>
+        (
+          await client.query(
+            "select id from public.external_identity_bindings where external_id = $1",
+            ["lead-tenant-b"]
+          )
+        ).rowCount
+      );
+      assert.equal(bindings, 0, "identity bindings stay unreadable to JWTs");
     });
 
     await t("an empty external_conversation_ref is rejected", async () => {

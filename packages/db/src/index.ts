@@ -36,6 +36,7 @@ export * from "./queries/external-identity-bindings";
 export * from "./queries/external-conversation-bindings";
 export * from "./queries/authority-resolutions";
 export * from "./queries/contacts";
+export * from "./queries/legacy-lead-contact";
 export * from "./queries/case-relationships";
 export * from "./queries/opportunity-closure";
 export * from "./queries/organization-policies";

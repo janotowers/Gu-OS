@@ -8,7 +8,8 @@
 -- means RLS actually denied it.
 --
 -- Deliberately NO blanket `grant execute on all functions`: that would silently
--- undo the explicit EXECUTE revokes on bootstrap_organization (00082) and
+-- undo the explicit EXECUTE revokes on bootstrap_organization (00082),
+-- resolve_or_create_contact_for_legacy_lead (forward SL-15) and
 -- is_active_org_member (00080), which this suite asserts.
 -- ============================================================
 
