@@ -1143,6 +1143,7 @@ export * from "./source-events";
 export * from "./conversation-bindings";
 export * from "./interaction-authority";
 export * from "./authority-resolutions";
+export * from "./legacy-service-auth";
 export * from "./case-subjects";
 export * from "./relationship-supervisor";
 export * from "./human-interaction";
