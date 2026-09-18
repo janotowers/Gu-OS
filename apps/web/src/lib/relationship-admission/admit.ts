@@ -102,6 +102,7 @@ import {
   reclaimSourceEvent,
   recordSourceEvent,
   recordSourceEventDecision,
+  resolveOrCreateContactForLegacyLead,
   settleSourceEvent,
   type DbClient,
 } from "@agents/db";
@@ -589,16 +590,21 @@ async function decide(params: {
  *   1. the Opportunity Case — creation is structurally unique per source event,
  *      so two workers cannot both create one;
  *   2. `source_events.admitted_case_id` — the recovery anchor;
- *   3. the `admission.disposition` fact;
- *   4. the `admission.source` fact;
- *   5. the `opportunity.objective` fact, when the decision carries an objective;
- *   6. the admission timeline event;
- *   7. settlement.
+ *   3. the Contact / opaque `legacy_lead` identity seam (SL-15 / Q18) —
+ *      `resolveOrCreateContactForLegacyLead` is database-atomic, so a crash
+ *      cannot leave an orphan Contact and a resume cannot mint a second one;
+ *   4. the `admission.disposition` fact;
+ *   5. the `admission.source` fact;
+ *   6. the `opportunity.objective` fact, when the decision carries an objective;
+ *   7. the admission timeline event;
+ *   8. settlement.
  *
  * A resume checks each before writing it, so a crash at any boundary converges
  * on exactly one canonical materialisation. Settlement is last and unconditional
  * on nothing: the event is never marked completed while something it owes is
- * missing.
+ * missing. Identity is therefore part of the owed set, not a second workflow:
+ * a process failure cannot settle an admitted Case without the seam, and retry
+ * reuses the existing typed binding.
  */
 async function completeMaterialisation(params: {
   db: DbClient;
@@ -712,7 +718,22 @@ async function completeMaterialisation(params: {
     throw new ClaimLost();
   }
 
-  // ── 3–5. The admitting facts.
+  // ── 3. The Contact / legacy_lead identity seam, after the Case exists and
+  // is linked, before any fact or settlement. The opaque lead id is the
+  // source-event ref already stored on the Case — compared whole, never parsed.
+  // Unadmitted dispositions never reach this function's admitted path.
+  await resolveOrCreateContactForLegacyLead(db, {
+    organizationId: ctx.organizationId,
+    legacyLeadId: event.externalLeadRef,
+    provenance: {
+      basis: "admission",
+      source_event_id: sourceEventId,
+      case_id: caseId,
+      provisional_materialization: true,
+    },
+  });
+
+  // ── 4–6. The admitting facts.
   //
   // Written through `insertCaseFactOnce`, whose identity is
   // (case_id, fact_key, source_ref) with `source_ref` naming THIS source event.
@@ -768,7 +789,7 @@ async function completeMaterialisation(params: {
     });
   }
 
-  // ── 6. The timeline event, once.
+  // ── 7. The timeline event, once.
   //
   // `operational_case_events` is append-only and carries no identity of its
   // own, so a partial unique index on (case_id, payload->>'source_event_id')
@@ -782,7 +803,7 @@ async function completeMaterialisation(params: {
     settled,
   });
 
-  // ── 7. Only now.
+  // ── 8. Only now.
   return settle(caseId);
 }
 

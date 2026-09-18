@@ -19,7 +19,10 @@
  * Test-only. Not exported from any module index.
  */
 import { randomUUID } from "node:crypto";
-import type { DbClient } from "@agents/db";
+import {
+  requireCreateIdentityProvenance,
+  type DbClient,
+} from "@agents/db";
 
 type Row = Record<string, unknown>;
 
@@ -78,6 +81,12 @@ export interface FakeDbOptions {
    */
   failWrite?: Array<{ table: string; occurrence?: number }>;
   /**
+   * Same one-shot injection for RPCs. Admission's Contact identity seam is a
+   * function, not a table write, so a crash-before-identity test has to fail
+   * the RPC itself.
+   */
+  failRpc?: Array<{ name: string; occurrence?: number }>;
+  /**
    * Column defaults per table, applied on insert.
    *
    * The fake speaks PostgREST, not PostgreSQL: it never sees a DEFAULT clause.
@@ -116,8 +125,11 @@ export interface FakeDb {
    */
   queries: FakeQuery[];
   writes: string[];
+  rpcCalls: Array<{ name: string; args: Record<string, unknown> }>;
   /** Arms a one-shot write failure after construction. */
   failNextWrite(table: string): void;
+  /** Arms a one-shot RPC failure after construction. */
+  failNextRpc(name: string): void;
 }
 
 function matches(row: Row, filters: Filter[]): boolean {
@@ -157,10 +169,17 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
   const reads: string[] = [];
   const queries: FakeQuery[] = [];
   const writes: string[] = [];
+  const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   const defaults = options.defaults ?? {};
   const writeCounts = new Map<string, number>();
+  const rpcCounts = new Map<string, number>();
   const armedFaults = (options.failWrite ?? []).map((fault) => ({
     table: fault.table,
+    occurrence: fault.occurrence ?? 1,
+    fired: false,
+  }));
+  const armedRpcFaults = (options.failRpc ?? []).map((fault) => ({
+    name: fault.name,
     occurrence: fault.occurrence ?? 1,
     fired: false,
   }));
@@ -175,6 +194,166 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
     if (!fault) return false;
     fault.fired = true;
     return true;
+  }
+
+  function takeRpcFault(name: string, ordinal: number): boolean {
+    const fault = armedRpcFaults.find(
+      (candidate) =>
+        !candidate.fired &&
+        candidate.name === name &&
+        candidate.occurrence === ordinal
+    );
+    if (!fault) return false;
+    fault.fired = true;
+    return true;
+  }
+
+  function raiseIdentity(code: string): never {
+    throw {
+      code: "P0001",
+      message: `resolve_or_create_contact_for_legacy_lead: ${code}`,
+    };
+  }
+
+  function compatibleContactId(binding: Row, organizationId: string): string {
+    if (binding.organization_id !== organizationId) {
+      raiseIdentity("cross_organization_binding");
+    }
+    const contactId = binding.ref_contact_id;
+    if (typeof contactId !== "string" || !contactId) {
+      raiseIdentity("incompatible_binding");
+    }
+    const contact = table("contacts").find((row) => row.id === contactId);
+    if (!contact || contact.organization_id !== organizationId) {
+      raiseIdentity("incompatible_binding");
+    }
+    return contactId;
+  }
+
+  /**
+   * Mirrors the SQL function's resolve-or-create + unique_violation converge.
+   * Contact + binding are applied together; a binding unique-violation rolls
+   * the Contact back so the fake cannot invent an orphan the database would
+   * not keep.
+   */
+  function resolveOrCreateContactForLegacyLeadRpc(
+    args: Record<string, unknown>
+  ): string {
+    const organizationId =
+      typeof args.p_organization_id === "string"
+        ? args.p_organization_id.trim()
+        : "";
+    const legacyLeadId =
+      typeof args.p_legacy_lead_id === "string"
+        ? args.p_legacy_lead_id.trim()
+        : "";
+    if (!organizationId) raiseIdentity("missing_organization");
+    const organizations = tables.organizations;
+    if (
+      organizations &&
+      organizations.length > 0 &&
+      !organizations.some((row) => row.id === organizationId)
+    ) {
+      raiseIdentity("missing_organization");
+    }
+    if (!legacyLeadId) raiseIdentity("missing_legacy_lead_id");
+
+    const matches = table("external_identity_bindings").filter(
+      (row) =>
+        row.source_system === "traditional_gu" &&
+        row.binding_kind === "legacy_lead" &&
+        row.external_id === legacyLeadId
+    );
+    if (matches.length > 1) raiseIdentity("ambiguous_binding");
+    if (matches.length === 1) return compatibleContactId(matches[0], organizationId);
+
+    let callerProvenance: Record<string, unknown>;
+    try {
+      callerProvenance = requireCreateIdentityProvenance(args.p_provenance);
+    } catch {
+      raiseIdentity("missing_provenance");
+    }
+
+    const now = new Date().toISOString();
+    const contact: Row = {
+      id: randomUUID(),
+      organization_id: organizationId,
+      display_name: null,
+      primary_phone_hint: null,
+      preferences_jsonb: {},
+      created_at: now,
+      updated_at: now,
+    };
+    const binding: Row = {
+      id: randomUUID(),
+      organization_id: organizationId,
+      source_system: "traditional_gu",
+      binding_kind: "legacy_lead",
+      external_id: legacyLeadId,
+      ref_contact_id: contact.id,
+      ref_organization_id: null,
+      ref_membership_id: null,
+      ref_case_id: null,
+      verification_jsonb: {},
+      provenance_jsonb: {
+        ...callerProvenance,
+        source: "resolve_or_create_contact_for_legacy_lead",
+        source_system: "traditional_gu",
+        binding_kind: "legacy_lead",
+        opaque_legacy_lead_ref: legacyLeadId,
+        organization_id: organizationId,
+      },
+      created_at: now,
+      updated_at: now,
+    };
+
+    if (uniqueViolation("external_identity_bindings", binding)) {
+      const raced = table("external_identity_bindings").filter(
+        (row) =>
+          row.source_system === "traditional_gu" &&
+          row.binding_kind === "legacy_lead" &&
+          row.external_id === legacyLeadId
+      );
+      if (raced.length > 1) raiseIdentity("ambiguous_binding");
+      if (raced.length === 1) return compatibleContactId(raced[0], organizationId);
+      throw {
+        code: "23505",
+        message: "duplicate key value violates unique constraint on external_identity_bindings",
+      };
+    }
+
+    table("contacts").push(contact);
+    writes.push("contacts");
+    table("external_identity_bindings").push(binding);
+    writes.push("external_identity_bindings");
+    return contact.id as string;
+  }
+
+  async function rpc(
+    name: string,
+    args: Record<string, unknown> = {}
+  ): Promise<{ data: unknown; error: unknown }> {
+    await options.onWrite?.(`rpc:${name}`);
+    const ordinal = (rpcCounts.get(name) ?? 0) + 1;
+    rpcCounts.set(name, ordinal);
+    if (takeRpcFault(name, ordinal)) {
+      return {
+        data: null,
+        error: {
+          code: "INJECTED",
+          message: `injected rpc failure on ${name} #${ordinal}`,
+        },
+      };
+    }
+    rpcCalls.push({ name, args });
+    if (name === "resolve_or_create_contact_for_legacy_lead") {
+      try {
+        return { data: resolveOrCreateContactForLegacyLeadRpc(args), error: null };
+      } catch (error) {
+        return { data: null, error };
+      }
+    }
+    return { data: null, error: { message: `no rpc ${name}` } };
   }
 
   function table(name: string): Row[] {
@@ -444,15 +623,26 @@ export function createFakeDb(options: FakeDbOptions = {}): FakeDb {
   }
 
   return {
-    client: { from: (name: string) => builder(name) } as unknown as DbClient,
+    client: {
+      from: (name: string) => builder(name),
+      rpc,
+    } as unknown as DbClient,
     tables,
     reads,
     queries,
     writes,
+    rpcCalls,
     failNextWrite(table: string) {
       armedFaults.push({
         table,
         occurrence: (writeCounts.get(table) ?? 0) + 1,
+        fired: false,
+      });
+    },
+    failNextRpc(name: string) {
+      armedRpcFaults.push({
+        name,
+        occurrence: (rpcCounts.get(name) ?? 0) + 1,
         fired: false,
       });
     },

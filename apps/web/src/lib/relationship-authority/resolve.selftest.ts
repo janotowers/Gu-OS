@@ -409,6 +409,25 @@ async function testSuppliedCaseCannotRedirectUnmappedLead(): Promise<void> {
   console.log("  ok  a supplied Case cannot redirect an unmapped lead");
 }
 
+async function testWamidBindingIsInvisibleToLeadRefResolver(): Promise<void> {
+  const { db } = fakeDb({
+    operational_cases: [
+      { id: CASE_ID, organization_id: ORG, runtime_authority: "legacy" },
+    ],
+    external_conversation_bindings: [
+      guBinding({ external_conversation_ref: "wamid.HBg-hosted-pilot" }),
+    ],
+  });
+  const result = await resolveInteractionAuthority({
+    ctx: ctx(db),
+    refs: { legacyLeadId: LEAD },
+    readCurrent: async () => currentResult({ leadTakeoverActive: false }),
+  });
+  assert.equal(result.caseId, null);
+  assert.equal(result.conversationAuthority, "gu");
+  console.log("  ok  a WAMID-keyed binding is invisible to the C2 Lead-ref resolver");
+}
+
 async function testLeadMapsToCaseWithoutSuppliedCaseId(): Promise<void> {
   const { db } = fakeDb({
     operational_cases: [
@@ -523,6 +542,7 @@ async function main(): Promise<void> {
   await testForeignCaseDoesNotLeakRuntime();
   await testAnswerWritesNothing();
   await testLeadMapsToCaseWithoutSuppliedCaseId();
+  await testWamidBindingIsInvisibleToLeadRefResolver();
   await testUnmappedLeadPreservesUnknownCase();
   await testAdvisorWaBindingCannotMintCase();
   await testSuppliedCaseCannotRedirectUnmappedLead();

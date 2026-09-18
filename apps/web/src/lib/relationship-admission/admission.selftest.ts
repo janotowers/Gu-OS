@@ -22,6 +22,20 @@
  *   SA-2.9   with `relationship_ops` off admission is fully inert;
  *   SA-2.10  no prospect-facing effect is reachable from this Slice.
  *
+ * SL-15 (Q18) extends the owed admitted materialisation with the Contact /
+ * opaque `legacy_lead` identity seam:
+ *
+ *   SA-15.1  the opaque lead id is compared whole and never parsed;
+ *   SA-15.4  two different lead ids are never merged;
+ *   SA-15.6  incompatible / cross-Organization bindings fail closed;
+ *   SA-15.8  only the admitted path creates a Contact; deferred / rejected /
+ *            inert paths do not;
+ *   SA-15.5  a new identity carries the required evidence basis; reserved
+ *            provenance cannot be overridden; reuse does not rewrite it;
+ *   SA-15.9  historical backfill uses the same primitive, then the governed
+ *            conversation-binding helper, only after proving governed
+ *            admission and only with the opaque lead id as the GU-thread ref.
+ *
  * Plus the shared-baseline correlation-coverage check (Technical Plan §7 (a)),
  * which applies from SL-2 onward.
  *
@@ -38,14 +52,18 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  backfillAdmittedLegacyLeadIdentity,
   claimSourceEvent,
   failSourceEvent,
   insertAiUsageEvent,
   insertCaseFact,
+  LegacyLeadContactError,
   linkAdmittedCase,
   reclaimSourceEvent,
   recordSourceEvent,
   recordSourceEventDecision,
+  RESOLVE_OR_CREATE_CONTACT_FOR_LEGACY_LEAD_RPC,
+  resolveOrCreateContactForLegacyLead,
   settleSourceEvent,
   type DbClient,
 } from "@agents/db";
@@ -60,6 +78,7 @@ import {
   type AdmissionProposal,
 } from "@agents/types";
 import { LegacyReadRefusal } from "../legacy-gateway/errors";
+import { resolveInteractionAuthority } from "../relationship-authority/resolve";
 import { runAdmission, applyPolicyToProposal } from "./admit";
 import { deriveDedupKey, latestInboundMessage } from "./ingest";
 import { createFakeDb, type FakeDb } from "../relationship-testing/fake-db";
@@ -170,6 +189,12 @@ function baseTables(
         ref_case_id: "case-other",
       },
     ],
+    organizations: [
+      { id: PILOT_ORG, name: "Pilot", status: "active" },
+      { id: OTHER_ORG, name: "Other", status: "active" },
+    ],
+    contacts: [],
+    external_conversation_bindings: [],
     organization_policies: [],
     source_events: [],
     operational_case_types: [
@@ -232,6 +257,7 @@ function harness(
   overrides: Parameters<typeof baseTables>[0] = {},
   extra: {
     failWrite?: Array<{ table: string; occurrence?: number }>;
+    failRpc?: Array<{ name: string; occurrence?: number }>;
     onWrite?: (table: string) => Promise<void> | void;
   } = {}
 ): FakeDb {
@@ -246,6 +272,26 @@ function harness(
       {
         table: "operational_cases",
         columns: ["organization_id", "context_jsonb->>source_event_id"],
+      },
+      // uq_external_identity_bindings_global_routing for routing-critical kinds.
+      {
+        table: "external_identity_bindings",
+        columns: ["source_system", "binding_kind", "external_id"],
+        where: (row) =>
+          row.binding_kind === "legacy_lead" ||
+          row.binding_kind === "legacy_organization_key" ||
+          row.binding_kind === "legacy_user" ||
+          row.binding_kind === "gu_whatsapp_number",
+      },
+      {
+        table: "external_conversation_bindings",
+        columns: [
+          "organization_id",
+          "case_id",
+          "provider",
+          "external_conversation_ref",
+        ],
+        where: (row) => row.status === "active",
       },
       // uq_case_facts_admission_evidence: one evidence row per (Case, fact key,
       // source event). Keyed on source_ref, so another writer's fact for the
@@ -279,6 +325,20 @@ function harness(
       },
       case_facts: { superseded_by: null, source_ref: null, confidence: null },
       operational_cases: { organization_id: null, runtime_authority: null },
+      contacts: {
+        display_name: null,
+        primary_phone_hint: null,
+        preferences_jsonb: {},
+      },
+      external_conversation_bindings: {
+        status: "active",
+        ended_at: null,
+        conversation_authority: null,
+        last_human_activity_at: null,
+        authority_source: null,
+        gu_channel_identity_binding_id: null,
+        provenance_jsonb: {},
+      },
     },
     ...extra,
   });
@@ -316,6 +376,47 @@ function isInjectedFailure(error: unknown): boolean {
     typeof error === "object" &&
     error !== null &&
     (error as { code?: string }).code === "INJECTED"
+  );
+}
+
+function legacyLeadBindings(db: FakeDb, leadId = PILOT_LEAD) {
+  return (db.tables.external_identity_bindings ?? []).filter(
+    (row) =>
+      row.source_system === "traditional_gu" &&
+      row.binding_kind === "legacy_lead" &&
+      row.external_id === leadId
+  );
+}
+
+function assertSingleLegacyLeadContact(
+  db: FakeDb,
+  leadId = PILOT_LEAD,
+  label = "admitted identity"
+): string {
+  const bindings = legacyLeadBindings(db, leadId);
+  assert.equal(bindings.length, 1, `${label}: exactly one legacy_lead binding`);
+  const contactId = bindings[0].ref_contact_id;
+  assert.equal(typeof contactId, "string", `${label}: binding points at a Contact`);
+  const contacts = (db.tables.contacts ?? []).filter((row) => row.id === contactId);
+  assert.equal(contacts.length, 1, `${label}: the bound Contact exists`);
+  assert.equal(
+    contacts[0].organization_id,
+    PILOT_ORG,
+    `${label}: Contact stays in the admitting Organization`
+  );
+  return contactId as string;
+}
+
+function assertNoPilotContact(db: FakeDb, label: string): void {
+  assert.equal(
+    (db.tables.contacts ?? []).length,
+    0,
+    `${label}: no Contact`
+  );
+  assert.equal(
+    legacyLeadBindings(db).length,
+    0,
+    `${label}: no legacy_lead binding for the pilot lead`
   );
 }
 
@@ -433,6 +534,26 @@ async function testAdmittedMaterialisesOneCase(): Promise<void> {
     (events[0].payload_jsonb as Record<string, unknown>).kind,
     "admission_disposition"
   );
+
+  const contactId = assertSingleLegacyLeadContact(db, PILOT_LEAD, "SA-15.8");
+  const provenance = legacyLeadBindings(db)[0].provenance_jsonb as Record<
+    string,
+    unknown
+  >;
+  assert.equal(provenance.source_system, "traditional_gu");
+  assert.equal(provenance.binding_kind, "legacy_lead");
+  assert.equal(provenance.opaque_legacy_lead_ref, PILOT_LEAD);
+  assert.equal(provenance.organization_id, PILOT_ORG);
+  assert.equal(provenance.basis, "admission");
+  assert.equal(provenance.provisional_materialization, true);
+  assert.equal(typeof provenance.source_event_id, "string");
+  assert.equal(provenance.case_id, cases[0].id);
+  assert.equal(
+    (db.tables.contacts ?? []).length,
+    1,
+    "one provisional Contact, not a person-merge"
+  );
+  assert.equal(contactId, legacyLeadBindings(db)[0].ref_contact_id);
 }
 
 // ============================================================
@@ -452,6 +573,7 @@ async function testAmbiguousCreatesNoCase(): Promise<void> {
   assert.equal(result.outcome.case_id, null);
   assert.equal(db.tables.operational_cases.length, 0, "EC-01: no Case");
   assert.equal(db.tables.case_facts.length, 0);
+  assertNoPilotContact(db, "SA-15.8 deferred path");
 
   // The disposition is still recorded, so an unadmitted lead is observable
   // rather than invisible.
@@ -608,11 +730,18 @@ async function testCrashBeforeDecision(): Promise<void> {
  * after all of it.
  */
 async function testEveryMaterialisationCrashBoundaryConverges(): Promise<void> {
-  // (table, occurrence) of the write to fail, in materialisation order.
-  const boundaries: Array<[string, { table: string; occurrence: number }]> = [
+  // Write / RPC to fail, in materialisation order. Identity is an owed RPC
+  // after the Case link and before facts, so a crash there cannot settle.
+  const boundaries: Array<
+    [string, { table: string; occurrence: number } | { rpc: string; occurrence: number }]
+  > = [
     // source_events write order: 1 insert, 2 claim, 3 decision, 4 link, 5 settle.
     ["A: after Case creation, before the source-event link", { table: "source_events", occurrence: 4 }],
-    ["B: after the link, before the disposition fact", { table: "case_facts", occurrence: 1 }],
+    [
+      "A2: after the link, before Contact identity",
+      { rpc: RESOLVE_OR_CREATE_CONTACT_FOR_LEGACY_LEAD_RPC, occurrence: 1 },
+    ],
+    ["B: after Contact identity, before the disposition fact", { table: "case_facts", occurrence: 1 }],
     ["C: after the disposition fact, before the source fact", { table: "case_facts", occurrence: 2 }],
     ["D: after the source fact, before the objective fact", { table: "case_facts", occurrence: 3 }],
     ["E: after the objective fact, before the timeline event", { table: "operational_case_events", occurrence: 1 }],
@@ -620,13 +749,26 @@ async function testEveryMaterialisationCrashBoundaryConverges(): Promise<void> {
   ];
 
   for (const [label, fault] of boundaries) {
-    const db = harness({}, { failWrite: [fault] });
+    const db = harness(
+      {},
+      "rpc" in fault
+        ? { failRpc: [{ name: fault.rpc, occurrence: fault.occurrence }] }
+        : { failWrite: [fault] }
+    );
 
     await assert.rejects(
       () => runAdmission(request(db)),
       isInjectedFailure,
       `${label}: the injected fault must actually fire`
     );
+
+    if (label.startsWith("A2:")) {
+      assert.equal(
+        (db.tables.contacts ?? []).length,
+        0,
+        `${label}: a failed identity RPC leaves no orphan Contact`
+      );
+    }
 
     // The decision is durable from before the Case existed, whatever failed.
     const beforeRetry = db.tables.source_events[0];
@@ -700,6 +842,13 @@ async function testEveryMaterialisationCrashBoundaryConverges(): Promise<void> {
       admissionEvents.length,
       1,
       `${label}: the timeline event is written once, not duplicated by recovery`
+    );
+
+    assertSingleLegacyLeadContact(db, PILOT_LEAD, `${label}: identity converges`);
+    assert.equal(
+      (db.tables.contacts ?? []).length,
+      1,
+      `${label}: resume must not mint a second Contact`
     );
   }
 }
@@ -857,6 +1006,7 @@ async function testStaleWorkerAfterSettlement(): Promise<void> {
     "the stale worker returns the canonical settled outcome, not one of its own"
   );
   assert.equal(stale.outcome.case_id, canonicalCaseId);
+  assertSingleLegacyLeadContact(db, PILOT_LEAD, "stale worker after settlement");
 
   // Nothing of B's was disturbed.
   const inbox = db.tables.source_events[0];
@@ -1139,6 +1289,8 @@ async function testMidMaterialisationRaceConverges(): Promise<void> {
   assert.equal(inbox.status, "completed");
   assert.equal(inbox.completed_at, settledAt, "A did not re-settle");
   assert.equal(inbox.admitted_case_id, canonicalCaseId);
+  assertSingleLegacyLeadContact(db, PILOT_LEAD, "mid-materialisation race");
+  assert.equal((db.tables.contacts ?? []).length, 1);
 
   // And A reports the canonical result rather than one of its own.
   assert.equal(stale.status, "evaluated");
@@ -1298,6 +1450,12 @@ async function testDistinctEventsAreNotDeduplicated(): Promise<void> {
   if (second.status !== "evaluated") return;
   assert.equal(second.outcome.deduplicated, false);
   assert.equal(db.tables.source_events.length, 2);
+  assert.equal(db.tables.operational_cases.length, 2, "two events, two Cases");
+  assertSingleLegacyLeadContact(
+    db,
+    PILOT_LEAD,
+    "same opaque lead reuses one Contact across two Opportunities"
+  );
 }
 
 // ============================================================
@@ -1328,6 +1486,7 @@ async function testHardBoundWins(): Promise<void> {
   assert.equal(result.outcome.decision.hard_bound, "prospect_blocked");
   assert.equal(result.outcome.decision.policy.source, "platform_hard_bound");
   assert.equal(db.tables.operational_cases.length, 0, "EC-02: no Case");
+  assertNoPilotContact(db, "SA-15.8 hard-bound path");
 }
 
 // ============================================================
@@ -1351,6 +1510,7 @@ async function testExcludedCategory(): Promise<void> {
   assert.equal(result.outcome.decision.policy.source, "organization_published");
   assert.equal(result.outcome.decision.policy.version, 3);
   assert.equal(db.tables.operational_cases.length, 0);
+  assertNoPilotContact(db, "SA-15.8 excluded-category path");
 }
 
 /** A trusted source must not carry an excluded objective past the exclusion. */
@@ -1584,11 +1744,263 @@ async function testNoProspectFacingEffectIsReachable(): Promise<void> {
     "operational_cases",
     "operational_case_events",
     "case_facts",
+    "contacts",
+    "external_identity_bindings",
   ]);
   for (const table of written) {
     assert.ok(
       allowed.has(table),
       `admission wrote to an unexpected table: ${table}`
+    );
+  }
+  assert.equal(
+    (db.tables.external_conversation_bindings ?? []).length,
+    0,
+    "future admission does not attach a conversation binding; that is backfill / C1"
+  );
+}
+
+// ============================================================
+// SA-15 — Contact / opaque legacy_lead identity seam
+// ============================================================
+
+async function testTwoOpaqueLeadsAreNeverMerged(): Promise<void> {
+  const otherLead = `${PILOT_LEAD}x`;
+  const db = harness();
+  await runAdmission(request(db));
+  await runAdmission(
+    request(db, {
+      lead: otherLead,
+      dedupKey: "traditional_gu:msg:other-lead",
+    })
+  );
+  assert.equal(db.tables.operational_cases.length, 2);
+  const first = assertSingleLegacyLeadContact(db, PILOT_LEAD, "lead A");
+  const second = assertSingleLegacyLeadContact(db, otherLead, "lead B");
+  assert.notEqual(first, second, "SA-15.4: two lead ids never share a Contact");
+  assert.equal((db.tables.contacts ?? []).length, 2);
+}
+
+async function testIncompatibleBindingFailsClosed(): Promise<void> {
+  const db = harness();
+  db.tables.external_identity_bindings.push({
+    id: "incompatible-lead",
+    organization_id: PILOT_ORG,
+    source_system: "traditional_gu",
+    binding_kind: "legacy_lead",
+    external_id: PILOT_LEAD,
+    ref_case_id: "case-not-a-contact",
+    ref_contact_id: null,
+  });
+
+  await assert.rejects(
+    () => runAdmission(request(db)),
+    (error: unknown) =>
+      error instanceof LegacyLeadContactError &&
+      error.code === "incompatible_binding"
+  );
+  assert.equal(
+    (db.tables.contacts ?? []).length,
+    0,
+    "SA-15.6: no second Contact is minted"
+  );
+  assert.equal(db.tables.source_events[0].status, "failed");
+  assert.notEqual(db.tables.source_events[0].status, "completed");
+}
+
+async function testCrossOrganizationBindingFailsClosed(): Promise<void> {
+  // A lead already bound to another Organization is refused by the gateway
+  // (SA-2.8) before admission materialisation runs. The identity seam still
+  // fail-closes if it is invoked with that binding — which is the SA-15.6
+  // claim, and the only way to observe it without the gateway short-circuit.
+  const db = harness();
+  db.tables.external_identity_bindings.push({
+    id: "cross-org-lead",
+    organization_id: OTHER_ORG,
+    source_system: "traditional_gu",
+    binding_kind: "legacy_lead",
+    external_id: PILOT_LEAD,
+    ref_contact_id: "contact-other-org",
+  });
+  db.tables.contacts.push({
+    id: "contact-other-org",
+    organization_id: OTHER_ORG,
+  });
+
+  await assert.rejects(
+    () =>
+      resolveOrCreateContactForLegacyLead(db.client, {
+        organizationId: PILOT_ORG,
+        legacyLeadId: PILOT_LEAD,
+        provenance: {
+          basis: "admission",
+          source_event_id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          case_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          provisional_materialization: true,
+        },
+      }),
+    (error: unknown) =>
+      error instanceof LegacyLeadContactError &&
+      error.code === "cross_organization_binding"
+  );
+  assert.equal(
+    (db.tables.contacts ?? []).filter((row) => row.organization_id === PILOT_ORG)
+      .length,
+    0,
+    "SA-15.6: no Contact is created in the requesting Organization"
+  );
+}
+
+async function testHistoricalBackfillUsesSamePrimitive(): Promise<void> {
+  const db = harness();
+  const admitted = await runAdmission(request(db));
+  assert.equal(admitted.status, "evaluated");
+  if (admitted.status !== "evaluated") return;
+  const caseId = admitted.outcome.case_id as string;
+  const contactId = assertSingleLegacyLeadContact(db);
+
+  const first = await backfillAdmittedLegacyLeadIdentity(db.client, {
+    organizationId: PILOT_ORG,
+    caseId,
+  });
+  assert.equal(first.contactId, contactId, "SA-15.9: backfill reuses the primitive");
+  assert.equal(first.conversationBinding.contact_id, contactId);
+  assert.equal(first.conversationBinding.provider, "whatsapp_business");
+  assert.equal(first.conversationBinding.thread_kind, "gu");
+  assert.equal(
+    first.conversationBinding.external_conversation_ref,
+    PILOT_LEAD,
+    "SL-15 historical repair stores the opaque lead id the C2 resolver looks up"
+  );
+  assert.equal((db.tables.external_conversation_bindings ?? []).length, 1);
+  const stored = legacyLeadBindings(db)[0].provenance_jsonb as Record<string, unknown>;
+  assert.equal(stored.basis, "admission", "SA-15.5: reuse does not rewrite provenance");
+
+  const again = await backfillAdmittedLegacyLeadIdentity(db.client, {
+    organizationId: PILOT_ORG,
+    caseId,
+  });
+  assert.equal(again.conversationBinding.id, first.conversationBinding.id);
+  assert.equal((db.tables.contacts ?? []).length, 1);
+  assert.equal((db.tables.external_conversation_bindings ?? []).length, 1);
+}
+
+async function testBackfillAmbiguousCaseMappingFailsClosed(): Promise<void> {
+  const db = harness();
+  await runAdmission(request(db, { dedupKey: "traditional_gu:msg:lead:one" }));
+  await runAdmission(request(db, { dedupKey: "traditional_gu:msg:lead:two" }));
+  const caseId = db.tables.operational_cases[0].id as string;
+
+  await assert.rejects(
+    () =>
+      backfillAdmittedLegacyLeadIdentity(db.client, {
+        organizationId: PILOT_ORG,
+        caseId,
+      }),
+    (error: unknown) =>
+      error instanceof LegacyLeadContactError &&
+      error.code === "ambiguous_case_mapping"
+  );
+  assert.equal(
+    (db.tables.external_conversation_bindings ?? []).length,
+    0,
+    "SA-15.9: ambiguous Case mapping writes no conversation binding"
+  );
+}
+
+async function testManualLeadOpportunityCannotMintIdentity(): Promise<void> {
+  const db = harness();
+  db.tables.operational_cases.push({
+    id: "manual-lead-opportunity",
+    organization_id: PILOT_ORG,
+    case_type: "lead_opportunity",
+    context_jsonb: { legacy_lead_id: PILOT_LEAD },
+  });
+
+  await assert.rejects(
+    () =>
+      backfillAdmittedLegacyLeadIdentity(db.client, {
+        organizationId: PILOT_ORG,
+        caseId: "manual-lead-opportunity",
+      }),
+    (error: unknown) =>
+      error instanceof LegacyLeadContactError &&
+      error.code === "not_governed_admission"
+  );
+  assertNoPilotContact(db, "constructed Case + legacy_lead_id is not Q18 admission");
+  assert.equal(
+    (db.tables.external_conversation_bindings ?? []).length,
+    0,
+    "constructed Case writes no conversation binding"
+  );
+}
+
+async function testBackfillLeadRefResolvesSameCase(): Promise<void> {
+  const db = harness();
+  const admitted = await runAdmission(request(db));
+  assert.equal(admitted.status, "evaluated");
+  if (admitted.status !== "evaluated") return;
+  const caseId = admitted.outcome.case_id as string;
+
+  await backfillAdmittedLegacyLeadIdentity(db.client, {
+    organizationId: PILOT_ORG,
+    caseId,
+  });
+
+  const resolved = await resolveInteractionAuthority({
+    ctx: { db: db.client, organizationId: PILOT_ORG, actorUserId: ADVISOR },
+    refs: { legacyLeadId: PILOT_LEAD },
+    readCurrent: async () => ({
+      value: {
+        legacyLeadId: PILOT_LEAD,
+        leadTakeoverActive: false,
+        lastOwnerInteractionAt: "2026-09-17T18:00:00.000Z",
+        numberKillSwitchActive: false,
+        guNumberRef: "5215500000003",
+      },
+      provenance: {
+        sourceSystem: "traditional_gu",
+        store: "mongo",
+        sourcePath: "gu2.users",
+        externalId: PILOT_LEAD,
+        capability: "legacy_conversation_authority_get",
+        adapter: "bootstrap_direct",
+        organizationId: PILOT_ORG,
+        bindingState: "unbound",
+        freshness: {
+          readAt: "2026-09-18T00:00:00.000Z",
+          sourceUpdatedAt: "2026-09-17T18:00:00.000Z",
+          ageSeconds: 21600,
+          sourceUpdatedAtField: "last_owner_interaction_wba",
+        },
+      },
+      observedOwnerRef: OWNER_UID,
+    }),
+  });
+
+  assert.equal(
+    resolved.caseId,
+    caseId,
+    "C2 Lead-ref reverse map must resolve the backfilled Case without a supplied caseId"
+  );
+  assert.equal(resolved.externalConversationRef, PILOT_LEAD);
+  assert.equal(resolved.conversationAuthority, "gu");
+}
+
+function testAdmissionDoesNotParseLegacyLeadId(): void {
+  const source = readFileSync(path.join(__dirname, "admit.ts"), "utf8");
+  const forbidden = [
+    /externalLeadRef\s*\.\s*split\s*\(/,
+    /externalLeadRef\s*\.\s*slice\s*\(/,
+    /externalLeadRef\s*\.\s*substring\s*\(/,
+    /externalLeadRef\s*\.\s*match\s*\(/,
+    /parseLegacyLead/,
+    /legacy_lead_id\.split/,
+  ];
+  for (const pattern of forbidden) {
+    assert.ok(
+      !pattern.test(source),
+      `SA-15.1: admission must not parse the opaque lead id (${pattern})`
     );
   }
 }
@@ -1907,6 +2319,14 @@ const tests: Array<[string, () => void | Promise<void>]> = [
   ["SA-2.9 relationship_ops off is fully inert", testFlagOffIsInert],
   ["SA-2.9 an unimplemented mode is inert", testUnimplementedModeIsInert],
   ["SA-2.10 no prospect-facing effect is reachable", testNoProspectFacingEffectIsReachable],
+  ["SA-15.1 admission does not parse the opaque lead id", testAdmissionDoesNotParseLegacyLeadId],
+  ["SA-15.4 two opaque leads are never merged", testTwoOpaqueLeadsAreNeverMerged],
+  ["SA-15.6 an incompatible binding fails closed", testIncompatibleBindingFailsClosed],
+  ["SA-15.6 a cross-Organization binding fails closed", testCrossOrganizationBindingFailsClosed],
+  ["SA-15.8 / SA-15.9 historical backfill uses the same primitive", testHistoricalBackfillUsesSamePrimitive],
+  ["SA-15.9 a constructed lead_opportunity cannot mint identity", testManualLeadOpportunityCannotMintIdentity],
+  ["SA-15.9 ambiguous Case mapping fails closed", testBackfillAmbiguousCaseMappingFailsClosed],
+  ["SA-15.9 backfill Lead-ref maps to the same Case for C2", testBackfillLeadRefResolvesSameCase],
   ["the proposal carries no decision field", testProposalCarriesNoDecision],
   ["an unknown category normalizes to other", testUnknownCategoryNormalizes],
   ["policy application is pure and testable", testPurePolicyApplication],

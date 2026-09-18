@@ -274,6 +274,7 @@ Era forward (aplicada por el CLI de Supabase):
 - `20260918014323_external_conversation_bindings.sql` — `external_conversation_bindings` (R1 SL-6 / TD-4): vínculo Organization-scoped entre un Caso/contacto y una conversación externa opaca. Los campos de autoridad de conversación son válidos solo en `thread_kind='gu'`; `advisor_wa` los fuerza a null por CHECK. Distinta de `operational_case_conversation_bindings` (00044). Solo `service_role`.
 - `20260918021047_authority_resolutions.sql` — `authority_resolutions` (R1 SL-6 / TD-3): incidente fail-safe durable (`unknown` | `conflicting`). Los miembros de la Organización leen; solo `service_role` escribe. No escribe `runtime_authority`.
 - `20260918141500_authority_resolution_lifecycle.sql` — columnas aditivas `provider_message_id` (identidad lógica C2, unique por Organización), `resolved_at` / `resolved_as` (cierre de un incidente abierto). No escribe `runtime_authority`.
+- `20260918184500_resolve_or_create_contact_for_legacy_lead.sql` — `resolve_or_create_contact_for_legacy_lead` (R1 SL-15 / Q18): resolve-or-create atómico de un Contacto provisional anclado a un `legacy_lead` opaco. SECURITY INVOKER, solo `service_role`. El id se compara entero y no se parsea; no fusiona leads; falla cerrado entre Organizations. Contacto + binding son una transacción, así que un crash no deja un Contacto huérfano.
 
 ## Uso de IA (observabilidad interna)
 

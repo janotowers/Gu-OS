@@ -21,6 +21,54 @@ import type { DbClient } from "../client";
 
 const UNIQUE_VIOLATION = "23505";
 
+export type ConversationBindingMismatchReason =
+  | "contact_mismatch"
+  | "thread_kind_mismatch"
+  | "channel_identity_mismatch";
+
+export class ConversationBindingConflictError extends Error {
+  readonly code = "conversation_binding_mismatch";
+  readonly reason: ConversationBindingMismatchReason;
+
+  constructor(reason: ConversationBindingMismatchReason, message?: string) {
+    super(message ?? `attachExternalConversationBinding: ${reason}`);
+    this.name = "ConversationBindingConflictError";
+    this.reason = reason;
+  }
+}
+
+function normalizeOptionalId(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function assertBindingMatchesRequest(
+  existing: ExternalConversationBinding,
+  input: AttachConversationBindingInput
+): void {
+  if (existing.contact_id !== input.contactId) {
+    throw new ConversationBindingConflictError(
+      "contact_mismatch",
+      "attachExternalConversationBinding: existing binding points at a different Contact"
+    );
+  }
+  if (existing.thread_kind !== input.threadKind) {
+    throw new ConversationBindingConflictError(
+      "thread_kind_mismatch",
+      "attachExternalConversationBinding: existing binding has a different thread_kind"
+    );
+  }
+  if (
+    normalizeOptionalId(existing.gu_channel_identity_binding_id) !==
+    normalizeOptionalId(input.guChannelIdentityBindingId)
+  ) {
+    throw new ConversationBindingConflictError(
+      "channel_identity_mismatch",
+      "attachExternalConversationBinding: existing binding has a different channel identity"
+    );
+  }
+}
+
 export interface AttachConversationBindingInput {
   organizationId: string;
   caseId: string;
@@ -62,9 +110,15 @@ function assertAdvisorWaHasNoAuthority(input: {
 }
 
 /**
- * Idempotent attach: re-binding the same active (case, provider, ref) is a
- * no-op that returns the existing row. A second *active* binding for that
- * triple is structurally impossible (partial unique index). Cross-tenant
+ * Idempotent attach of the exact same semantic binding: Organization + Case +
+ * provider + opaque ref + Contact + thread_kind + channel identity (when
+ * material). An existing or race-winning row that matches that identity is
+ * reused. An incompatible Contact, thread_kind or channel identity fails
+ * closed — silent reuse of a different Contact or of `advisor_wa` when `gu`
+ * was requested is identity drift, not idempotency.
+ *
+ * A second *active* binding for the (case, provider, ref) triple is
+ * structurally impossible (partial unique index). Cross-tenant
  * Case/contact/channel pointers are impossible by composite FK.
  */
 export async function attachExternalConversationBinding(
@@ -92,7 +146,10 @@ export async function attachExternalConversationBinding(
     provider: input.provider,
     externalConversationRef,
   });
-  if (existing) return existing;
+  if (existing) {
+    assertBindingMatchesRequest(existing, input);
+    return existing;
+  }
 
   const { data, error } = await db
     .from("external_conversation_bindings")
@@ -120,7 +177,10 @@ export async function attachExternalConversationBinding(
         provider: input.provider,
         externalConversationRef,
       });
-      if (raced) return raced;
+      if (raced) {
+        assertBindingMatchesRequest(raced, input);
+        return raced;
+      }
     }
     throw error;
   }
