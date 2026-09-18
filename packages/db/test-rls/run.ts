@@ -7,7 +7,7 @@
  * SL-7 `portfolio_presentation_state` and the Work Portfolio read paths; SL-12
  * the chat tool's Organization resolution and the ranking kill switch; Cycle 3
  * order 5 `tool_calls` as read-own and not user-writable; SL-6
- * `external_conversation_bindings`.
+ * `external_conversation_bindings` and `authority_resolutions`.
  *
  * Technical Plan §8: "Cross-tenant negative suite (two-orgs fixture, read and
  * write paths) required from SL-0 and gating every multi-seat surface."
@@ -2607,15 +2607,17 @@ async function main(): Promise<void> {
       assert.equal(code, FK_VIOLATION);
     });
 
+    const persistedResolution = (
+      await client.query<{ id: string }>(
+        `insert into public.authority_resolutions
+           (organization_id, case_id, external_conversation_ref, state, detected_at)
+         values ($1, $2, 'lead-opaque', 'unknown', now())
+         returning id`,
+        [f.orgA, f.orgCaseA]
+      )
+    ).rows[0].id;
+
     await t("org members can read their Organization's authority_resolutions", async () => {
-      await asRole(client, service, async () => {
-        await client.query(
-          `insert into public.authority_resolutions
-             (organization_id, case_id, external_conversation_ref, state, detected_at)
-           values ($1, $2, 'lead-opaque', 'unknown', now())`,
-          [f.orgA, f.orgCaseA]
-        );
-      });
       const memberCount = await asRole(client, authed(f.creatorA), async () =>
         (await client.query("select id from public.authority_resolutions")).rowCount
       );
@@ -2623,6 +2625,17 @@ async function main(): Promise<void> {
         (await client.query("select id from public.authority_resolutions")).rowCount
       );
       assert.ok((memberCount ?? 0) >= 1);
+      assert.equal(
+        await asRole(client, authed(f.creatorA), async () =>
+          (
+            await client.query(
+              "select id from public.authority_resolutions where id = $1",
+              [persistedResolution]
+            )
+          ).rowCount
+        ),
+        1
+      );
       assert.equal(otherCount, 0);
     });
 
