@@ -184,26 +184,19 @@ function isFailSafe(resolution: InteractionAuthorityResolution): boolean {
 }
 
 /**
- * Returning C2 data requires an observed owner inside the key scope.
- * Recording an internal fail-safe is allowed only for a Case bound by
- * a server-side active `gu` mapping when owner observation failed.
- * An out-of-scope observed owner, or an unmapped Lead with no owner,
- * never persists — a valid key must not fabricate incidents.
+ * Returning C2 data and persisting a fail-safe both require server-side
+ * Organization and legacy owner/source scope. A Lead→Case binding does
+ * not substitute for owner scope (ADR-111 §6).
  */
 function persistPolicy(
   resolution: InteractionAuthorityResolution,
   scoped: { ok: boolean }
 ): { mayReturnC2: boolean; mayPersistFailSafe: boolean } {
   const mayReturnC2 = scoped.ok;
-  const observed = resolution.observedOwnerRef?.trim() || null;
-  const boundCaseId = resolution.caseId?.trim() || null;
-  const outOfScopeOwner = Boolean(observed) && !scoped.ok;
-  const ownerUnavailable = !observed;
-  const mayPersistFailSafe =
-    isFailSafe(resolution) &&
-    !outOfScopeOwner &&
-    (mayReturnC2 || Boolean(boundCaseId && ownerUnavailable));
-  return { mayReturnC2, mayPersistFailSafe };
+  return {
+    mayReturnC2,
+    mayPersistFailSafe: isFailSafe(resolution) && mayReturnC2,
+  };
 }
 
 export async function handleLegacyAuthorityRequest(
@@ -212,11 +205,9 @@ export async function handleLegacyAuthorityRequest(
   const audit = deps.audit ?? defaultAudit;
   const presented = presentedKeyId(deps.request.headers);
   const wellFormed = presented !== null && KEY_ID_RE.test(presented);
-  const known = wellFormed && deps.lookupKey(presented) !== null;
   const classified = classifyC2PresentedKeyId({
     presented,
     wellFormed,
-    known,
   });
   const limit =
     deps.rateLimit ??
@@ -404,10 +395,6 @@ export async function handleLegacyAuthorityRequest(
   }
 
   if (!mayReturnC2) {
-    if (mayPersistFailSafe) {
-      const failed = await persistObservation();
-      if (failed) return failed;
-    }
     const reason = scoped.ok ? "source_scope_mismatch" : scoped.reason;
     audit({
       event: "legacy_service_auth",

@@ -1,6 +1,11 @@
+import { createHash } from "node:crypto";
+
 type Bucket = { timestamps: number[] };
 
 const buckets = new Map<string, Bucket>();
+
+/** Fixed cardinality of pre-auth well-formed key-id buckets. */
+export const C2_WELL_FORMED_BUCKET_COUNT = 64;
 
 /** Test seam. Production never needs this. */
 export function resetRateLimit(): void {
@@ -12,21 +17,25 @@ export function rateLimitBucketCount(): number {
   return buckets.size;
 }
 
-export type C2PresentedKeyClass = "missing" | "malformed" | "unknown" | "known";
+export type C2PresentedKeyClass = "missing" | "malformed" | "well_formed";
+
+function wellFormedBucketKey(presented: string): string {
+  const digest = createHash("sha256").update(presented, "utf8").digest();
+  return `well-formed:${digest[0]! % C2_WELL_FORMED_BUCKET_COUNT}`;
+}
 
 /**
- * Pre-auth C2 rate-limit classification. Attacker-controlled identifiers
- * never become Map keys or audit values. Known keys are provisioned and
- * therefore finite.
+ * Pre-auth C2 classification. Bucket selection must not depend on whether
+ * the presented id exists. Known and unknown well-formed ids share the
+ * same hashed bucket space so existence cannot be enumerated.
  */
 export function classifyC2PresentedKeyId(params: {
   presented: string | null;
   wellFormed: boolean;
-  known: boolean;
 }): {
   class: C2PresentedKeyClass;
   bucketKey: string;
-  auditKeyId: string | null;
+  auditKeyId: null;
 } {
   if (!params.presented) {
     return { class: "missing", bucketKey: "missing", auditKeyId: null };
@@ -34,13 +43,10 @@ export function classifyC2PresentedKeyId(params: {
   if (!params.wellFormed) {
     return { class: "malformed", bucketKey: "malformed", auditKeyId: null };
   }
-  if (!params.known) {
-    return { class: "unknown", bucketKey: "unknown", auditKeyId: null };
-  }
   return {
-    class: "known",
-    bucketKey: params.presented,
-    auditKeyId: params.presented,
+    class: "well_formed",
+    bucketKey: wellFormedBucketKey(params.presented),
+    auditKeyId: null,
   };
 }
 

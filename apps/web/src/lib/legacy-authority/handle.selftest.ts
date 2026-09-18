@@ -23,6 +23,8 @@ import {
   signLegacyServiceAuth,
 } from "../legacy-service-auth";
 import {
+  C2_WELL_FORMED_BUCKET_COUNT,
+  classifyC2PresentedKeyId,
   rateLimitBucketCount,
   resetRateLimit,
 } from "../public-rate-limit";
@@ -654,7 +656,8 @@ async function callMapped(
   };
 }
 
-async function testSourceReadFailureMappedPersistsInternally(): Promise<void> {
+async function testSourceReadFailureMappedDoesNotPersist(): Promise<void> {
+  const audits: LegacyServiceAuthAuditEntry[] = [];
   const result = await callMapped(
     await signedRequest({
       body: JSON.stringify({
@@ -666,6 +669,7 @@ async function testSourceReadFailureMappedPersistsInternally(): Promise<void> {
       readCurrent: async () => {
         throw new Error("mongo unavailable");
       },
+      audit: (entry) => audits.push(entry),
     }
   );
   assert.equal(result.status, 403);
@@ -673,14 +677,11 @@ async function testSourceReadFailureMappedPersistsInternally(): Promise<void> {
   assert.equal(result.body.conversation_authority, undefined);
   assert.equal(
     result.writes.some((write) => write.table === "authority_resolutions"),
-    true
+    false
   );
-  assert.equal(
-    result.writes.find((write) => write.table === "authority_resolutions")?.values
-      .case_id,
-    CASE_ID
-  );
-  console.log("  ok  source read failure + mapped Case persists internally and returns 403");
+  assert.equal(audits.at(-1)?.key_id, authorityKey.keyId);
+  assert.equal(audits.at(-1)?.reason, "source_scope_mismatch");
+  console.log("  ok  source read failure + mapped Case is 403, audited, and does not persist");
 }
 
 async function testSourceReadFailureUnmappedDoesNotPersist(): Promise<void> {
@@ -706,7 +707,8 @@ async function testSourceReadFailureUnmappedDoesNotPersist(): Promise<void> {
   console.log("  ok  source read failure + unmapped Lead returns 403 and does not persist");
 }
 
-async function testOwnerUnavailableMappedPersistsInternally(): Promise<void> {
+async function testOwnerUnavailableMappedDoesNotPersist(): Promise<void> {
+  const audits: LegacyServiceAuthAuditEntry[] = [];
   const result = await callMapped(
     await signedRequest({
       body: JSON.stringify({
@@ -714,14 +716,18 @@ async function testOwnerUnavailableMappedPersistsInternally(): Promise<void> {
         provider_message_id: "wamid-owner-unavailable",
       }),
     }),
-    { readCurrent: async () => current(null, null) }
+    {
+      readCurrent: async () => current(null, null),
+      audit: (entry) => audits.push(entry),
+    }
   );
   assert.equal(result.status, 403);
   assert.equal(
     result.writes.some((write) => write.table === "authority_resolutions"),
-    true
+    false
   );
-  console.log("  ok  owner unavailable + mapped Case persists internally and returns 403");
+  assert.equal(audits.at(-1)?.key_id, authorityKey.keyId);
+  console.log("  ok  owner unavailable + mapped Case is 403, audited, and does not persist");
 }
 
 async function testOutOfScopeOwnerDoesNotPersist(): Promise<void> {
@@ -873,14 +879,84 @@ async function testInvalidKeyIdsDoNotGrowRateLimitState(): Promise<void> {
     `malformed ids grew buckets by ${afterMalformed - before}`
   );
   assert.ok(
-    afterUnknown - before <= 3,
-    `unknown ids grew buckets by ${afterUnknown - before}`
+    afterUnknown - before <= C2_WELL_FORMED_BUCKET_COUNT + 2,
+    `well-formed ids grew buckets by ${afterUnknown - before}`
   );
   assert.equal(
     audits.every((entry) => entry.key_id === null),
     true
   );
   console.log("  ok  unique invalid key ids do not create unbounded rate-limit state");
+}
+
+async function unsignedWellFormed(keyId: string): Promise<Request> {
+  return new Request("http://legacy.test/api/legacy/authority", {
+    method: "POST",
+    headers: {
+      [HEADER_KEY_ID]: keyId,
+      [HEADER_TIMESTAMP]: TS,
+      [HEADER_SIGNATURE]: `v1=${"aa".repeat(32)}`,
+      "content-type": "application/json",
+    },
+    body: "{}",
+  });
+}
+
+async function statusOf(request: Request): Promise<number> {
+  const response = await handleLegacyAuthorityRequest({
+    request,
+    db: fakeDb().db,
+    lookupKey: (id) => KEYS.get(id) ?? null,
+    nowSeconds: Number(TS),
+    audit: () => undefined,
+  });
+  return response.status;
+}
+
+function wellFormedBucketOf(keyId: string): string {
+  return classifyC2PresentedKeyId({ presented: keyId, wellFormed: true }).bucketKey;
+}
+
+function collidingUnknownIds(targetBucket: string, count: number): string[] {
+  const ids: string[] = [];
+  for (let i = 0; ids.length < count; i++) {
+    const id = `unkcol${i.toString().padStart(5, "0")}`;
+    if (wellFormedBucketOf(id) === targetBucket) ids.push(id);
+  }
+  return ids;
+}
+
+async function testRateLimitDoesNotEnumerateKeyExistence(): Promise<void> {
+  resetRateLimit();
+  for (let i = 0; i < 130; i++) {
+    await statusOf(await unsignedWellFormed(`unkenum${i.toString().padStart(3, "0")}`));
+  }
+  const unknownProbe = await statusOf(await unsignedWellFormed("unkenumprobe"));
+  const knownProbe = await statusOf(
+    await signedRequest({
+      body: JSON.stringify({ legacy_lead_id: LEAD }),
+      signatureHex: "aa".repeat(32),
+    })
+  );
+  assert.equal(unknownProbe, knownProbe);
+  assert.equal(unknownProbe, 401);
+
+  resetRateLimit();
+  const knownBucket = wellFormedBucketOf(authorityKey.keyId);
+  const colliders = collidingUnknownIds(knownBucket, 122);
+  for (const id of colliders.slice(0, 121)) {
+    await statusOf(await unsignedWellFormed(id));
+  }
+  const exhaustedUnknown = await statusOf(await unsignedWellFormed(colliders[121]!));
+  const exhaustedKnown = await statusOf(
+    await signedRequest({
+      body: JSON.stringify({ legacy_lead_id: LEAD }),
+      signatureHex: "bb".repeat(32),
+    })
+  );
+  assert.equal(exhaustedUnknown, exhaustedKnown);
+  assert.equal(exhaustedUnknown, 429);
+  console.log("  ok  pre-auth rate limiting does not enumerate whether a key id exists");
 }
 
 function testRouteUsesRawBody(): void {
@@ -916,13 +992,14 @@ async function main(): Promise<void> {
   await testSourceScopeFailClosed();
   await testNoncanonicalPathDoesNotAcceptAlternateSignature();
   await testRateLimitAppliesToRejectedRequests();
-  await testSourceReadFailureMappedPersistsInternally();
+  await testSourceReadFailureMappedDoesNotPersist();
   await testSourceReadFailureUnmappedDoesNotPersist();
-  await testOwnerUnavailableMappedPersistsInternally();
+  await testOwnerUnavailableMappedDoesNotPersist();
   await testOutOfScopeOwnerDoesNotPersist();
   await testServiceAndSourceSystemBindings();
   await testPersistFailureStillAudits();
   await testInvalidKeyIdsDoNotGrowRateLimitState();
+  await testRateLimitDoesNotEnumerateKeyExistence();
   testRouteUsesRawBody();
   console.log("legacy authority route selftest ok");
 }

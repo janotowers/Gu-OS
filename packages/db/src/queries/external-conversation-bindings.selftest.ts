@@ -312,6 +312,59 @@ async function testMigrationSourceMatchesContract(): Promise<void> {
   console.log("  ok  migration source matches SA-6.1 / SA-6.2 / SA-6.13; 00044 untouched");
 }
 
+async function testAttachHelperHasNoRuntimeProducer(): Promise<void> {
+  const repoRoot = path.resolve(__dirname, "..", "..", "..", "..");
+  const roots = [
+    path.join(repoRoot, "apps"),
+    path.join(repoRoot, "packages"),
+    path.join(repoRoot, "scripts"),
+  ];
+  const callers: string[] = [];
+
+  async function walk(dir: string): Promise<void> {
+    let entries: Array<import("node:fs").Dirent>;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (
+          entry.name === "node_modules" ||
+          entry.name === ".next" ||
+          entry.name === "dist" ||
+          entry.name === ".turbo"
+        ) {
+          continue;
+        }
+        await walk(full);
+        continue;
+      }
+      if (!/\.(ts|tsx|js|mjs)$/.test(entry.name)) continue;
+      if (entry.name.includes(".selftest.")) continue;
+      const text = await fs.readFile(full, "utf8");
+      if (!text.includes("attachExternalConversationBinding")) continue;
+      const isCall = /attachExternalConversationBinding\s*\(/.test(text);
+      const isDef = /export async function attachExternalConversationBinding/.test(
+        text
+      );
+      if (isCall && !isDef) {
+        callers.push(path.relative(repoRoot, full).replaceAll("\\", "/"));
+      }
+    }
+  }
+
+  for (const root of roots) await walk(root);
+  assert.deepEqual(
+    callers,
+    [],
+    `no runtime producer may be invented: ${callers.join(", ")}`
+  );
+  console.log("  ok  attachExternalConversationBinding has no non-test runtime caller");
+}
+
 async function main(): Promise<void> {
   console.log("external conversation bindings selftest");
   await testOpaqueRefAndAdvisorWaRefusal();
@@ -319,6 +372,7 @@ async function main(): Promise<void> {
   await testReverseMapIgnoresAdvisorWa();
   await testUpdateAuthorityOnGuThread();
   await testMigrationSourceMatchesContract();
+  await testAttachHelperHasNoRuntimeProducer();
   console.log("external conversation bindings selftest ok");
 }
 
