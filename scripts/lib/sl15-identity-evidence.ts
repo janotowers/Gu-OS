@@ -451,6 +451,68 @@ export function evaluateSl15HostedWriteGate(
   };
 }
 
+export interface TrackedTreeInspection {
+  unstagedStatus: number;
+  stagedStatus: number;
+}
+
+/**
+ * Repository-wide tracked-diff inspection. Equivalent to:
+ *   git diff --quiet HEAD --
+ *   git diff --cached --quiet HEAD --
+ *
+ * Untracked and ignored files (for example `.env.staging.local`) are invisible
+ * to both commands and must not be treated as a tracked-code mismatch.
+ */
+export function inspectTrackedWorkingTree(
+  runGit: (args: readonly string[]) => { status: number }
+): TrackedTreeInspection {
+  const unstaged = runGit(["diff", "--quiet", "HEAD", "--"]);
+  const staged = runGit(["diff", "--cached", "--quiet", "HEAD", "--"]);
+  return {
+    unstagedStatus: unstaged.status,
+    stagedStatus: staged.status,
+  };
+}
+
+export function evaluateTrackedTreeMatchesHead(
+  inspection: TrackedTreeInspection
+): { ok: boolean; reason: string } {
+  if (inspection.unstagedStatus !== 0) {
+    return {
+      ok: false,
+      reason:
+        inspection.unstagedStatus === 1
+          ? "tracked working tree differs from HEAD"
+          : "could not prove tracked working tree matches HEAD",
+    };
+  }
+  if (inspection.stagedStatus !== 0) {
+    return {
+      ok: false,
+      reason:
+        inspection.stagedStatus === 1
+          ? "staged tracked files differ from HEAD"
+          : "could not prove staged tree matches HEAD",
+    };
+  }
+  return { ok: true, reason: "executed tracked code matches HEAD" };
+}
+
+export function evaluateVerifierSha(
+  sha: string | null | undefined
+): { ok: boolean; sha: string | null; reason: string } {
+  const trimmed = (sha ?? "").trim();
+  if (!/^[0-9a-f]{40}$/i.test(trimmed)) {
+    return {
+      ok: false,
+      sha: null,
+      reason: "verifier SHA is not a full git HEAD SHA",
+    };
+  }
+  return { ok: true, sha: trimmed.toLowerCase(), reason: "full HEAD SHA" };
+}
+
 export function evaluateSl15EvidencePins(pins: {
   productSha: string | null;
   verifierSha: string | null;
@@ -467,7 +529,7 @@ export function evaluateSl15EvidencePins(pins: {
   if (normalizeSl15ProductSha(pins.productSha) !== SL15_STAGING_PRODUCT_SHA) {
     return { ok: false, reason: "product SHA is not the delivered staging SHA" };
   }
-  if (!pins.verifierSha || !/^[0-9a-f]{40}$/i.test(pins.verifierSha)) {
+  if (!evaluateVerifierSha(pins.verifierSha).ok) {
     return { ok: false, reason: "verifier SHA is missing or not a full git SHA" };
   }
   if (!pins.ranAt || Number.isNaN(Date.parse(pins.ranAt))) {
@@ -504,6 +566,7 @@ export function evaluateSl15VerifierSourceContract(source: string): HostedCheck[
   const writeGateCall = source.search(/evaluateSl15HostedWriteGate\(/);
   const admissionGateCall = source.search(/evaluateGovernedAdmissionGate\(/);
   const createClientCall = source.search(/createClient\(/);
+  const treeGuardCall = source.search(/requireExecutedTrackedCodeMatchesHead\(/);
   add(
     "imports only the reviewed helper, target binding, and evidence evaluator",
     unexpected.length === 0,
@@ -520,6 +583,19 @@ export function evaluateSl15VerifierSourceContract(source: string): HostedCheck[
     "requires evaluateSl15HostedWriteGate before createClient",
     writeGateCall >= 0 && createClientCall >= 0 && writeGateCall < createClientCall,
     "write gate precedes client construction"
+  );
+
+  add(
+    "proves executed tracked code matches HEAD before createClient and before the helper",
+    treeGuardCall >= 0 &&
+      createClientCall >= 0 &&
+      firstHelperCall >= 0 &&
+      treeGuardCall < createClientCall &&
+      treeGuardCall < firstHelperCall &&
+      source.includes("inspectTrackedWorkingTree") &&
+      source.includes("evaluateTrackedTreeMatchesHead") &&
+      source.includes("evaluateVerifierSha"),
+    "dirty tracked tree cannot record verifierSha"
   );
 
   add(

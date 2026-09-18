@@ -15,10 +15,13 @@
  *   * proves governed admission before the first write;
  *   * writes only through backfillAdmittedLegacyLeadIdentity, twice;
  *   * has no ad-hoc SQL business write and no Traditional Gu write path;
- *   * pins product SHA, verifier SHA, staging environment, and timestamp.
+ *   * pins product SHA, verifier SHA, staging environment, and timestamp;
+ *   * records verifierSha only when the tracked working tree matches HEAD.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -28,6 +31,9 @@ import {
   evaluateSl15EvidencePins,
   evaluateSl15HostedWriteGate,
   evaluateSl15VerifierSourceContract,
+  evaluateTrackedTreeMatchesHead,
+  evaluateVerifierSha,
+  inspectTrackedWorkingTree,
   SL15_HOSTED_ENVIRONMENT,
   SL15_STAGING_PRODUCT_SHA,
   SL15_STAGING_PROJECT_REF,
@@ -372,6 +378,123 @@ function writeGate(
 }
 
 {
+  const short = evaluateVerifierSha("12ed79e");
+  assert.equal(short.ok, false, "a short HEAD prefix is not a verifier SHA");
+  const full = evaluateVerifierSha(SL15_STAGING_PRODUCT_SHA);
+  assert.equal(full.ok, true, "a full 40-character SHA is accepted");
+  assert.equal(full.sha, SL15_STAGING_PRODUCT_SHA);
+}
+
+{
+  const calls: string[][] = [];
+  inspectTrackedWorkingTree((args) => {
+    calls.push([...args]);
+    return { status: 0 };
+  });
+  assert.deepEqual(
+    calls,
+    [
+      ["diff", "--quiet", "HEAD", "--"],
+      ["diff", "--cached", "--quiet", "HEAD", "--"],
+    ],
+    "inspection is the repository-wide tracked-diff pair"
+  );
+}
+
+{
+  assert.equal(
+    evaluateTrackedTreeMatchesHead({ unstagedStatus: 0, stagedStatus: 0 }).ok,
+    true,
+    "a clean tracked tree passes"
+  );
+  assert.equal(
+    evaluateTrackedTreeMatchesHead({ unstagedStatus: 1, stagedStatus: 0 }).ok,
+    false,
+    "an unstaged tracked modification fails closed"
+  );
+  assert.equal(
+    evaluateTrackedTreeMatchesHead({ unstagedStatus: 0, stagedStatus: 1 }).ok,
+    false,
+    "a staged tracked modification fails closed"
+  );
+  assert.equal(
+    evaluateTrackedTreeMatchesHead({ unstagedStatus: 128, stagedStatus: 0 }).ok,
+    false,
+    "a git inspection error fails closed"
+  );
+}
+
+{
+  const root = mkdtempSync(join(tmpdir(), "sl15-tree-"));
+  const git = (args: string[]) =>
+    spawnSync("git", args, {
+      cwd: root,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: "sl15-test",
+        GIT_AUTHOR_EMAIL: "sl15-test@example.com",
+        GIT_COMMITTER_NAME: "sl15-test",
+        GIT_COMMITTER_EMAIL: "sl15-test@example.com",
+      },
+    });
+  const inspect = () =>
+    inspectTrackedWorkingTree((args) => {
+      const result = git([...args]);
+      return { status: result.status ?? 128 };
+    });
+  try {
+    assert.equal(git(["init", "-b", "main"]).status, 0);
+    assert.equal(git(["config", "core.autocrlf", "false"]).status, 0);
+    assert.equal(git(["config", "commit.gpgsign", "false"]).status, 0);
+    writeFileSync(join(root, "tracked.ts"), "export const x = 1;\n");
+    writeFileSync(join(root, ".gitignore"), ".env.staging.local\n");
+    assert.equal(git(["add", "tracked.ts", ".gitignore"]).status, 0);
+    assert.equal(git(["commit", "-m", "init"]).status, 0);
+
+    const head = evaluateVerifierSha(git(["rev-parse", "HEAD"]).stdout);
+    assert.equal(head.ok, true, "verifier SHA is the full HEAD SHA");
+    assert.match(head.sha ?? "", /^[0-9a-f]{40}$/);
+    assert.equal((git(["rev-parse", "HEAD"]).stdout ?? "").trim().toLowerCase(), head.sha);
+
+    assert.equal(
+      evaluateTrackedTreeMatchesHead(inspect()).ok,
+      true,
+      "a clean tracked tree passes against a real git repo"
+    );
+
+    writeFileSync(join(root, "tracked.ts"), "export const x = 2;\n");
+    assert.equal(
+      evaluateTrackedTreeMatchesHead(inspect()).ok,
+      false,
+      "a tracked unstaged modification fails closed against a real git repo"
+    );
+
+    assert.equal(git(["add", "tracked.ts"]).status, 0);
+    assert.equal(git(["restore", "--source=HEAD", "--worktree", "tracked.ts"]).status, 0);
+    const stagedOnly = inspect();
+    assert.equal(stagedOnly.unstagedStatus, 0, "worktree restored to HEAD");
+    assert.equal(stagedOnly.stagedStatus, 1, "index still differs from HEAD");
+    assert.equal(
+      evaluateTrackedTreeMatchesHead(stagedOnly).ok,
+      false,
+      "a staged tracked modification fails closed against a real git repo"
+    );
+
+    assert.equal(git(["restore", "--staged", "--worktree", "tracked.ts"]).status, 0);
+    writeFileSync(join(root, ".env.staging.local"), "GUOS_STAGING_SUPABASE_URL=https://example.invalid\n");
+    writeFileSync(join(root, "operator-notes.local"), "untracked operator material\n");
+    assert.equal(
+      evaluateTrackedTreeMatchesHead(inspect()).ok,
+      true,
+      "untracked/ignored operator environment material is not a tracked-code mismatch"
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+{
   const here = dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(join(here, "../verify-sl15-identity.ts"), "utf8");
   const checks = evaluateSl15VerifierSourceContract(source);
@@ -405,6 +528,10 @@ function writeGate(
   assert.ok(
     checks.some((check) => !check.ok && check.label.includes("twice")),
     "a single helper call fails the source contract"
+  );
+  assert.ok(
+    checks.some((check) => !check.ok && check.label.includes("tracked code matches HEAD")),
+    "omitting the dirty-tree guard fails the source contract"
   );
 }
 

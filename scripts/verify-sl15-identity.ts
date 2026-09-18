@@ -14,6 +14,8 @@
  *
  * Staging only. The expected staging project/ref is checked, and
  * `--acknowledge-durable-write` makes the Gu OS write a decision.
+ * Before createClient or any durable write, the tracked working tree must
+ * match HEAD so verifierSha names the code that actually executed.
  *
  * Organization and Case must be named by the operator. This runner will not invent or select a Case and never auto-selects one.
  *
@@ -33,7 +35,7 @@
  *     [--json evidence.json]
  */
 
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
@@ -53,6 +55,9 @@ import {
   evaluateHostedSl15Identity,
   evaluateSl15EvidencePins,
   evaluateSl15HostedWriteGate,
+  evaluateTrackedTreeMatchesHead,
+  evaluateVerifierSha,
+  inspectTrackedWorkingTree,
   SL15_HOSTED_ENVIRONMENT,
   SL15_STAGING_PROJECT_REF,
   type HostedCheck,
@@ -82,12 +87,33 @@ function redact(value: string | null): string | null {
   return `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
 }
 
-function requireVerifierSha(): string {
-  const sha = execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
-  if (!/^[0-9a-f]{40}$/i.test(sha)) {
-    throw new Error("FAIL CLOSED - could not pin verifier SHA from git rev-parse HEAD");
+function runGit(args: readonly string[]): { status: number; stdout: string } {
+  const result = spawnSync("git", [...args], { encoding: "utf8" });
+  return {
+    status: result.status ?? 128,
+    stdout: (result.stdout ?? "").toString(),
+  };
+}
+
+/**
+ * Fail closed unless executed tracked code == HEAD. HEAD alone is not enough:
+ * a local edit to the harness or `@agents/db` could write while evidence still
+ * named the unchanged SHA. Untracked/ignored operator files are invisible to
+ * these diffs and do not fail the check.
+ */
+function requireExecutedTrackedCodeMatchesHead(): string {
+  const tree = evaluateTrackedTreeMatchesHead(inspectTrackedWorkingTree(runGit));
+  if (!tree.ok) {
+    throw new Error(
+      `FAIL CLOSED - ${tree.reason}. ` +
+        "Executed tracked code must match HEAD before verifierSha can be recorded."
+    );
   }
-  return sha;
+  const head = evaluateVerifierSha(runGit(["rev-parse", "HEAD"]).stdout);
+  if (!head.ok || !head.sha) {
+    throw new Error(`FAIL CLOSED - ${head.reason}`);
+  }
+  return head.sha;
 }
 
 async function main(): Promise<void> {
@@ -114,7 +140,7 @@ async function main(): Promise<void> {
   const organizationId = writeGate.organizationId;
   const caseId = writeGate.caseId;
   const productSha = writeGate.productSha;
-  const verifierSha = requireVerifierSha();
+  const verifierSha = requireExecutedTrackedCodeMatchesHead();
   const ranAt = new Date().toISOString();
   const pins = evaluateSl15EvidencePins({
     productSha,
