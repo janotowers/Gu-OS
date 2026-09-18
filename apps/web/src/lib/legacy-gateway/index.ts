@@ -11,6 +11,7 @@
  * functions exist to reach systems a browser must never reach directly.
  */
 import type {
+  LegacyConversationAuthority,
   LegacyDealAppointments,
   LegacyLeadContext,
   LegacyPropertyDetails,
@@ -19,6 +20,7 @@ import type {
 } from "@agents/types";
 import {
   appointmentGet,
+  legacyConversationAuthorityGet,
   legacyLeadGetContext,
   legacyLeadGetRecentMessages,
   propertyGetDetails,
@@ -63,6 +65,7 @@ export type {
 } from "./source-clients";
 export {
   appointmentGet,
+  legacyConversationAuthorityGet,
   legacyLeadGetContext,
   legacyLeadGetRecentMessages,
   propertyGetDetails,
@@ -128,4 +131,23 @@ export async function readLegacyPropertyDetails(
     externalId: legacyPropertyId,
   });
   return propertyGetDetails({ ctx, readers, legacyPropertyId });
+}
+
+/**
+ * Resolver-facing current-state read (SL-6 / TD-3 Q17). Not a model tool
+ * and not a C6 endpoint. Mongo is required; a missing credential is a
+ * refusal, not a stale-projection fallback.
+ */
+export async function readLegacyConversationAuthority(
+  ctx: GatewayCallerContext,
+  legacyLeadId: string
+): Promise<LegacyReadResult<LegacyConversationAuthority>> {
+  const readers = await resolveLegacySourceReaders({
+    db: ctx.db,
+    organizationId: ctx.organizationId,
+    capability: "legacy_conversation_authority_get",
+    externalId: legacyLeadId,
+    needsMongo: true,
+  });
+  return legacyConversationAuthorityGet({ ctx, readers, legacyLeadId });
 }

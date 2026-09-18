@@ -38,6 +38,7 @@ import { withRotationAwareCache, type CacheEntry } from "./adapters";
 import { APPOINTMENT_SCAN_LIMIT } from "./source-clients";
 import {
   appointmentGet,
+  legacyConversationAuthorityGet,
   legacyLeadGetContext,
   legacyLeadGetRecentMessages,
   propertyGetDetails,
@@ -81,6 +82,12 @@ const appointmentFixture = loadFixture<{
   firestore: FixtureDocument[];
   mongo: FixtureDocument[];
 }>("appointments.json");
+const authorityFixture = loadFixture<{
+  legacyLeadId: string;
+  botNumber: string;
+  users: FixtureDocument[];
+  gunumbers: FixtureDocument[];
+}>("conversation-authority.json");
 
 const PILOT_ORG = "11111111-1111-1111-1111-111111111111";
 const OTHER_ORG = "22222222-2222-2222-2222-222222222222";
@@ -93,6 +100,7 @@ const OTHER_OWNER_UID = "other-owner-uid-000000001";
 const PILOT_LEAD = "5215500000001521550000000252155000000003";
 const OTHER_ORG_LEAD = "5215500000077521550000000252155000000099";
 const UNOWNED_LEAD = "5215500000088521550000000252155000000003";
+const FOREIGN_OWNED_LEAD = "5215500000099521550000000252155000000003";
 const GATEWAY_ON = { LEGACY_GATEWAY_ENABLED: "true" } as const;
 
 // ============================================================
@@ -201,6 +209,8 @@ function fixtureReaders(
     properties: FixtureDocument[];
     firestoreAppointments: FixtureDocument[];
     mongoAppointments: FixtureDocument[];
+    mongoLeadRuntimes: FixtureDocument[];
+    mongoGuNumbers: FixtureDocument[];
   }) => void = () => undefined
 ): RecordingReaders {
   // Deep copies, so a mutation for a drift test cannot leak into the next one.
@@ -211,6 +221,8 @@ function fixtureReaders(
     properties: structuredClone(propertyFixture.documents),
     firestoreAppointments: structuredClone(appointmentFixture.firestore),
     mongoAppointments: structuredClone(appointmentFixture.mongo),
+    mongoLeadRuntimes: structuredClone(authorityFixture.users),
+    mongoGuNumbers: structuredClone(authorityFixture.gunumbers),
   };
   mutate(documents);
 
@@ -252,6 +264,18 @@ function fixtureReaders(
         reads.push(`mongo:gu2.appointments/${id}`);
         return documents.mongoAppointments
           .filter((d) => d.data.deal_id === id)
+          .map((d) => ({ id: d.id, data: d.data }));
+      },
+      async findLeadRuntimeByLeadId(id) {
+        reads.push(`mongo:gu2.users/${id}`);
+        return documents.mongoLeadRuntimes
+          .filter((d) => d.data.lead_id === id)
+          .map((d) => ({ id: d.id, data: d.data }));
+      },
+      async findGuNumberByBotNumber(botNumber) {
+        reads.push(`mongo:gu2.gunumbers/${botNumber}`);
+        return documents.mongoGuNumbers
+          .filter((d) => d.data.bot_number === botNumber)
           .map((d) => ({ id: d.id, data: d.data }));
       },
     },
@@ -534,6 +558,21 @@ async function testDriftAlarm(): Promise<void> {
     );
     assert.equal(alarms[0].contractId, "firestore.properties.v1");
 
+    alarms.length = 0;
+    await expectRefusal(
+      () =>
+        legacyConversationAuthorityGet({
+          ctx: pilotContext(),
+          readers: fixtureReaders((documents) => {
+            documents.mongoLeadRuntimes[0].data.bypass_bot = "yes";
+          }),
+          legacyLeadId: PILOT_LEAD,
+          env: GATEWAY_ON,
+        }),
+      "contract_drift"
+    );
+    assert.equal(alarms[0].contractId, "mongo.gu2.users.v1");
+
     // An ADDITIVE field is not drift. Both legacy repositories add fields
     // continuously; alarming on that would train operators to ignore alarms.
     alarms.length = 0;
@@ -715,6 +754,26 @@ async function testBindingGate(): Promise<void> {
     assert.equal(bound.provenance.bindingState, "unbound");
   }
 
+  // Authority read of a lead bound to another Organization: refused before Mongo.
+  {
+    const readers = fixtureReaders();
+    await expectRefusal(
+      () =>
+        legacyConversationAuthorityGet({
+          ctx: pilotContext(),
+          readers,
+          legacyLeadId: OTHER_ORG_LEAD,
+          env: GATEWAY_ON,
+        }),
+      "belongs_to_another_organization"
+    );
+    assert.deepEqual(
+      readers.reads,
+      [],
+      "a cross-tenant authority request must be refused before any source is touched"
+    );
+  }
+
   console.log("  ok  SA-1.6 binding + membership + containment gate every read");
 }
 
@@ -751,6 +810,20 @@ async function testFlagsOffIsInert(): Promise<void> {
     );
     assert.deepEqual(readers.reads, []);
   }
+  {
+    const readers = fixtureReaders();
+    await expectRefusal(
+      () =>
+        legacyConversationAuthorityGet({
+          ctx: pilotContext({ relationshipOps: false }),
+          readers,
+          legacyLeadId: PILOT_LEAD,
+          env: GATEWAY_ON,
+        }),
+      "gateway_disabled"
+    );
+    assert.deepEqual(readers.reads, []);
+  }
   console.log("  ok  flags off leaves the gateway inert - no source is touched");
 }
 
@@ -778,6 +851,8 @@ function testNoGenericCrudSurface(): void {
     "listConversationThreads",
     "listDealAppointments",
     "findAppointmentsByDeal",
+    "findLeadRuntimeByLeadId",
+    "findGuNumberByBotNumber",
   ];
   for (const method of readerMethods) {
     assert.equal(
@@ -812,6 +887,24 @@ function testNoGenericCrudSurface(): void {
       }),
     /may not read/
   );
+  assert.throws(
+    () =>
+      assertAllowedSourcePath({
+        store: "mongo",
+        template: "gu2.users",
+        capability: "legacy_lead_get_context",
+      }),
+    /may not read/
+  );
+  assert.throws(
+    () =>
+      assertAllowedSourcePath({
+        store: "mongo",
+        template: "gu2.gunumbers",
+        capability: "appointment_get",
+      }),
+    /may not read/
+  );
   // An identifier cannot walk out of its collection.
   assert.throws(
     () => resolveSourcePath("leads/{legacyLeadId}", { legacyLeadId: "../users/x" }),
@@ -828,7 +921,7 @@ function testNoGenericCrudSurface(): void {
     assert.ok(excluded.reason.length > 20, `${excluded.path} is excluded without a reason`);
   }
 
-  console.log("  ok  SA-1.7 the surface is four named reads - no generic CRUD, no effect");
+  console.log("  ok  SA-1.7 the surface is named reads only - no generic CRUD, no effect");
 }
 
 // ============================================================
@@ -1182,6 +1275,214 @@ async function testAppointmentsRefuseOnOverflow(): Promise<void> {
   console.log("  ok  a source result past the bounded read refuses instead of truncating");
 }
 
+// ============================================================
+// SA-6.3, SA-6.4 — current-state semantic authority read
+// ============================================================
+
+const AUTHORITY_VALUE_KEYS = [
+  "legacyLeadId",
+  "leadTakeoverActive",
+  "lastOwnerInteractionAt",
+  "numberKillSwitchActive",
+  "guNumberRef",
+] as const;
+
+async function testConversationAuthority(): Promise<void> {
+  const readers = fixtureReaders();
+  const result = await legacyConversationAuthorityGet({
+    ctx: pilotContext(),
+    readers,
+    legacyLeadId: PILOT_LEAD,
+    env: GATEWAY_ON,
+  });
+
+  assert.equal(result.value.legacyLeadId, PILOT_LEAD);
+  assert.equal(result.value.leadTakeoverActive, false);
+  assert.equal(result.value.lastOwnerInteractionAt, "2026-09-17T18:00:00.000Z");
+  assert.equal(result.value.numberKillSwitchActive, false);
+  assert.equal(result.value.guNumberRef, authorityFixture.botNumber);
+
+  assert.deepEqual(
+    Object.keys(result.value).sort(),
+    [...AUTHORITY_VALUE_KEYS].sort(),
+    "the capability may expose only the named semantic fields"
+  );
+  assert.equal(
+    JSON.stringify(result.value).includes("bypass_bot"),
+    false,
+    "raw source field names must not leak into the result"
+  );
+  assert.equal(
+    JSON.stringify(result.value).includes("_id"),
+    false,
+    "a raw Mongo document must not reach the caller"
+  );
+
+  assert.equal(result.provenance.sourceSystem, "traditional_gu");
+  assert.equal(result.provenance.store, "mongo");
+  assert.equal(result.provenance.sourcePath, "gu2.users");
+  assert.equal(result.provenance.capability, "legacy_conversation_authority_get");
+  assert.equal(result.provenance.adapter, "bootstrap_direct");
+  assert.equal(result.provenance.organizationId, PILOT_ORG);
+  assert.equal(result.provenance.freshness.sourceUpdatedAtField, "last_owner_interaction_wba");
+  assert.equal(
+    result.provenance.freshness.sourceUpdatedAt,
+    "2026-09-17T18:00:00.000Z"
+  );
+  assert.ok(readers.reads.includes(`mongo:gu2.users/${PILOT_LEAD}`));
+  assert.ok(
+    readers.reads.includes(`mongo:gu2.gunumbers/${authorityFixture.botNumber}`)
+  );
+
+  console.log("  ok  SA-6.3/SA-6.4 authority read is semantic, current, and provenanced");
+}
+
+async function testConversationAuthorityFourCombinations(): Promise<void> {
+  const combinations: Array<{
+    lead: boolean;
+    number: boolean;
+    label: string;
+  }> = [
+    { lead: false, number: false, label: "00" },
+    { lead: false, number: true, label: "01" },
+    { lead: true, number: false, label: "10" },
+    { lead: true, number: true, label: "11" },
+  ];
+
+  for (const combination of combinations) {
+    const result = await legacyConversationAuthorityGet({
+      ctx: pilotContext(),
+      readers: fixtureReaders((documents) => {
+        documents.mongoLeadRuntimes[0].data.bypass_bot = combination.lead;
+        documents.mongoGuNumbers[0].data.bypass_bot = combination.number;
+      }),
+      legacyLeadId: PILOT_LEAD,
+      env: GATEWAY_ON,
+    });
+    assert.equal(
+      result.value.leadTakeoverActive,
+      combination.lead,
+      `combination ${combination.label}: per-lead takeover`
+    );
+    assert.equal(
+      result.value.numberKillSwitchActive,
+      combination.number,
+      `combination ${combination.label}: per-number kill switch`
+    );
+    assert.notEqual(
+      result.value.leadTakeoverActive === result.value.numberKillSwitchActive &&
+        combination.lead !== combination.number,
+      true,
+      `combination ${combination.label}: the two flags must stay distinct`
+    );
+  }
+
+  console.log("  ok  SA-6.5 per-lead takeover and per-number kill switch stay distinct");
+}
+
+async function testConversationAuthorityFailClosed(): Promise<void> {
+  const readersWithoutMongo = fixtureReaders();
+  await expectRefusal(
+    () =>
+      legacyConversationAuthorityGet({
+        ctx: pilotContext(),
+        readers: { firestore: readersWithoutMongo.firestore, mongo: null },
+        legacyLeadId: PILOT_LEAD,
+        env: GATEWAY_ON,
+      }),
+    "no_usable_credential"
+  );
+  assert.deepEqual(
+    readersWithoutMongo.reads,
+    [],
+    "a missing Mongo reader must not fall back to any other store"
+  );
+
+  await expectRefusal(
+    () =>
+      legacyConversationAuthorityGet({
+        ctx: pilotContext(),
+        readers: fixtureReaders((documents) => {
+          documents.mongoLeadRuntimes = documents.mongoLeadRuntimes.filter(
+            (document) => document.data.lead_id !== PILOT_LEAD
+          );
+        }),
+        legacyLeadId: PILOT_LEAD,
+        env: GATEWAY_ON,
+      }),
+    "not_found"
+  );
+
+  await expectRefusal(
+    () =>
+      legacyConversationAuthorityGet({
+        ctx: pilotContext(),
+        readers: fixtureReaders((documents) => {
+          const duplicate = structuredClone(documents.mongoLeadRuntimes[0]);
+          duplicate.id = "user-runtime-pilot-duplicate";
+          documents.mongoLeadRuntimes.push(duplicate);
+        }),
+        legacyLeadId: PILOT_LEAD,
+        env: GATEWAY_ON,
+      }),
+    "pairing_ambiguous"
+  );
+
+  await expectRefusal(
+    () =>
+      legacyConversationAuthorityGet({
+        ctx: pilotContext(),
+        readers: fixtureReaders((documents) => {
+          const duplicate = structuredClone(documents.mongoGuNumbers[0]);
+          duplicate.id = "gunumber-pilot-duplicate";
+          documents.mongoGuNumbers.push(duplicate);
+        }),
+        legacyLeadId: PILOT_LEAD,
+        env: GATEWAY_ON,
+      }),
+    "pairing_ambiguous"
+  );
+
+  await expectRefusal(
+    () =>
+      legacyConversationAuthorityGet({
+        ctx: pilotContext(),
+        readers: fixtureReaders(),
+        legacyLeadId: FOREIGN_OWNED_LEAD,
+        env: GATEWAY_ON,
+      }),
+    "belongs_to_another_organization"
+  );
+
+  await expectRefusal(
+    () =>
+      legacyConversationAuthorityGet({
+        ctx: pilotContext(),
+        readers: fixtureReaders(),
+        legacyLeadId: UNOWNED_LEAD,
+        env: GATEWAY_ON,
+      }),
+    "ownership_not_contained"
+  );
+
+  const missingNumber = await legacyConversationAuthorityGet({
+    ctx: pilotContext(),
+    readers: fixtureReaders((documents) => {
+      delete documents.mongoLeadRuntimes[0].data.bot_phone_number;
+      documents.mongoGuNumbers = [];
+    }),
+    legacyLeadId: PILOT_LEAD,
+    env: GATEWAY_ON,
+  });
+  assert.equal(missingNumber.value.leadTakeoverActive, false);
+  assert.equal(missingNumber.value.numberKillSwitchActive, null);
+  assert.equal(missingNumber.value.guNumberRef, null);
+
+  console.log(
+    "  ok  authority read fails closed on missing Mongo, ambiguity, and uncontained ownership"
+  );
+}
+
 async function main(): Promise<void> {
   console.log("legacy gateway selftest");
   await testLeadContext();
@@ -1193,6 +1494,9 @@ async function main(): Promise<void> {
   await testAppointmentOwnershipIsUniform();
   await testAppointmentsNeverSilentlyDropRecords();
   await testAppointmentsRefuseOnOverflow();
+  await testConversationAuthority();
+  await testConversationAuthorityFourCombinations();
+  await testConversationAuthorityFailClosed();
   await testCredentialRotationInvalidatesCache();
   await testFlagsOffIsInert();
   testNoGenericCrudSurface();

@@ -272,7 +272,7 @@ async function main(): Promise<void> {
         (legacy.mongo.checkUri ? " [via the resolver-independent check form]" : "")
     );
   } else {
-    console.log("\ntraditional_gu_mongo: not configured - skipping (only appointment_get needs it)");
+    console.log("\ntraditional_gu_mongo: not configured - skipping (appointment_get and legacy_conversation_authority_get need it)");
   }
 
   if (!targetArgs.apply) {

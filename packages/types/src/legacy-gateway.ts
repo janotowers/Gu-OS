@@ -1,6 +1,6 @@
 /**
  * Bounded operational read capabilities over Traditional Gu (R1 SL-1 / TD-5,
- * architecture contract AC-1).
+ * architecture contract AC-1; R1 SL-6 / TD-3 Q17).
  *
  * These types are the **durable interface**. The adapter behind each capability
  * is a replaceable bootstrap detail (direct Firestore/Mongo reads today,
@@ -8,7 +8,7 @@
  * contract is what callers depend on and what fixtures pin.
  *
  * Three rules the shapes here exist to enforce:
- *   * **No generic CRUD, ever.** The vocabulary is closed: four semantic
+ *   * **No generic CRUD, ever.** The vocabulary is closed: named semantic
  *     capabilities, each with its own typed request and result. There is no
  *     "read collection X" shape to widen into one.
  *   * **Provenance on every result** - where it came from, which store, when it
@@ -17,6 +17,14 @@
  *   * **External identifiers stay opaque.** `legacy_lead_id` is a composite
  *     operational-context key (audit 5.1); it is carried whole and never parsed
  *     into phone-number components.
+ *
+ * C6's ratified first-wave contract is still exactly four capabilities
+ * (`legacy_lead_get_context`, `legacy_lead_get_recent_messages`,
+ * `appointment_get`, `property_get_details`). `legacy_conversation_authority_get`
+ * is a later SL-6 / TD-3 addition in this same union. It is **not** a C6
+ * endpoint, is not a model tool, and is sanctioned on `bootstrap_direct` only
+ * until a least-privilege legacy-side implementation sits behind the same
+ * replaceable abstraction (Q17).
  */
 
 // ============================================================
@@ -24,14 +32,18 @@
 // ============================================================
 
 /**
- * The complete first-wave capability surface (TD-5). Adding a member is a
- * capability-surface change and belongs to a Slice, not to a call site.
+ * Named gateway capabilities. Adding a member is a capability-surface change
+ * and belongs to a Slice, not to a call site.
+ *
+ * The first four are the SL-1 / C6 first-wave surface. The fifth is the SL-6
+ * authority read (TD-3 Q17) and is not retrofitted into C6.
  */
 export const LEGACY_GATEWAY_CAPABILITIES = [
   "legacy_lead_get_context",
   "legacy_lead_get_recent_messages",
   "appointment_get",
   "property_get_details",
+  "legacy_conversation_authority_get",
 ] as const;
 
 export type LegacyGatewayCapability =
@@ -286,6 +298,47 @@ export interface LegacyPropertyDetails {
   addressLabel: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+}
+
+// ============================================================
+// legacy_conversation_authority_get (R1 SL-6 / TD-3 Q17)
+// ============================================================
+
+/**
+ * Current conversation-authority inputs from Traditional Gu. A semantic
+ * projection only — never a pass-through of the Mongo lead-runtime or
+ * Gu-number documents.
+ *
+ * The per-lead takeover flag and the per-Gu-number kill switch are distinct
+ * fields with distinct meanings (audit §24.6). Neither is read as the other.
+ * This shape reports both; it does not interpret a resume window.
+ */
+export interface LegacyConversationAuthority {
+  /** Opaque composite key. Carried whole, never parsed (audit 5.1, 5.3). */
+  legacyLeadId: string;
+  /**
+   * Per-lead same-thread takeover (`users.bypass_bot`). Null when the source
+   * did not record a boolean.
+   */
+  leadTakeoverActive: boolean | null;
+  /**
+   * Last same-thread owner interaction as the source recorded it
+   * (`last_owner_interaction_wba`), normalized to an instant. Null when
+   * absent or unparseable. Resume-window interpretation is not this
+   * capability's job.
+   */
+  lastOwnerInteractionAt: string | null;
+  /**
+   * Per-Gu-number kill switch (`gunumbers.bypass_bot`). Distinct from
+   * `leadTakeoverActive`. Null when no number was resolved, the number
+   * record was missing, or the source did not record a boolean.
+   */
+  numberKillSwitchActive: boolean | null;
+  /**
+   * Opaque Gu-number identity the kill switch was read for, when a number
+   * was resolved. Null when the lead runtime carried none.
+   */
+  guNumberRef: string | null;
 }
 
 // ============================================================

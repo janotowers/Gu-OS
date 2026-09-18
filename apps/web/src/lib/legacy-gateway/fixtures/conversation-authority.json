@@ -1,0 +1,72 @@
+{
+  "recorded": {
+    "sourceSystem": "traditional_gu",
+    "store": "mongo",
+    "paths": ["gu2.users", "gu2.gunumbers"],
+    "contractIds": ["mongo.gu2.users.v1", "mongo.gu2.gunumbers.v1"],
+    "recordedAt": "2026-09-17",
+    "sampleSize": null,
+    "environment": "code-derived from Traditional Gu writers (users by opaque lead_id; gunumbers by bot_number). Not a first-hand hosted sample. Hosted T7 confirms the database placement and field presence.",
+    "values": "SYNTHETIC. Field names and kinds are from current writers; every value is replaced.",
+    "notes": [
+      "Two distinct bypass_bot fields: per-lead on users, per-number on gunumbers. Neither is the other.",
+      "lead_id is an opaque composite operational-context key and is compared whole.",
+      "Database is gu2 per audit §5.2 and the SL-1 allowlist reservation. SL-1 first-hand inventory also records users in bot; that inventory is not this capability's store.",
+      "This fixture does not encode a resume window. Window interpretation is the independent oracle's job."
+    ]
+  },
+  "legacyLeadId": "5215500000001521550000000252155000000003",
+  "botNumber": "5215500000003",
+  "users": [
+    {
+      "id": "user-runtime-pilot-1",
+      "data": {
+        "_id": "user-runtime-pilot-1",
+        "lead_id": "5215500000001521550000000252155000000003",
+        "bypass_bot": false,
+        "last_owner_interaction_wba": "2026-09-17T18:00:00.000Z",
+        "bot_phone_number": "5215500000003",
+        "owner_firebase_id": "owner-uid-0000000000000001",
+        "phone_number": "5215500000001"
+      }
+    },
+    {
+      "id": "user-runtime-foreign-1",
+      "data": {
+        "_id": "user-runtime-foreign-1",
+        "lead_id": "5215500000099521550000000252155000000003",
+        "bypass_bot": true,
+        "last_owner_interaction_wba": "2026-09-17T17:00:00.000Z",
+        "bot_phone_number": "5215500000008",
+        "owner_firebase_id": "other-owner-uid-000000001"
+      }
+    },
+    {
+      "id": "user-runtime-unowned-1",
+      "data": {
+        "_id": "user-runtime-unowned-1",
+        "lead_id": "5215500000088521550000000252155000000003",
+        "bypass_bot": false,
+        "last_owner_interaction_wba": "2026-09-17T16:00:00.000Z"
+      }
+    }
+  ],
+  "gunumbers": [
+    {
+      "id": "gunumber-pilot-1",
+      "data": {
+        "_id": "gunumber-pilot-1",
+        "bot_number": "5215500000003",
+        "bypass_bot": false
+      }
+    },
+    {
+      "id": "gunumber-foreign-1",
+      "data": {
+        "_id": "gunumber-foreign-1",
+        "bot_number": "5215500000008",
+        "bypass_bot": true
+      }
+    }
+  ]
+}

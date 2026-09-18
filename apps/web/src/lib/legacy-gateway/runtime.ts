@@ -11,10 +11,12 @@
  * credential produces a refusal rather than a gamble against a live source.
  *
  * Fail-closed shape of this module: a missing Firestore credential is a refusal,
- * because three of the four capabilities cannot answer without it. A missing
- * Mongo credential is NOT a refusal - only `appointment_get` uses Mongo, and it
- * reports `storesConsulted.mongo = false` so a single-store answer is explicitly
- * incomplete rather than silently authoritative.
+ * because the first-wave capabilities cannot answer without it. A missing
+ * Mongo credential is NOT a refusal at this seam for `appointment_get` — that
+ * capability reports `storesConsulted.mongo = false` so a single-store answer
+ * is explicitly incomplete rather than silently authoritative.
+ * `legacy_conversation_authority_get` requires Mongo and refuses in the
+ * capability when the reader is null; it does not fall back to a projection.
  */
 import {
   getOrganizationToolSecretForRuntime,
