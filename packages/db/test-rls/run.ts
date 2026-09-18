@@ -2667,6 +2667,40 @@ async function main(): Promise<void> {
       assert.equal(code, CHECK_VIOLATION);
     });
 
+    await t("duplicate provider_message_id in one Organization is rejected", async () => {
+      await client.query(
+        `insert into public.authority_resolutions
+           (organization_id, case_id, state, detected_at, provider_message_id)
+         values ($1, $2, 'unknown', now(), 'wamid-unique-1')`,
+        [f.orgA, f.orgCaseA]
+      );
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.authority_resolutions
+               (organization_id, case_id, state, detected_at, provider_message_id)
+             values ($1, $2, 'conflicting', now(), 'wamid-unique-1')`,
+            [f.orgA, f.orgCaseA]
+          )
+        )
+      );
+      assert.equal(code, UNIQUE_VIOLATION);
+    });
+
+    await t("resolved_at and resolved_as must be paired", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.authority_resolutions
+               (organization_id, case_id, state, detected_at, resolved_at)
+             values ($1, $2, 'unknown', now(), now())`,
+            [f.orgA, f.orgCaseA]
+          )
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
+    });
+
     await t("a Case from another Organization cannot own a resolution (composite FK)", async () => {
       const code = await asRole(client, service, () =>
         errorCode(() =>

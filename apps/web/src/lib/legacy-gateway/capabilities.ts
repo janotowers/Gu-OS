@@ -930,6 +930,15 @@ export async function legacyConversationAuthorityGet(
   }
 
   const readAt = new Date().toISOString();
+  const leadFreshness = buildFreshness(readAt, {
+    candidates: [
+      {
+        field: "last_owner_interaction_wba",
+        value: userDocument.data.last_owner_interaction_wba,
+      },
+    ],
+  });
+  const numberFreshness = buildFreshness(readAt, { candidates: [] });
   const value: LegacyConversationAuthority = {
     legacyLeadId,
     leadTakeoverActive: normalizeBoolean(userDocument.data.bypass_bot),
@@ -940,23 +949,39 @@ export async function legacyConversationAuthorityGet(
     guNumberRef,
   };
 
-  return withProvenance(
-    value,
-    buildProvenance({
-      store: "mongo",
+  const contributions = [
+    {
+      field: "leadTakeoverActive",
       sourcePath,
-      externalId: legacyLeadId,
-      capability,
-      organizationId: input.ctx.organizationId,
-      bindingState: gate.bindingState,
-      freshness: buildFreshness(readAt, {
-        candidates: [
+      sourceUpdatedAt: leadFreshness.sourceUpdatedAt,
+      sourceUpdatedAtField: leadFreshness.sourceUpdatedAtField,
+    },
+    ...(botNumber
+      ? [
           {
-            field: "last_owner_interaction_wba",
-            value: userDocument.data.last_owner_interaction_wba,
+            field: "numberKillSwitchActive",
+            sourcePath: "gu2.gunumbers",
+            sourceUpdatedAt: numberFreshness.sourceUpdatedAt,
+            sourceUpdatedAtField: numberFreshness.sourceUpdatedAtField,
           },
-        ],
-      }),
-    })
-  );
+        ]
+      : []),
+  ];
+
+  return {
+    ...withProvenance(
+      value,
+      buildProvenance({
+        store: "mongo",
+        sourcePath,
+        externalId: legacyLeadId,
+        capability,
+        organizationId: input.ctx.organizationId,
+        bindingState: gate.bindingState,
+        freshness: leadFreshness,
+        contributions,
+      })
+    ),
+    observedOwnerRef: normalizeString(userDocument.data.owner_firebase_id),
+  };
 }

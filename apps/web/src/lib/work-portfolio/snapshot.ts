@@ -11,7 +11,8 @@
  *  - **the remaining predicates without a producer are typed inputs, not queries.**
  *    `approval_requests` and `effect_operations` are always empty from the
  *    live wiring (Slice Plan SL-7, D4). `authority_conflict` is live as of
- *    SL-6: assembled from durable `authority_resolutions` rows. The remaining
+ *    SL-6: assembled from durable `authority_resolutions` rows that are
+ *    still unresolved. The remaining
  *    empty inputs stay typed fixtures until SL-9.
  *
  * `approval_decisions` IS live: `case_approvals` exists and every surface
@@ -263,8 +264,9 @@ function toWork(row: WorkItem): PortfolioWork {
 function latestAuthorityConflict(
   rows: readonly AuthorityResolution[]
 ): PortfolioAuthorityConflict | null {
-  if (rows.length === 0) return null;
-  const latest = [...rows].sort((a, b) =>
+  const unresolved = rows.filter((row) => row.resolved_at == null);
+  if (unresolved.length === 0) return null;
+  const latest = [...unresolved].sort((a, b) =>
     Date.parse(b.detected_at) - Date.parse(a.detected_at)
   )[0];
   if (!latest) return null;

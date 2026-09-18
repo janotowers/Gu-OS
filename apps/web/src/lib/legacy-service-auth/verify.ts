@@ -113,9 +113,37 @@ export function verifyLegacyServiceAuth(
   }
 
   const ownerRef = input.legacyOwnerRef?.trim() || null;
+  if (key.legacySourceScope.ownerRefs.length === 0) {
+    return { ok: false, status: 403, reason: "source_scope_mismatch" };
+  }
   if (ownerRef && !key.legacySourceScope.ownerRefs.includes(ownerRef)) {
     return { ok: false, status: 403, reason: "source_scope_mismatch" };
   }
 
   return { ok: true, key };
+}
+
+/**
+ * ADR-111 §6: a signed owner claim is a consistency assertion, not
+ * authorization. The server-observed owner of the Lead must be in the
+ * key's configured scope. An omitted claim does not widen the key.
+ */
+export function assertObservedOwnerInScope(params: {
+  key: LegacyServiceAuthKey;
+  observedOwnerRef: string | null | undefined;
+  claimedOwnerRef?: string | null;
+}): VerifyResult {
+  const allowed = params.key.legacySourceScope.ownerRefs;
+  if (allowed.length === 0) {
+    return { ok: false, status: 403, reason: "source_scope_mismatch" };
+  }
+  const observed = params.observedOwnerRef?.trim() || null;
+  if (!observed || !allowed.includes(observed)) {
+    return { ok: false, status: 403, reason: "source_scope_mismatch" };
+  }
+  const claimed = params.claimedOwnerRef?.trim() || null;
+  if (claimed && claimed !== observed) {
+    return { ok: false, status: 403, reason: "source_scope_mismatch" };
+  }
+  return { ok: true, key: params.key };
 }

@@ -16,6 +16,7 @@ export interface InsertAuthorityResolutionInput {
   failSafeReason?: string | null;
   provenance?: Record<string, unknown>;
   runtimeAuthorityObserved?: "legacy" | "gu_os" | null;
+  providerMessageId?: string | null;
 }
 
 function requireOpaque(value: string | undefined | null): string | null {
@@ -36,6 +37,7 @@ export async function insertAuthorityResolution(
     );
   }
 
+  const providerMessageId = requireOpaque(input.providerMessageId);
   const { data, error } = await db
     .from("authority_resolutions")
     .insert({
@@ -47,11 +49,73 @@ export async function insertAuthorityResolution(
       fail_safe_reason: input.failSafeReason ?? null,
       provenance_jsonb: input.provenance ?? {},
       runtime_authority_observed: input.runtimeAuthorityObserved ?? null,
+      provider_message_id: providerMessageId,
+      resolved_at: null,
+      resolved_as: null,
     })
     .select("*")
     .single();
-  if (error) throw error;
+
+  if (error) {
+    if ((error as { code?: string }).code === "23505" && providerMessageId) {
+      const existing = await findAuthorityResolutionByProviderMessageId(db, {
+        organizationId: input.organizationId,
+        providerMessageId,
+      });
+      if (existing) return existing;
+    }
+    throw error;
+  }
   return data as AuthorityResolution;
+}
+
+export async function findAuthorityResolutionByProviderMessageId(
+  db: DbClient,
+  params: { organizationId: string; providerMessageId: string }
+): Promise<AuthorityResolution | null> {
+  const providerMessageId = requireOpaque(params.providerMessageId);
+  if (!providerMessageId) return null;
+  const { data, error } = await db
+    .from("authority_resolutions")
+    .select("*")
+    .eq("organization_id", params.organizationId)
+    .eq("provider_message_id", providerMessageId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as AuthorityResolution | null) ?? null;
+}
+
+export async function closeUnresolvedAuthorityResolutions(
+  db: DbClient,
+  params: {
+    organizationId: string;
+    caseId?: string | null;
+    externalConversationRef?: string | null;
+    resolvedAt: string;
+    resolvedAs: "gu" | "human_active";
+  }
+): Promise<number> {
+  if (!params.organizationId?.trim()) {
+    throw new Error("closeUnresolvedAuthorityResolutions: organizationId is required");
+  }
+  const caseId = params.caseId?.trim() || null;
+  const externalConversationRef = requireOpaque(params.externalConversationRef);
+  if (!caseId && !externalConversationRef) return 0;
+
+  let query = db
+    .from("authority_resolutions")
+    .update({
+      resolved_at: params.resolvedAt,
+      resolved_as: params.resolvedAs,
+    })
+    .eq("organization_id", params.organizationId)
+    .is("resolved_at", null);
+  if (caseId) query = query.eq("case_id", caseId);
+  else query = query.eq("external_conversation_ref", externalConversationRef);
+
+  const { data, error } = await query.select("id");
+  if (error) throw error;
+  return (data ?? []).length;
 }
 
 export async function listAuthorityResolutionsForCases(

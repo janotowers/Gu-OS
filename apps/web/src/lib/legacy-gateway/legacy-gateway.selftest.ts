@@ -1322,6 +1322,20 @@ async function testConversationAuthority(): Promise<void> {
   assert.equal(result.provenance.store, "mongo");
   assert.equal(result.provenance.sourcePath, "gu2.users");
   assert.equal(result.provenance.capability, "legacy_conversation_authority_get");
+  const numberContribution = result.provenance.contributions?.find(
+    (item) => item.field === "numberKillSwitchActive"
+  );
+  const leadContribution = result.provenance.contributions?.find(
+    (item) => item.field === "leadTakeoverActive"
+  );
+  assert.ok(leadContribution);
+  assert.equal(leadContribution?.sourcePath, "gu2.users");
+  assert.ok(numberContribution);
+  assert.equal(numberContribution.sourcePath, "gu2.gunumbers");
+  assert.notEqual(numberContribution.sourcePath, "gu2.users");
+  assert.equal(numberContribution.sourceUpdatedAt, null);
+  assert.equal(numberContribution.sourceUpdatedAtField, null);
+  assert.equal(result.observedOwnerRef != null, true);
   assert.equal(result.provenance.adapter, "bootstrap_direct");
   assert.equal(result.provenance.organizationId, PILOT_ORG);
   assert.equal(result.provenance.freshness.sourceUpdatedAtField, "last_owner_interaction_wba");
@@ -1477,6 +1491,12 @@ async function testConversationAuthorityFailClosed(): Promise<void> {
   assert.equal(missingNumber.value.leadTakeoverActive, false);
   assert.equal(missingNumber.value.numberKillSwitchActive, null);
   assert.equal(missingNumber.value.guNumberRef, null);
+  assert.equal(
+    missingNumber.provenance.contributions?.some(
+      (item) => item.field === "numberKillSwitchActive"
+    ),
+    false
+  );
 
   console.log(
     "  ok  authority read fails closed on missing Mongo, ambiguity, and uncontained ownership"

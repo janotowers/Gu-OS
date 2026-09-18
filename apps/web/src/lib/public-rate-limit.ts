@@ -2,6 +2,11 @@ type Bucket = { timestamps: number[] };
 
 const buckets = new Map<string, Bucket>();
 
+/** Test seam. Production never needs this. */
+export function resetRateLimit(): void {
+  buckets.clear();
+}
+
 export function rateLimit(
   key: string,
   max: number,

@@ -22,7 +22,7 @@ import {
   HEADER_TIMESTAMP,
   signLegacyServiceAuth,
 } from "../legacy-service-auth";
-import { handleLegacyAuthorityRequest } from "./handle";
+import { handleLegacyAuthorityRequest, type LegacyServiceAuthAuditEntry } from "./handle";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -84,6 +84,7 @@ function fakeDb(): {
       select: () => self,
       eq: () => self,
       in: () => self,
+      is: () => self,
       order: () => self,
       insert: (values: Row) => {
         writes.push({ table, values });
@@ -114,8 +115,9 @@ function fakeDb(): {
 }
 
 function current(
-  takeover: boolean | null
-): LegacyReadResult<LegacyConversationAuthority> {
+  takeover: boolean | null,
+  observedOwnerRef: string | null = "PrincipalUid00000000000000000001"
+): LegacyReadResult<LegacyConversationAuthority> & { observedOwnerRef: string | null } {
   return {
     value: {
       legacyLeadId: LEAD,
@@ -140,6 +142,7 @@ function current(
         sourceUpdatedAtField: "last_owner_interaction_wba",
       },
     },
+    observedOwnerRef,
   };
 }
 
@@ -185,6 +188,11 @@ async function call(
     writes?: Array<{ table: string; values: Row }>;
     takeover?: boolean | null;
     nowSeconds?: number;
+    readCurrent?: Parameters<typeof handleLegacyAuthorityRequest>[0]["readCurrent"];
+    persist?: Parameters<typeof handleLegacyAuthorityRequest>[0]["persist"];
+    rateLimit?: Parameters<typeof handleLegacyAuthorityRequest>[0]["rateLimit"];
+    audit?: Parameters<typeof handleLegacyAuthorityRequest>[0]["audit"];
+    observedOwnerRef?: string | null;
   } = {}
 ): Promise<{ status: number; body: Record<string, unknown>; writes: Array<{ table: string; values: Row }> }> {
   const { db, writes } = fakeDb();
@@ -193,8 +201,17 @@ async function call(
     db,
     lookupKey: (id) => KEYS.get(id) ?? null,
     nowSeconds: extras.nowSeconds ?? Number(TS),
-    readCurrent: async () =>
-      current(extras.takeover === undefined ? false : extras.takeover),
+    readCurrent: extras.readCurrent
+      ?? (async () =>
+        current(
+          extras.takeover === undefined ? false : extras.takeover,
+          extras.observedOwnerRef === undefined
+            ? "PrincipalUid00000000000000000001"
+            : extras.observedOwnerRef
+        )),
+    persist: extras.persist,
+    rateLimit: extras.rateLimit ?? (() => ({ ok: true as const })),
+    audit: extras.audit ?? (() => undefined),
   });
   extras.writes?.push(...writes);
   return {
@@ -311,7 +328,11 @@ async function testMismatchedKeyBindingRejected(): Promise<void> {
 async function testFailSafePersistsAndDoesNotWriteRuntime(): Promise<void> {
   const result = await call(
     await signedRequest({
-      body: JSON.stringify({ legacy_lead_id: LEAD, case_id: CASE_ID }),
+      body: JSON.stringify({
+        legacy_lead_id: LEAD,
+        case_id: CASE_ID,
+        provider_message_id: "wamid-fail-safe-1",
+      }),
     }),
     { takeover: null }
   );
@@ -323,10 +344,205 @@ async function testFailSafePersistsAndDoesNotWriteRuntime(): Promise<void> {
     true
   );
   assert.equal(
+    result.writes.find((write) => write.table === "authority_resolutions")
+      ?.values.provider_message_id,
+    "wamid-fail-safe-1"
+  );
+  assert.equal(
     result.writes.some((write) => write.table === "operational_cases"),
     false
   );
   console.log("  ok  fail-safe persists; runtime_authority is not written");
+}
+
+async function testSourceScopeFailClosed(): Promise<void> {
+  const emptyScopeKey: LegacyServiceAuthKey = {
+    ...authorityKey,
+    keyId: "tgu-authority-read-empty-scope",
+    legacySourceScope: { sourceSystem: "traditional_gu", ownerRefs: [] },
+  };
+  KEYS.set(emptyScopeKey.keyId, emptyScopeKey);
+
+  const omitted = await call(
+    await signedRequest({ body: JSON.stringify({ legacy_lead_id: LEAD }) })
+  );
+  assert.equal(omitted.status, 200);
+
+  const emptyScope = await call(
+    await signedRequest({
+      key: emptyScopeKey,
+      body: JSON.stringify({ legacy_lead_id: LEAD }),
+    })
+  );
+  assert.equal(emptyScope.status, 403);
+  assert.equal(emptyScope.body.reason, "source_scope_mismatch");
+
+  const allowedClaim = await call(
+    await signedRequest({
+      body: JSON.stringify({
+        legacy_lead_id: LEAD,
+        legacy_owner_ref: "PrincipalUid00000000000000000001",
+      }),
+    })
+  );
+  assert.equal(allowedClaim.status, 200);
+
+  const disagreeingClaim = await call(
+    await signedRequest({
+      body: JSON.stringify({
+        legacy_lead_id: LEAD,
+        legacy_owner_ref: "PrincipalUid00000000000000000001",
+      }),
+    }),
+    { observedOwnerRef: "someone-else-owner" }
+  );
+  assert.equal(disagreeingClaim.status, 403);
+  assert.equal(disagreeingClaim.body.reason, "source_scope_mismatch");
+
+  const observedOutside = await call(
+    await signedRequest({ body: JSON.stringify({ legacy_lead_id: LEAD }) }),
+    { observedOwnerRef: "out-of-scope-owner" }
+  );
+  assert.equal(observedOutside.status, 403);
+  assert.equal(observedOutside.body.reason, "source_scope_mismatch");
+
+  console.log("  ok  source scope is fail-closed on omitted, empty, disagreeing, and out-of-scope owners");
+}
+
+async function testNoncanonicalPathDoesNotAcceptAlternateSignature(): Promise<void> {
+  const noncanonical = "/api/legacy/../legacy/authority";
+  const result = await call(
+    await signedRequest({
+      body: JSON.stringify({ legacy_lead_id: LEAD }),
+      path: noncanonical,
+    })
+  );
+  assert.equal(result.status, 401);
+  assert.deepEqual(result.body, LEGACY_SERVICE_AUTH_UNAUTHORIZED_BODY);
+  console.log("  ok  a signature over a noncanonical path is not accepted");
+}
+
+async function testFailSafeRequiresProviderMessageId(): Promise<void> {
+  const result = await call(
+    await signedRequest({
+      body: JSON.stringify({ legacy_lead_id: LEAD, case_id: CASE_ID }),
+    }),
+    { takeover: null }
+  );
+  assert.equal(result.status, 400);
+  assert.equal(result.body.reason, "provider_message_id_required");
+  assert.equal(
+    result.writes.some((write) => write.table === "authority_resolutions"),
+    false
+  );
+  console.log("  ok  a fail-safe persist without provider_message_id is refused");
+}
+
+async function testC2MapsLeadToCaseWithoutSuppliedCaseId(): Promise<void> {
+  const writes: Array<{ table: string; values: Row }> = [];
+  function builder(table: string) {
+    let rows: Row[] =
+      table === "external_conversation_bindings"
+        ? [
+            {
+              id: "bind-gu",
+              organization_id: ORG,
+              case_id: CASE_ID,
+              thread_kind: "gu",
+              status: "active",
+              provider: "whatsapp_business",
+              external_conversation_ref: LEAD,
+            },
+          ]
+        : table === "operational_cases"
+          ? [{ id: CASE_ID, organization_id: ORG, runtime_authority: "legacy" }]
+          : [];
+    const self: Record<string, unknown> = {
+      select: () => self,
+      eq: (column: string, value: unknown) => {
+        rows = rows.filter((row) => row[column] === value);
+        return self;
+      },
+      in: () => self,
+      order: () => self,
+      insert: (values: Row) => {
+        writes.push({ table, values });
+        return self;
+      },
+      update: (values: Row) => {
+        writes.push({ table, values });
+        return self;
+      },
+      maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
+      single: async () => ({
+        data: {
+          id: "resolution-mapped",
+          created_at: "2026-09-18T02:20:00.000Z",
+          ...(writes.at(-1)?.values ?? {}),
+        },
+        error: null,
+      }),
+      then: (resolve: (v: { data: Row[]; error: null }) => unknown) =>
+        resolve({ data: rows, error: null }),
+    };
+    return self;
+  }
+  const request = await signedRequest({
+    body: JSON.stringify({
+      legacy_lead_id: LEAD,
+      provider_message_id: "wamid-mapped-case",
+    }),
+  });
+  const response = await handleLegacyAuthorityRequest({
+    request,
+    db: { from: (table: string) => builder(table) } as unknown as DbClient,
+    lookupKey: (id) => KEYS.get(id) ?? null,
+    nowSeconds: Number(TS),
+    readCurrent: async () => current(null),
+    rateLimit: () => ({ ok: true as const }),
+    audit: () => undefined,
+  });
+  const body = (await response.json()) as Record<string, unknown>;
+  assert.equal(response.status, 200);
+  assert.equal(body.conversation_authority, "unknown");
+  const persisted = writes.find((write) => write.table === "authority_resolutions");
+  assert.equal(persisted?.values.case_id, CASE_ID);
+  assert.equal(persisted?.values.provider_message_id, "wamid-mapped-case");
+  console.log("  ok  C2 maps lead → Case server-side without a supplied case id");
+}
+
+async function testAuditAttributesKeyAndPurpose(): Promise<void> {
+  const entries: LegacyServiceAuthAuditEntry[] = [];
+  await call(await signedRequest({ body: JSON.stringify({ legacy_lead_id: LEAD }) }), {
+    audit: (entry) => entries.push(entry),
+  });
+  assert.equal(entries[0]?.event, "legacy_service_auth");
+  assert.equal(entries[0]?.key_id, authorityKey.keyId);
+  assert.equal(entries[0]?.purpose, "authority-read");
+  assert.equal(entries[0]?.outcome, "accepted");
+  console.log("  ok  audit attributes key id and purpose per request");
+}
+
+async function testRateLimitAppliesToRejectedRequests(): Promise<void> {
+  const entries: Array<{ status: number; reason: string }> = [];
+  let calls = 0;
+  const result = await call(
+    await signedRequest({
+      body: JSON.stringify({ legacy_lead_id: LEAD }),
+      signatureHex: "aa".repeat(32),
+    }),
+    {
+      rateLimit: () => {
+        calls += 1;
+        return { ok: false as const, retryAfterMs: 1000 };
+      },
+      audit: (entry) => entries.push({ status: entry.status, reason: entry.reason }),
+    }
+  );
+  assert.equal(result.status, 429);
+  assert.equal(calls, 1);
+  assert.equal(entries[0]?.reason, "rate_limited");
+  console.log("  ok  rate limiting applies before acceptance, including rejected signatures");
 }
 
 function testRouteUsesRawBody(): void {
@@ -356,6 +572,12 @@ async function main(): Promise<void> {
   await testReSerializedBodyRejected();
   await testMismatchedKeyBindingRejected();
   await testFailSafePersistsAndDoesNotWriteRuntime();
+  await testFailSafeRequiresProviderMessageId();
+  await testC2MapsLeadToCaseWithoutSuppliedCaseId();
+  await testAuditAttributesKeyAndPurpose();
+  await testSourceScopeFailClosed();
+  await testNoncanonicalPathDoesNotAcceptAlternateSignature();
+  await testRateLimitAppliesToRejectedRequests();
   testRouteUsesRawBody();
   console.log("legacy authority route selftest ok");
 }

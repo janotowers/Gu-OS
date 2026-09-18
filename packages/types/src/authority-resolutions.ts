@@ -8,6 +8,8 @@
 
 export type AuthorityResolutionState = "unknown" | "conflicting";
 
+export type AuthorityResolutionResolvedAs = "gu" | "human_active";
+
 export interface AuthorityResolution {
   id: string;
   organization_id: string;
@@ -18,5 +20,10 @@ export interface AuthorityResolution {
   fail_safe_reason: string | null;
   provenance_jsonb: Record<string, unknown>;
   runtime_authority_observed: "legacy" | "gu_os" | null;
+  /** Opaque C2 logical request identity. Null on rows that predate the column. */
+  provider_message_id: string | null;
+  /** Null means the incident is still unresolved and may surface. */
+  resolved_at: string | null;
+  resolved_as: AuthorityResolutionResolvedAs | null;
   created_at: string;
 }

@@ -19,9 +19,11 @@ export {
 } from "./keys";
 export {
   AUTHORITY_READ_MAX_BODY_BYTES,
+  LEGACY_AUTHORITY_PATH,
   contentEncodingOf,
+  parseRequestTarget,
   readSignedRawBody,
   requestTarget,
 } from "./raw-body";
-export { verifyLegacyServiceAuth } from "./verify";
+export { assertObservedOwnerInScope, verifyLegacyServiceAuth } from "./verify";
 export type { VerifyResult } from "./verify";

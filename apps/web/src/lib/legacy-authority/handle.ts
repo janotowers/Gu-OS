@@ -2,8 +2,9 @@
  * POST /api/legacy/authority — C2 advisory (SL-6 / TD-3 / SA-6.12).
  *
  * Authenticates per ADR-111, resolves Organization from the key, answers
- * who holds the conversation, and persists fail-safe incidents. The answer
- * is log-only: it writes no runtime_authority and suppresses no reply.
+ * who holds the conversation, and persists fail-safe incidents
+ * idempotently on `provider_message_id`. The answer is advisory: it
+ * writes no runtime_authority and suppresses no reply.
  */
 import type { DbClient } from "@agents/db";
 import type {
@@ -15,19 +16,33 @@ import type {
 } from "@agents/types";
 import { LEGACY_SERVICE_AUTH_UNAUTHORIZED_BODY } from "@agents/types";
 import {
-  persistFailSafeAuthorityResolution,
+  recordAuthorityResolutionObservation,
   resolveInteractionAuthority,
   type ReadCurrentConversationAuthority,
 } from "../relationship-authority";
 import {
   AUTHORITY_READ_MAX_BODY_BYTES,
+  HEADER_KEY_ID,
+  assertObservedOwnerInScope,
   contentEncodingOf,
   readSignedRawBody,
   requestTarget,
   verifyLegacyServiceAuth,
 } from "../legacy-service-auth";
+import { rateLimit } from "../public-rate-limit";
 
 const THREAD_KINDS = new Set<ConversationThreadKind>(["gu", "advisor_wa"]);
+const AUTHORITY_READ_RATE_MAX = 120;
+const AUTHORITY_READ_RATE_WINDOW_MS = 60_000;
+
+export interface LegacyServiceAuthAuditEntry {
+  event: "legacy_service_auth";
+  key_id: string | null;
+  purpose: "authority-read";
+  outcome: "accepted" | "rejected";
+  status: number;
+  reason: string;
+}
 
 export interface HandleLegacyAuthorityDeps {
   request: Request;
@@ -35,7 +50,9 @@ export interface HandleLegacyAuthorityDeps {
   lookupKey: (keyId: string) => LegacyServiceAuthKey | null;
   nowSeconds?: number;
   readCurrent?: ReadCurrentConversationAuthority;
-  persist?: typeof persistFailSafeAuthorityResolution;
+  persist?: typeof recordAuthorityResolutionObservation;
+  rateLimit?: (bucketKey: string) => { ok: true } | { ok: false; retryAfterMs: number };
+  audit?: (entry: LegacyServiceAuthAuditEntry) => void;
 }
 
 function json(status: number, body: unknown): Response {
@@ -52,6 +69,15 @@ function unauthorized(): Response {
 function optionalString(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
   return typeof value === "string" ? value : undefined;
+}
+
+function presentedKeyId(headers: Headers): string | null {
+  const raw = headers.get(HEADER_KEY_ID)?.trim();
+  return raw ? raw : null;
+}
+
+function defaultAudit(entry: LegacyServiceAuthAuditEntry): void {
+  console.info(JSON.stringify(entry));
 }
 
 function parseAuthorityBody(
@@ -100,6 +126,13 @@ function parseAuthorityBody(
   ) {
     return { ok: false };
   }
+  if (
+    raw.provider_message_id !== undefined &&
+    raw.provider_message_id !== null &&
+    typeof raw.provider_message_id !== "string"
+  ) {
+    return { ok: false };
+  }
   return {
     ok: true,
     body: {
@@ -108,6 +141,7 @@ function parseAuthorityBody(
       thread_kind: threadKind as ConversationThreadKind | undefined,
       organization_id: optionalString(raw.organization_id),
       legacy_owner_ref: optionalString(raw.legacy_owner_ref),
+      provider_message_id: optionalString(raw.provider_message_id),
     },
   };
 }
@@ -135,12 +169,55 @@ function toResponse(
 export async function handleLegacyAuthorityRequest(
   deps: HandleLegacyAuthorityDeps
 ): Promise<Response> {
+  const audit = deps.audit ?? defaultAudit;
+  const keyId = presentedKeyId(deps.request.headers);
+  const limit =
+    deps.rateLimit ??
+    ((bucketKey: string) =>
+      rateLimit(
+        `legacy-authority:${bucketKey}`,
+        AUTHORITY_READ_RATE_MAX,
+        AUTHORITY_READ_RATE_WINDOW_MS
+      ));
+  const limited = limit(keyId ?? "missing-key-id");
+  if (!limited.ok) {
+    audit({
+      event: "legacy_service_auth",
+      key_id: keyId,
+      purpose: "authority-read",
+      outcome: "rejected",
+      status: 429,
+      reason: "rate_limited",
+    });
+    return json(429, {
+      error: "rate_limited",
+      retry_after_ms: limited.retryAfterMs,
+    });
+  }
+
   if (deps.request.method !== "POST") {
+    audit({
+      event: "legacy_service_auth",
+      key_id: keyId,
+      purpose: "authority-read",
+      outcome: "rejected",
+      status: 405,
+      reason: "method_not_allowed",
+    });
     return json(405, { error: "method_not_allowed" });
   }
 
   const raw = await readSignedRawBody(deps.request, AUTHORITY_READ_MAX_BODY_BYTES);
   if (!raw.ok) {
+    const status = raw.status === 413 ? 413 : 401;
+    audit({
+      event: "legacy_service_auth",
+      key_id: keyId,
+      purpose: "authority-read",
+      outcome: "rejected",
+      status,
+      reason: status === 413 ? "payload_too_large" : "authentication_failed",
+    });
     return raw.status === 413
       ? json(413, { error: "payload_too_large" })
       : unauthorized();
@@ -149,7 +226,7 @@ export async function handleLegacyAuthorityRequest(
   const target = requestTarget(deps.request);
   const parsed = parseAuthorityBody(raw.bytes);
   const organizationClaim = parsed.ok ? parsed.body.organization_id ?? null : null;
-  const ownerRef = parsed.ok ? parsed.body.legacy_owner_ref ?? null : null;
+  const ownerClaim = parsed.ok ? parsed.body.legacy_owner_ref ?? null : null;
 
   const verified = verifyLegacyServiceAuth({
     method: deps.request.method,
@@ -163,16 +240,32 @@ export async function handleLegacyAuthorityRequest(
     maxBodyBytes: AUTHORITY_READ_MAX_BODY_BYTES,
     lookupKey: deps.lookupKey,
     organizationClaim,
-    legacyOwnerRef: ownerRef,
+    legacyOwnerRef: ownerClaim,
   });
 
   if (!verified.ok) {
+    audit({
+      event: "legacy_service_auth",
+      key_id: keyId,
+      purpose: "authority-read",
+      outcome: "rejected",
+      status: verified.status,
+      reason: verified.reason,
+    });
     if (verified.status === 401) return unauthorized();
     if (verified.status === 413) return json(413, { error: "payload_too_large" });
     return json(403, { error: "forbidden", reason: verified.reason });
   }
 
   if (!parsed.ok) {
+    audit({
+      event: "legacy_service_auth",
+      key_id: verified.key.keyId,
+      purpose: "authority-read",
+      outcome: "rejected",
+      status: 400,
+      reason: "invalid_body",
+    });
     return json(400, { error: "invalid_body" });
   }
 
@@ -187,13 +280,55 @@ export async function handleLegacyAuthorityRequest(
     readCurrent: deps.readCurrent,
   });
 
-  const persist = deps.persist ?? persistFailSafeAuthorityResolution;
+  const scoped = assertObservedOwnerInScope({
+    key: verified.key,
+    observedOwnerRef: resolution.observedOwnerRef,
+    claimedOwnerRef: ownerClaim,
+  });
+  if (!scoped.ok) {
+    audit({
+      event: "legacy_service_auth",
+      key_id: verified.key.keyId,
+      purpose: "authority-read",
+      outcome: "rejected",
+      status: scoped.status,
+      reason: scoped.reason,
+    });
+    return json(403, { error: "forbidden", reason: scoped.reason });
+  }
+
+  const failSafe =
+    resolution.conversationAuthority === "unknown" ||
+    resolution.conversationAuthority === "conflicting";
+  const providerMessageId = parsed.body.provider_message_id?.trim() || null;
+  if (failSafe && !providerMessageId) {
+    audit({
+      event: "legacy_service_auth",
+      key_id: verified.key.keyId,
+      purpose: "authority-read",
+      outcome: "rejected",
+      status: 400,
+      reason: "provider_message_id_required",
+    });
+    return json(400, { error: "invalid_body", reason: "provider_message_id_required" });
+  }
+
+  const persist = deps.persist ?? recordAuthorityResolutionObservation;
   await persist({
     db: deps.db,
     resolution,
-    caseId: parsed.body.case_id ?? null,
+    caseId: resolution.caseId,
     legacyLeadId: parsed.body.legacy_lead_id ?? null,
+    providerMessageId,
   });
 
+  audit({
+    event: "legacy_service_auth",
+    key_id: verified.key.keyId,
+    purpose: "authority-read",
+    outcome: "accepted",
+    status: 200,
+    reason: "ok",
+  });
   return json(200, toResponse(organizationId, resolution));
 }

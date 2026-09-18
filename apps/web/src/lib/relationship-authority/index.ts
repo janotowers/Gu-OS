@@ -3,4 +3,7 @@ export {
   type ReadCurrentConversationAuthority,
   type ResolveInteractionAuthorityInput,
 } from "./resolve";
-export { persistFailSafeAuthorityResolution } from "./persist";
+export {
+  persistFailSafeAuthorityResolution,
+  recordAuthorityResolutionObservation,
+} from "./persist";

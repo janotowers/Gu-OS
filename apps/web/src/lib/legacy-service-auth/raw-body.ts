@@ -42,10 +42,37 @@ export async function readSignedRawBody(
   return { ok: true, bytes };
 }
 
+/** The only path this C2 route serves. Used as the signed path. */
+export const LEGACY_AUTHORITY_PATH = "/api/legacy/authority";
+
+/**
+ * Path + query from a raw URL string without going through `URL`, which
+ * collapses dot segments and re-encodes. ADR-111 §3 forbids that
+ * normalization on the signed request-target.
+ */
+export function parseRequestTarget(url: string): { path: string; rawQuery: string } {
+  const withoutHash = url.split("#")[0] ?? url;
+  const queryAt = withoutHash.indexOf("?");
+  const beforeQuery = queryAt === -1 ? withoutHash : withoutHash.slice(0, queryAt);
+  const rawQuery = queryAt === -1 ? "" : withoutHash.slice(queryAt + 1);
+  const authority = /^[a-zA-Z][a-zA-Z+\-.]*:\/\/[^/?#]*/.exec(beforeQuery);
+  const path = authority ? beforeQuery.slice(authority[0].length) || "/" : beforeQuery || "/";
+  return { path, rawQuery };
+}
+
+/**
+ * C2 is a fixed route. Next.js 16 / undici `Request.url` already collapses
+ * `/a/../b` (and `%2e%2e`) before a route handler can observe the raw
+ * request-target — an ADR-111 §3 contradiction recorded on the ADR, not
+ * papered over. This function therefore:
+ *   * never feeds `new URL(...).pathname` into the verifier as if it were raw;
+ *   * signs/verifies the declared route path;
+ *   * preserves the query string from the raw URL text when present.
+ */
 export function requestTarget(request: Request): { path: string; rawQuery: string } {
-  const url = new URL(request.url);
+  const parsed = parseRequestTarget(request.url);
   return {
-    path: url.pathname || "/",
-    rawQuery: url.search.startsWith("?") ? url.search.slice(1) : "",
+    path: LEGACY_AUTHORITY_PATH,
+    rawQuery: parsed.rawQuery,
   };
 }

@@ -18,6 +18,7 @@ import {
   attachExternalConversationBinding,
   endConversationBinding,
   findActiveConversationBinding,
+  listActiveGuConversationBindingsByRef,
   listConversationBindingsForCase,
   updateConversationAuthority,
 } from "./external-conversation-bindings";
@@ -201,6 +202,42 @@ async function testIdempotentAttachAndList(): Promise<void> {
   console.log("  ok  attach is idempotent; end frees the active triple");
 }
 
+async function testReverseMapIgnoresAdvisorWa(): Promise<void> {
+  const { db } = fakeDb({
+    external_conversation_bindings: [
+      {
+        id: "bind-wa",
+        organization_id: ORG,
+        case_id: CASE,
+        contact_id: CONTACT,
+        provider: "whatsapp_business",
+        external_conversation_ref: "lead-opaque-1",
+        thread_kind: "advisor_wa",
+        status: "active",
+      },
+      {
+        id: "bind-gu",
+        organization_id: ORG,
+        case_id: CASE,
+        contact_id: CONTACT,
+        provider: "whatsapp_business",
+        external_conversation_ref: "lead-opaque-1",
+        thread_kind: "gu",
+        status: "active",
+      },
+    ],
+  });
+  const listed = await listActiveGuConversationBindingsByRef(db, {
+    organizationId: ORG,
+    externalConversationRef: "lead-opaque-1",
+    provider: "whatsapp_business",
+  });
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0]?.thread_kind, "gu");
+  assert.equal(listed[0]?.id, "bind-gu");
+  console.log("  ok  reverse map returns active gu bindings only");
+}
+
 async function testUpdateAuthorityOnGuThread(): Promise<void> {
   const { db } = fakeDb({ external_conversation_bindings: [] });
   const row = await attachExternalConversationBinding(db, attachArgs());
@@ -279,6 +316,7 @@ async function main(): Promise<void> {
   console.log("external conversation bindings selftest");
   await testOpaqueRefAndAdvisorWaRefusal();
   await testIdempotentAttachAndList();
+  await testReverseMapIgnoresAdvisorWa();
   await testUpdateAuthorityOnGuThread();
   await testMigrationSourceMatchesContract();
   console.log("external conversation bindings selftest ok");

@@ -54,6 +54,13 @@ export interface LegacyAuthorityRequestBody {
   thread_kind?: ConversationThreadKindWire;
   organization_id?: string;
   legacy_owner_ref?: string;
+  /**
+   * Logical C2 request identity. The provider message id available at the
+   * Traditional Gu pre-agent seam after its dedup guard (Technical Plan
+   * Appendix D.3). Opaque; compared whole. Required to persist a fail-safe
+   * incident so a retry cannot insert a duplicate.
+   */
+  provider_message_id?: string;
 }
 
 /** Advisory answer. Nothing here is an instruction to suppress a reply. */

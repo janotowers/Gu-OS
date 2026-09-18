@@ -33,13 +33,17 @@ const OTHER_LEAD = "5215500000009521550000000252155000000003";
 
 type Row = Record<string, unknown>;
 
-function fakeDb(tables: Record<string, Row[]>): {
+function fakeDb(
+  tables: Record<string, Row[]>,
+  failing: Partial<Record<string, string>> = {}
+): {
   db: DbClient;
   writes: Array<{ table: string; op: string; values: Row }>;
 } {
   const writes: Array<{ table: string; op: string; values: Row }> = [];
   function builder(table: string) {
     let rows = (tables[table] ?? []).slice();
+    const failure = failing[table] ?? null;
     const self: Record<string, unknown> = {
       select: () => self,
       order: () => self,
@@ -47,8 +51,14 @@ function fakeDb(tables: Record<string, Row[]>): {
         rows = rows.filter((r) => r[column] === value);
         return self;
       },
-      maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
-      single: async () => ({ data: rows[0] ?? null, error: null }),
+      maybeSingle: async () =>
+        failure
+          ? { data: null, error: { message: failure } }
+          : { data: rows[0] ?? null, error: null },
+      single: async () =>
+        failure
+          ? { data: null, error: { message: failure } }
+          : { data: rows[0] ?? null, error: null },
       insert: (values: Row) => {
         writes.push({ table, op: "insert", values });
         return self;
@@ -57,8 +67,14 @@ function fakeDb(tables: Record<string, Row[]>): {
         writes.push({ table, op: "update", values });
         return self;
       },
-      then: (resolve: (v: { data: Row[]; error: null }) => unknown) =>
-        resolve({ data: rows, error: null }),
+      then: (
+        resolve: (v: { data: Row[] | null; error: { message: string } | null }) => unknown
+      ) =>
+        resolve(
+          failure
+            ? { data: null, error: { message: failure } }
+            : { data: rows, error: null }
+        ),
     };
     return self;
   }
@@ -96,6 +112,7 @@ function currentResult(
         sourceUpdatedAtField: "last_owner_interaction_wba",
       },
     },
+    observedOwnerRef: "PrincipalUid00000000000000000001",
   };
 }
 
@@ -271,7 +288,7 @@ async function testFailClosed(): Promise<void> {
     readCurrent: async () => currentResult({ leadTakeoverActive: true }),
   });
   assert.equal(mismatch.conversationAuthority, "conflicting");
-  assert.equal(mismatch.failSafeReason, "lead_ref_does_not_match_gu_binding");
+  assert.equal(mismatch.failSafeReason, "case_id_does_not_match_gu_binding");
 
   const noLead = await resolveInteractionAuthority({
     ctx: ctx(db),
@@ -334,6 +351,141 @@ async function testAnswerWritesNothing(): Promise<void> {
   console.log("  ok  SA-6.11 the answer writes nothing and does not move runtime_authority");
 }
 
+async function testUnmappedLeadPreservesUnknownCase(): Promise<void> {
+  const { db } = fakeDb({
+    operational_cases: [
+      { id: CASE_ID, organization_id: ORG, runtime_authority: "legacy" },
+    ],
+    external_conversation_bindings: [],
+  });
+  const result = await resolveInteractionAuthority({
+    ctx: ctx(db),
+    refs: { legacyLeadId: LEAD },
+    readCurrent: async () => currentResult({ leadTakeoverActive: false }),
+  });
+  assert.equal(result.caseId, null);
+  assert.equal(result.conversationAuthority, "gu");
+  assert.equal(result.bindingReadFailed, false);
+  console.log("  ok  no active gu binding leaves Case unmapped without inventing one");
+}
+
+async function testAdvisorWaBindingCannotMintCase(): Promise<void> {
+  const { db } = fakeDb({
+    external_conversation_bindings: [
+      guBinding({
+        id: "bind-wa",
+        thread_kind: "advisor_wa",
+        conversation_authority: null,
+        last_human_activity_at: null,
+        authority_source: null,
+      }),
+    ],
+  });
+  const result = await resolveInteractionAuthority({
+    ctx: ctx(db),
+    refs: { legacyLeadId: LEAD },
+    readCurrent: async () => currentResult({ leadTakeoverActive: false }),
+  });
+  assert.equal(result.caseId, null);
+  assert.equal(result.conversationAuthority, "gu");
+  console.log("  ok  advisor_wa evidence cannot mint a Case mapping");
+}
+
+async function testSuppliedCaseCannotRedirectUnmappedLead(): Promise<void> {
+  const { db } = fakeDb({
+    operational_cases: [
+      { id: CASE_ID, organization_id: ORG, runtime_authority: "legacy" },
+    ],
+    external_conversation_bindings: [],
+  });
+  const result = await resolveInteractionAuthority({
+    ctx: ctx(db),
+    refs: { legacyLeadId: LEAD, caseId: CASE_ID },
+    readCurrent: async () => currentResult({ leadTakeoverActive: false }),
+  });
+  assert.equal(result.conversationAuthority, "conflicting");
+  assert.equal(result.failSafeReason, "case_id_does_not_match_gu_binding");
+  assert.equal(result.caseId, null);
+  console.log("  ok  a supplied Case cannot redirect an unmapped lead");
+}
+
+async function testLeadMapsToCaseWithoutSuppliedCaseId(): Promise<void> {
+  const { db } = fakeDb({
+    operational_cases: [
+      { id: CASE_ID, organization_id: ORG, runtime_authority: "legacy" },
+    ],
+    external_conversation_bindings: [guBinding()],
+  });
+  const result = await resolveInteractionAuthority({
+    ctx: ctx(db),
+    refs: { legacyLeadId: LEAD },
+    readCurrent: async () => currentResult({ leadTakeoverActive: false }),
+  });
+  assert.equal(result.caseId, CASE_ID);
+  assert.equal(result.conversationAuthority, "gu");
+  assert.equal(result.runtimeAuthority, "legacy");
+  console.log("  ok  a single active gu binding maps lead → Case server-side");
+}
+
+async function testMultipleGuBindingsConflict(): Promise<void> {
+  const otherCase = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+  const { db } = fakeDb({
+    external_conversation_bindings: [
+      guBinding(),
+      guBinding({ id: "bind-gu-2", case_id: otherCase }),
+    ],
+  });
+  const result = await resolveInteractionAuthority({
+    ctx: ctx(db),
+    refs: { legacyLeadId: LEAD },
+    readCurrent: async () => currentResult({ leadTakeoverActive: false }),
+  });
+  assert.equal(result.conversationAuthority, "conflicting");
+  assert.equal(result.failSafeReason, "multiple_active_gu_bindings");
+  assert.equal(result.caseId, null);
+  console.log("  ok  incompatible active gu mappings fail safe as conflicting");
+}
+
+async function testBindingReadFailureIsNotConfident(): Promise<void> {
+  const { db } = fakeDb(
+    {
+      operational_cases: [
+        { id: CASE_ID, organization_id: ORG, runtime_authority: "legacy" },
+      ],
+    },
+    { external_conversation_bindings: "bindings unavailable" }
+  );
+  const result = await resolveInteractionAuthority({
+    ctx: ctx(db),
+    refs: { caseId: CASE_ID, legacyLeadId: LEAD },
+    readCurrent: async () => currentResult({ leadTakeoverActive: false }),
+  });
+  assert.equal(result.conversationAuthority, "unknown");
+  assert.equal(result.humanActive, null);
+  assert.equal(result.bindingReadFailed, true);
+  assert.equal(result.failSafeReason, "binding_read_failure");
+  assert.notEqual(result.conversationAuthority, "gu");
+  console.log("  ok  a binding read failure cannot become a confident answer");
+}
+
+async function testCaseRuntimeReadFailureIsDimensional(): Promise<void> {
+  const { db } = fakeDb(
+    { external_conversation_bindings: [guBinding()] },
+    { operational_cases: "case unavailable" }
+  );
+  const result = await resolveInteractionAuthority({
+    ctx: ctx(db),
+    refs: { caseId: CASE_ID, legacyLeadId: LEAD },
+    readCurrent: async () => currentResult({ leadTakeoverActive: false }),
+  });
+  assert.equal(result.runtimeAuthority, null);
+  assert.equal(result.runtimeAuthorityReadFailed, true);
+  assert.equal(result.bindingReadFailed, false);
+  assert.equal(result.conversationAuthority, "gu");
+  assert.equal(result.failSafeReason, "case_runtime_authority_read_failure");
+  console.log("  ok  a Case runtime read failure is preserved, not swallowed into a silent confident answer");
+}
+
 function testSourceHasNoWindowOrWriter(): void {
   const source = [
     "resolve.ts",
@@ -370,6 +522,13 @@ async function main(): Promise<void> {
   await testFailClosed();
   await testForeignCaseDoesNotLeakRuntime();
   await testAnswerWritesNothing();
+  await testLeadMapsToCaseWithoutSuppliedCaseId();
+  await testUnmappedLeadPreservesUnknownCase();
+  await testAdvisorWaBindingCannotMintCase();
+  await testSuppliedCaseCannotRedirectUnmappedLead();
+  await testMultipleGuBindingsConflict();
+  await testBindingReadFailureIsNotConfident();
+  await testCaseRuntimeReadFailureIsDimensional();
   testSourceHasNoWindowOrWriter();
   assertResolutionShape(
     await resolveInteractionAuthority({

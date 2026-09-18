@@ -93,6 +93,19 @@ export interface LegacyReadFreshness {
  */
 export type LegacyBindingState = "bound" | "unbound";
 
+/**
+ * One allowlisted source's contribution inside a composed read.
+ * Used when a single capability envelope cannot honestly carry one
+ * `sourcePath` / freshness pair for every field.
+ */
+export interface LegacyReadSourceContribution {
+  /** Semantic field this source produced, e.g. `numberKillSwitchActive`. */
+  field: string;
+  sourcePath: string;
+  sourceUpdatedAt: string | null;
+  sourceUpdatedAtField: string | null;
+}
+
 /** Provenance carried by every gateway result. Never optional. */
 export interface LegacyReadProvenance {
   sourceSystem: "traditional_gu";
@@ -107,12 +120,23 @@ export interface LegacyReadProvenance {
   organizationId: string;
   bindingState: LegacyBindingState;
   freshness: LegacyReadFreshness;
+  /**
+   * Present when the envelope composes more than one allowlisted source.
+   * Envelope `sourcePath` / `freshness` stay the primary (lead) contribution
+   * and must not be read as attributing every field to that path.
+   */
+  contributions?: readonly LegacyReadSourceContribution[];
 }
 
 /** Envelope every capability returns. Data never travels without provenance. */
 export interface LegacyReadResult<T> {
   value: T;
   provenance: LegacyReadProvenance;
+  /**
+   * Server-observed Traditional Gu owner/source of the read record.
+   * Authorization evidence for ADR-111 §6, not a capability semantic field.
+   */
+  observedOwnerRef?: string | null;
 }
 
 // ============================================================

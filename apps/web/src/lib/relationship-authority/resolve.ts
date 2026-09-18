@@ -23,6 +23,7 @@ import type {
   RuntimeAuthority,
 } from "@agents/types";
 import {
+  listActiveGuConversationBindingsByRef,
   listConversationBindingsForCase,
   type DbClient,
 } from "@agents/db";
@@ -32,7 +33,11 @@ import { readLegacyConversationAuthority } from "../legacy-gateway";
 
 export type ReadCurrentConversationAuthority = (
   legacyLeadId: string
-) => Promise<LegacyReadResult<LegacyConversationAuthority>>;
+) => Promise<
+  LegacyReadResult<LegacyConversationAuthority> & {
+    observedOwnerRef?: string | null;
+  }
+>;
 
 export interface ResolveInteractionAuthorityInput {
   ctx: GatewayCallerContext;
@@ -82,7 +87,11 @@ function emptyResolution(
 ): InteractionAuthorityResolution {
   return {
     organizationId,
+    caseId: null,
     runtimeAuthority: null,
+    runtimeAuthorityReadFailed: false,
+    bindingReadFailed: false,
+    observedOwnerRef: null,
     conversationAuthority: "unknown",
     humanActive: null,
     leadTakeoverActive: null,
@@ -97,11 +106,11 @@ function emptyResolution(
   };
 }
 
-async function readRuntimeAuthority(params: {
+async function readCaseRuntime(params: {
   db: DbClient;
   organizationId: string;
   caseId: string;
-}): Promise<RuntimeAuthority | null> {
+}): Promise<{ found: boolean; runtimeAuthority: RuntimeAuthority | null }> {
   const { data, error } = await params.db
     .from("operational_cases")
     .select("id, organization_id, runtime_authority")
@@ -112,7 +121,26 @@ async function readRuntimeAuthority(params: {
   const row = data as {
     runtime_authority?: RuntimeAuthority | null;
   } | null;
-  return row?.runtime_authority ?? null;
+  if (!row) return { found: false, runtimeAuthority: null };
+  return { found: true, runtimeAuthority: row.runtime_authority ?? null };
+}
+
+async function observeCurrentOwner(
+  readCurrent: ReadCurrentConversationAuthority,
+  legacyLeadId: string
+): Promise<{
+  observedOwnerRef: string | null;
+  provenance: InteractionAuthorityResolution["provenance"];
+}> {
+  try {
+    const current = await readCurrent(legacyLeadId);
+    return {
+      observedOwnerRef: current.observedOwnerRef ?? null,
+      provenance: current.provenance,
+    };
+  } catch {
+    return { observedOwnerRef: null, provenance: null };
+  }
 }
 
 function defaultReadCurrent(
@@ -121,84 +149,163 @@ function defaultReadCurrent(
   return (legacyLeadId) => readLegacyConversationAuthority(ctx, legacyLeadId);
 }
 
+function unique(values: readonly string[]): string[] {
+  return [...new Set(values)];
+}
+
 export async function resolveInteractionAuthority(
   input: ResolveInteractionAuthorityInput
 ): Promise<InteractionAuthorityResolution> {
   const organizationId = requireOrganizationId(input.ctx.organizationId);
   const advisorWaIgnored = input.refs.threadKind === "advisor_wa";
   const suppliedLeadId = opaqueLeadId(input.refs.legacyLeadId);
-  const caseId = opaqueLeadId(input.refs.caseId);
+  const suppliedCaseId = opaqueLeadId(input.refs.caseId);
+  const readCurrent = input.readCurrent ?? defaultReadCurrent(input.ctx);
 
   let runtimeAuthority: RuntimeAuthority | null = null;
+  let runtimeAuthorityReadFailed = false;
+  let suppliedCaseFound = false;
   let resolvedLeadId = suppliedLeadId;
+  let resolvedCaseId: string | null = null;
+  let mappingConflict: { reason: string; caseId: string | null } | null = null;
 
-  if (caseId) {
+  if (suppliedCaseId) {
     try {
-      runtimeAuthority = await readRuntimeAuthority({
+      const read = await readCaseRuntime({
         db: input.ctx.db,
         organizationId,
-        caseId,
+        caseId: suppliedCaseId,
       });
+      suppliedCaseFound = read.found;
+      runtimeAuthority = read.runtimeAuthority;
+    } catch {
+      runtimeAuthorityReadFailed = true;
+    }
+  }
 
+  try {
+    if (suppliedLeadId) {
+      const guBindings = await listActiveGuConversationBindingsByRef(input.ctx.db, {
+        organizationId,
+        externalConversationRef: suppliedLeadId,
+        provider: "whatsapp_business",
+      });
+      const caseIds = unique(guBindings.map((row) => row.case_id));
+      if (caseIds.length > 1) {
+        mappingConflict = { reason: "multiple_active_gu_bindings", caseId: null };
+      } else if (caseIds.length === 1) {
+        const mappedCaseId = caseIds[0] ?? null;
+        if (suppliedCaseId && mappedCaseId && suppliedCaseId !== mappedCaseId) {
+          mappingConflict = {
+            reason: "case_id_does_not_match_gu_binding",
+            caseId: mappedCaseId,
+          };
+        } else {
+          resolvedCaseId = mappedCaseId;
+          if (resolvedCaseId && !suppliedCaseId && !runtimeAuthorityReadFailed) {
+            try {
+              const read = await readCaseRuntime({
+                db: input.ctx.db,
+                organizationId,
+                caseId: resolvedCaseId,
+              });
+              runtimeAuthority = read.runtimeAuthority;
+            } catch {
+              runtimeAuthorityReadFailed = true;
+            }
+          }
+        }
+      } else if (suppliedCaseId && suppliedCaseFound) {
+        mappingConflict = {
+          reason: "case_id_does_not_match_gu_binding",
+          caseId: null,
+        };
+      }
+    } else if (suppliedCaseId) {
       const bindings = await listConversationBindingsForCase(input.ctx.db, {
         organizationId,
-        caseId,
+        caseId: suppliedCaseId,
       });
-      const guBindings = bindings.filter((row) => row.thread_kind === "gu");
-      const guRefs = [
-        ...new Set(guBindings.map((row) => row.external_conversation_ref)),
-      ];
-
-      if (suppliedLeadId) {
-        if (guRefs.length > 0 && !guRefs.includes(suppliedLeadId)) {
-          return emptyResolution(organizationId, {
-            runtimeAuthority,
-            conversationAuthority: "conflicting",
-            advisorWaIgnored,
-            failSafeReason: "lead_ref_does_not_match_gu_binding",
-          });
-        }
-      } else if (guRefs.length > 1) {
-        return emptyResolution(organizationId, {
-          runtimeAuthority,
-          conversationAuthority: "conflicting",
-          advisorWaIgnored,
-          failSafeReason: "multiple_gu_conversation_refs",
-        });
+      const guRefs = unique(
+        bindings
+          .filter((row) => row.thread_kind === "gu")
+          .map((row) => row.external_conversation_ref)
+      );
+      if (guRefs.length > 1) {
+        mappingConflict = {
+          reason: "multiple_gu_conversation_refs",
+          caseId: suppliedCaseId,
+        };
       } else if (guRefs.length === 1) {
         resolvedLeadId = guRefs[0] ?? null;
-      }
-    } catch {
-      if (!suppliedLeadId) {
-        return emptyResolution(organizationId, {
-          advisorWaIgnored,
-          failSafeReason: "case_read_failure",
-        });
+        resolvedCaseId = suppliedCaseId;
       }
     }
+  } catch {
+    const observed = suppliedLeadId
+      ? await observeCurrentOwner(readCurrent, suppliedLeadId)
+      : { observedOwnerRef: null, provenance: null };
+    return emptyResolution(organizationId, {
+      runtimeAuthority,
+      runtimeAuthorityReadFailed,
+      bindingReadFailed: true,
+      observedOwnerRef: observed.observedOwnerRef,
+      provenance: observed.provenance,
+      advisorWaIgnored,
+      failSafeReason: "binding_read_failure",
+    });
+  }
+
+  if (mappingConflict) {
+    const leadForOwner = suppliedLeadId ?? resolvedLeadId;
+    const observed = leadForOwner
+      ? await observeCurrentOwner(readCurrent, leadForOwner)
+      : { observedOwnerRef: null, provenance: null };
+    return emptyResolution(organizationId, {
+      caseId: mappingConflict.caseId,
+      runtimeAuthority,
+      runtimeAuthorityReadFailed,
+      observedOwnerRef: observed.observedOwnerRef,
+      provenance: observed.provenance,
+      conversationAuthority: "conflicting",
+      advisorWaIgnored,
+      failSafeReason: mappingConflict.reason,
+    });
   }
 
   if (!resolvedLeadId) {
     return emptyResolution(organizationId, {
+      caseId: resolvedCaseId,
       runtimeAuthority,
+      runtimeAuthorityReadFailed,
       conversationAuthority: "unknown",
       advisorWaIgnored,
       failSafeReason: advisorWaIgnored
         ? "advisor_wa_cannot_mint_authority"
-        : "no_legacy_lead_id",
+        : resolvedCaseId
+          ? "unmapped_conversation"
+          : "no_legacy_lead_id",
     });
   }
-
-  const readCurrent = input.readCurrent ?? defaultReadCurrent(input.ctx);
 
   try {
     const current = await readCurrent(resolvedLeadId);
     const conversationAuthority = verdictFromTakeover(
       current.value.leadTakeoverActive
     );
+    const failSafeReason =
+      conversationAuthority === "unknown"
+        ? "lead_takeover_not_boolean"
+        : runtimeAuthorityReadFailed
+          ? "case_runtime_authority_read_failure"
+          : null;
     return {
       organizationId,
+      caseId: resolvedCaseId,
       runtimeAuthority,
+      runtimeAuthorityReadFailed,
+      bindingReadFailed: false,
+      observedOwnerRef: current.observedOwnerRef ?? null,
       conversationAuthority,
       humanActive: humanActiveOf(conversationAuthority),
       leadTakeoverActive: current.value.leadTakeoverActive,
@@ -208,23 +315,24 @@ export async function resolveInteractionAuthority(
       advisorWaIgnored,
       answeredFrom: "legacy_conversation_authority_get",
       provenance: current.provenance,
-      failSafeReason:
-        conversationAuthority === "unknown"
-          ? "lead_takeover_not_boolean"
-          : null,
+      failSafeReason,
     };
   } catch (error) {
     if (isLegacyReadRefusal(error)) {
       const conflicting = error.reason === "pairing_ambiguous";
       return emptyResolution(organizationId, {
+        caseId: resolvedCaseId,
         runtimeAuthority,
+        runtimeAuthorityReadFailed,
         conversationAuthority: conflicting ? "conflicting" : "unknown",
         advisorWaIgnored,
         failSafeReason: error.reason,
       });
     }
     return emptyResolution(organizationId, {
+      caseId: resolvedCaseId,
       runtimeAuthority,
+      runtimeAuthorityReadFailed,
       conversationAuthority: "unknown",
       advisorWaIgnored,
       failSafeReason: "read_failure",

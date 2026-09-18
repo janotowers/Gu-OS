@@ -8,6 +8,8 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DbClient } from "../client";
 import {
+  closeUnresolvedAuthorityResolutions,
+  findAuthorityResolutionByProviderMessageId,
   insertAuthorityResolution,
   listAuthorityResolutionsForCases,
 } from "./authority-resolutions";
@@ -21,6 +23,17 @@ type Row = Record<string, unknown>;
 function fakeDb(tables: Record<string, Row[]>): DbClient {
   function builder(table: string) {
     let rows = (tables[table] ?? []).slice();
+    let pendingUpdate: Row | null = null;
+    const applyUpdate = () => {
+      if (!pendingUpdate) return;
+      const patch = pendingUpdate;
+      pendingUpdate = null;
+      for (const row of rows) {
+        Object.assign(row, patch);
+        const live = (tables[table] ?? []).find((x) => x.id === row.id);
+        if (live) Object.assign(live, patch);
+      }
+    };
     const self: Record<string, unknown> = {
       select: () => self,
       eq: (column: string, value: unknown) => {
@@ -32,19 +45,52 @@ function fakeDb(tables: Record<string, Row[]>): DbClient {
         return self;
       },
       order: () => self,
+      is: (column: string, value: unknown) => {
+        rows = rows.filter((r) => r[column] == value);
+        return self;
+      },
       insert: (values: Row) => {
+        const existing = (tables[table] ?? []).find(
+          (row) =>
+            values.provider_message_id &&
+            row.provider_message_id === values.provider_message_id
+        );
+        if (existing) {
+          rows = [existing];
+          self.single = async () => ({
+            data: null,
+            error: { code: "23505", message: "duplicate" },
+          });
+          return self;
+        }
         const inserted = {
           id: `res-${(tables[table] ?? []).length + 1}`,
           created_at: "2026-09-18T02:10:00.000Z",
+          resolved_at: null,
+          resolved_as: null,
           ...values,
         };
         (tables[table] ??= []).push(inserted);
         rows = [inserted];
+        self.single = async () => ({ data: inserted, error: null });
         return self;
       },
-      single: async () => ({ data: rows[0] ?? null, error: null }),
-      then: (resolve: (v: { data: Row[]; error: null }) => unknown) =>
-        resolve({ data: rows, error: null }),
+      update: (values: Row) => {
+        pendingUpdate = values;
+        return self;
+      },
+      single: async () => {
+        applyUpdate();
+        return { data: rows[0] ?? null, error: null };
+      },
+      maybeSingle: async () => {
+        applyUpdate();
+        return { data: rows[0] ?? null, error: null };
+      },
+      then: (resolve: (v: { data: Row[]; error: null }) => unknown) => {
+        applyUpdate();
+        return resolve({ data: rows, error: null });
+      },
     };
     return self;
   }
@@ -70,6 +116,54 @@ async function testInsertAndList(): Promise<void> {
   assert.equal(listed.length, 1);
   assert.equal(listed[0]?.external_conversation_ref, "lead-opaque-1");
   console.log("  ok  insert then list by case");
+}
+
+async function testProviderMessageIdIsIdempotent(): Promise<void> {
+  const db = fakeDb({ authority_resolutions: [] });
+  const first = await insertAuthorityResolution(db, {
+    organizationId: ORG,
+    caseId: CASE_ID,
+    state: "unknown",
+    detectedAt: "2026-09-18T02:10:00.000Z",
+    providerMessageId: "wamid-1",
+  });
+  const second = await insertAuthorityResolution(db, {
+    organizationId: ORG,
+    caseId: CASE_ID,
+    state: "unknown",
+    detectedAt: "2026-09-18T02:11:00.000Z",
+    providerMessageId: "wamid-1",
+  });
+  assert.equal(second.id, first.id);
+  const found = await findAuthorityResolutionByProviderMessageId(db, {
+    organizationId: ORG,
+    providerMessageId: "wamid-1",
+  });
+  assert.equal(found?.id, first.id);
+  console.log("  ok  provider_message_id retries collapse to one row");
+}
+
+async function testCloseUnresolved(): Promise<void> {
+  const db = fakeDb({
+    authority_resolutions: [
+      {
+        id: "open-1",
+        organization_id: ORG,
+        case_id: CASE_ID,
+        state: "unknown",
+        resolved_at: null,
+        resolved_as: null,
+      },
+    ],
+  });
+  const closed = await closeUnresolvedAuthorityResolutions(db, {
+    organizationId: ORG,
+    caseId: CASE_ID,
+    resolvedAt: "2026-09-18T02:20:00.000Z",
+    resolvedAs: "gu",
+  });
+  assert.equal(closed, 1);
+  console.log("  ok  closeUnresolved marks the open incident");
 }
 
 async function testConfidentStateRefused(): Promise<void> {
@@ -100,12 +194,27 @@ async function testMigrationSource(): Promise<void> {
   assert.match(sql, /auth\.role\(\) = 'service_role'/);
   assert.match(sql, /00084/);
   assert.doesNotMatch(sql, /runtime_authority\s*=/);
+
+  const lifecycle = await fs.readFile(
+    path.resolve(
+      __dirname,
+      "../../forward/supabase/migrations/20260918141500_authority_resolution_lifecycle.sql"
+    ),
+    "utf8"
+  );
+  assert.match(lifecycle, /provider_message_id/);
+  assert.match(lifecycle, /resolved_at/);
+  assert.match(lifecycle, /authority_resolutions_org_provider_message_id_uidx/);
+  assert.match(lifecycle, /authority_resolutions_resolved_pair/);
+  assert.doesNotMatch(lifecycle, /runtime_authority\s*=/);
   console.log("  ok  migration source matches SA-6.7 / SA-6.13; no runtime_authority write");
 }
 
 async function main(): Promise<void> {
   console.log("authority resolutions selftest");
   await testInsertAndList();
+  await testProviderMessageIdIsIdempotent();
+  await testCloseUnresolved();
   await testConfidentStateRefused();
   await testMigrationSource();
   console.log("authority resolutions selftest ok");

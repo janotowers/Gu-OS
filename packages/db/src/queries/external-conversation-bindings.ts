@@ -153,6 +153,36 @@ export async function findActiveConversationBinding(
   return (data as ExternalConversationBinding) ?? null;
 }
 
+/**
+ * Reverse map: opaque external conversation ref → active `gu` bindings
+ * in the Organization. `advisor_wa` rows are excluded — they cannot mint
+ * a Case or conversation authority.
+ */
+export async function listActiveGuConversationBindingsByRef(
+  db: DbClient,
+  params: {
+    organizationId: string;
+    externalConversationRef: string;
+    provider?: ConversationProvider;
+  }
+): Promise<ExternalConversationBinding[]> {
+  const externalConversationRef = requireOpaqueRef(
+    params.externalConversationRef,
+    "listActiveGuConversationBindingsByRef"
+  );
+  let query = db
+    .from("external_conversation_bindings")
+    .select("*")
+    .eq("organization_id", params.organizationId)
+    .eq("external_conversation_ref", externalConversationRef)
+    .eq("thread_kind", "gu")
+    .eq("status", "active");
+  if (params.provider) query = query.eq("provider", params.provider);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ExternalConversationBinding[];
+}
+
 export async function listConversationBindingsForCase(
   db: DbClient,
   params: {

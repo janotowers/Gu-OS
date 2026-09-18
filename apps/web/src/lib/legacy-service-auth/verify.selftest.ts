@@ -21,7 +21,8 @@ import {
   HEADER_TIMESTAMP,
 } from "./headers";
 import { lookupFromMap } from "./keys";
-import { verifyLegacyServiceAuth } from "./verify";
+import { parseRequestTarget } from "./raw-body";
+import { assertObservedOwnerInScope, verifyLegacyServiceAuth } from "./verify";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -192,7 +193,60 @@ function testWrongPurposeAndOrgAndScope(): void {
     assert.equal(scope.reason, "source_scope_mismatch");
   }
   assert.equal(sameOrg.ok, true);
+
+  const omittedOwner = verifyVector(vector);
+  assert.equal(omittedOwner.ok, true, "omitting an owner claim is not authorization");
+
+  const emptyScope = verifyVector(vector, {
+    lookupKey: lookupFromMap(
+      new Map([
+        [
+          vector.key_id,
+          keyFor(vector, {
+            legacySourceScope: { sourceSystem: "traditional_gu", ownerRefs: [] },
+          }),
+        ],
+      ])
+    ),
+  });
+  assert.equal(emptyScope.ok, false);
+  if (!emptyScope.ok) {
+    assert.equal(emptyScope.status, 403);
+    assert.equal(emptyScope.reason, "source_scope_mismatch");
+  }
+
+  const allowed = assertObservedOwnerInScope({
+    key: keyFor(vector),
+    observedOwnerRef: OWNER,
+    claimedOwnerRef: null,
+  });
+  assert.equal(allowed.ok, true);
+
+  const disagreeing = assertObservedOwnerInScope({
+    key: keyFor(vector),
+    observedOwnerRef: "other-owner",
+    claimedOwnerRef: OWNER,
+  });
+  assert.equal(disagreeing.ok, false);
+
+  const outside = assertObservedOwnerInScope({
+    key: keyFor(vector),
+    observedOwnerRef: "other-owner",
+  });
+  assert.equal(outside.ok, false);
+
   console.log("  ok  purpose / Organization / source-scope mismatches are 403");
+}
+
+function testRequestTargetDoesNotCollapseDotSegments(): void {
+  const raw = parseRequestTarget("http://legacy.test/api/legacy/../legacy/authority?b=1&a=2");
+  assert.equal(raw.path, "/api/legacy/../legacy/authority");
+  assert.equal(raw.rawQuery, "b=1&a=2");
+  assert.equal(
+    new URL("http://legacy.test/api/legacy/../legacy/authority").pathname,
+    "/api/legacy/authority"
+  );
+  console.log("  ok  parseRequestTarget preserves dot segments that URL() would collapse");
 }
 
 function testRotationAndRevocation(): void {
@@ -294,6 +348,7 @@ function main(): void {
   testRotationAndRevocation();
   testMalformedHeadersAndEncoding();
   testAlteredPathAndBody();
+  testRequestTargetDoesNotCollapseDotSegments();
   console.log("legacy service auth verifier selftest ok");
 }
 

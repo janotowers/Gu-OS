@@ -49,8 +49,19 @@ export type InteractionAuthorityAnsweredFrom =
 
 export interface InteractionAuthorityResolution {
   organizationId: string;
+  /**
+   * Case resolved server-side from an active `gu` binding, or the supplied
+   * Case when it is a consistent assertion. Null when unmapped.
+   */
+  caseId: string | null;
   /** Read from the Case when one is in-org. Never written by the resolver. */
   runtimeAuthority: RuntimeAuthority | null;
+  /** True when the Case runtime-authority read threw. Runtime stays null. */
+  runtimeAuthorityReadFailed: boolean;
+  /** True when the binding identity/mapping read threw. */
+  bindingReadFailed: boolean;
+  /** Server-observed Traditional Gu owner, when the current-state read produced one. */
+  observedOwnerRef: string | null;
   conversationAuthority: InteractionConversationVerdict;
   /**
    * Confident same-thread takeover only. Null when the conversation

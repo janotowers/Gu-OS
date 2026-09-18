@@ -36,6 +36,7 @@ function fakeDb(): DbClient {
   const self: Record<string, unknown> = {
     select: () => self,
     eq: () => self,
+    order: () => self,
     maybeSingle: async () => ({ data: null, error: null }),
     then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
       resolve({ data: [], error: null }),
