@@ -6,7 +6,8 @@
  * M-RESOLUTION-IDENTITY indexes; SL-4 the Case Subjects and wake identity;
  * SL-7 `portfolio_presentation_state` and the Work Portfolio read paths; SL-12
  * the chat tool's Organization resolution and the ranking kill switch; Cycle 3
- * order 5 `tool_calls` as read-own and not user-writable.
+ * order 5 `tool_calls` as read-own and not user-writable; SL-6
+ * `external_conversation_bindings`.
  *
  * Technical Plan §8: "Cross-tenant negative suite (two-orgs fixture, read and
  * write paths) required from SL-0 and gating every multi-seat surface."
@@ -2370,6 +2371,254 @@ async function main(): Promise<void> {
         );
         assert.equal(closed.rowCount, 1);
       });
+    });
+
+    // ---------------------------------------------------------------
+    console.log("\nSL-6 external_conversation_bindings — TD-4 / SA-6.1 / SA-6.2 / SA-6.13");
+
+    const contactA = (
+      await client.query<{ id: string }>(
+        "insert into public.contacts (organization_id, display_name) values ($1, 'Contact A') returning id",
+        [f.orgA]
+      )
+    ).rows[0].id;
+    const contactB = (
+      await client.query<{ id: string }>(
+        "insert into public.contacts (organization_id, display_name) values ($1, 'Contact B') returning id",
+        [f.orgB]
+      )
+    ).rows[0].id;
+    const channelA = (
+      await client.query<{ id: string }>(
+        `insert into public.external_identity_bindings
+           (organization_id, source_system, binding_kind, external_id, ref_organization_id)
+         values ($1, 'traditional_gu', 'gu_whatsapp_number', '+5211111111', $1)
+         returning id`,
+        [f.orgA]
+      )
+    ).rows[0].id;
+    const channelB = (
+      await client.query<{ id: string }>(
+        `insert into public.external_identity_bindings
+           (organization_id, source_system, binding_kind, external_id, ref_organization_id)
+         values ($1, 'traditional_gu', 'gu_whatsapp_number', '+5222222222', $1)
+         returning id`,
+        [f.orgB]
+      )
+    ).rows[0].id;
+
+    const persistedBinding = (
+      await client.query<{ id: string }>(
+        `insert into public.external_conversation_bindings
+           (organization_id, case_id, contact_id, provider, external_conversation_ref,
+            thread_kind, gu_channel_identity_binding_id)
+         values ($1, $2, $3, 'whatsapp_business', 'lead-persisted', 'gu', $4)
+         returning id`,
+        [f.orgA, f.orgCaseA, contactA, channelA]
+      )
+    ).rows[0].id;
+
+    await t("external_conversation_bindings is unreadable from any authenticated JWT", async () => {
+      const member = await asRole(client, authed(f.creatorA), async () =>
+        (await client.query("select id from public.external_conversation_bindings")).rowCount
+      );
+      const other = await asRole(client, authed(f.memberB), async () =>
+        (await client.query("select id from public.external_conversation_bindings")).rowCount
+      );
+      const anon = await asRole(client, { role: "anon" }, async () =>
+        (await client.query("select id from public.external_conversation_bindings")).rowCount
+      );
+      assert.equal(member, 0);
+      assert.equal(other, 0);
+      assert.equal(anon, 0);
+    });
+
+    await t("an authenticated member cannot insert an external conversation binding", async () => {
+      const code = await asRole(client, authed(f.creatorA), () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref, thread_kind)
+             values ($1, $2, $3, 'whatsapp_business', 'forged', 'gu')`,
+            [f.orgA, f.orgCaseA, contactA]
+          )
+        )
+      );
+      assert.equal(code, RLS_VIOLATION);
+    });
+
+    await t("service_role writes a gu-thread binding with conversation authority", async () => {
+      await asRole(client, service, async () => {
+        const { rowCount } = await client.query(
+          `insert into public.external_conversation_bindings
+             (organization_id, case_id, contact_id, provider, external_conversation_ref,
+              thread_kind, conversation_authority, last_human_activity_at, authority_source)
+           values ($1, $2, $3, 'whatsapp_business', 'lead-gu-owned', 'gu',
+                   'human_active', now(), 'legacy_conversation_authority_get')`,
+          [f.orgA, f.orgCaseA, contactA]
+        );
+        assert.equal(rowCount, 1);
+      });
+    });
+
+    await t("advisor_wa with conversation_authority is rejected by CHECK", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref,
+                thread_kind, conversation_authority)
+             values ($1, $2, $3, 'whatsapp_business', 'advisor-bad-auth', 'advisor_wa', 'human_active')`,
+            [f.orgA, f.orgCaseA, contactA]
+          )
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
+    });
+
+    await t("advisor_wa with last_human_activity_at is rejected by CHECK", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref,
+                thread_kind, last_human_activity_at)
+             values ($1, $2, $3, 'whatsapp_business', 'advisor-bad-ts', 'advisor_wa', now())`,
+            [f.orgA, f.orgCaseA, contactA]
+          )
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
+    });
+
+    await t("advisor_wa with authority_source is rejected by CHECK", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref,
+                thread_kind, authority_source)
+             values ($1, $2, $3, 'whatsapp_business', 'advisor-bad-src', 'advisor_wa', 'c1_event')`,
+            [f.orgA, f.orgCaseA, contactA]
+          )
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
+    });
+
+    await t("advisor_wa with all authority columns null is accepted", async () => {
+      await asRole(client, service, async () => {
+        const { rowCount } = await client.query(
+          `insert into public.external_conversation_bindings
+             (organization_id, case_id, contact_id, provider, external_conversation_ref, thread_kind)
+           values ($1, $2, $3, 'whatsapp_business', 'advisor-ok', 'advisor_wa')`,
+          [f.orgA, f.orgCaseA, contactA]
+        );
+        assert.equal(rowCount, 1);
+      });
+    });
+
+    await t("a second active binding for the same (case, provider, ref) is rejected", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref, thread_kind)
+             values ($1, $2, $3, 'whatsapp_business', 'lead-persisted', 'gu')`,
+            [f.orgA, f.orgCaseA, contactA]
+          )
+        )
+      );
+      assert.equal(code, UNIQUE_VIOLATION);
+    });
+
+    await t("ending the active binding frees the triple for a new active row", async () => {
+      await asRole(client, service, async () => {
+        await client.query(
+          `update public.external_conversation_bindings
+              set status = 'ended', ended_at = now(), updated_at = now()
+            where id = $1`,
+          [persistedBinding]
+        );
+        const { rowCount } = await client.query(
+          `insert into public.external_conversation_bindings
+             (organization_id, case_id, contact_id, provider, external_conversation_ref, thread_kind)
+           values ($1, $2, $3, 'whatsapp_business', 'lead-persisted', 'gu')`,
+          [f.orgA, f.orgCaseA, contactA]
+        );
+        assert.equal(rowCount, 1);
+      });
+    });
+
+    await t("a Case from another Organization cannot be bound (composite FK)", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref, thread_kind)
+             values ($1, $2, $3, 'whatsapp_business', 'cross-case', 'gu')`,
+            [f.orgA, f.orgCaseB, contactA]
+          )
+        )
+      );
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    await t("a contact from another Organization cannot be bound (composite FK)", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref, thread_kind)
+             values ($1, $2, $3, 'whatsapp_business', 'cross-contact', 'gu')`,
+            [f.orgA, f.orgCaseA, contactB]
+          )
+        )
+      );
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    await t("a Gu-channel identity from another Organization cannot be bound", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref,
+                thread_kind, gu_channel_identity_binding_id)
+             values ($1, $2, $3, 'whatsapp_business', 'cross-channel', 'gu', $4)`,
+            [f.orgA, f.orgCaseA, contactA, channelB]
+          )
+        )
+      );
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    await t("a legacy NULL-Organization Case cannot be bound", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref, thread_kind)
+             values ($1, $2, $3, 'whatsapp_business', 'legacy-case', 'gu')`,
+            [f.orgA, f.legacyCase, contactA]
+          )
+        )
+      );
+      assert.equal(code, FK_VIOLATION);
+    });
+
+    await t("an empty external_conversation_ref is rejected", async () => {
+      const code = await asRole(client, service, () =>
+        errorCode(() =>
+          client.query(
+            `insert into public.external_conversation_bindings
+               (organization_id, case_id, contact_id, provider, external_conversation_ref, thread_kind)
+             values ($1, $2, $3, 'whatsapp_business', '   ', 'gu')`,
+            [f.orgA, f.orgCaseA, contactA]
+          )
+        )
+      );
+      assert.equal(code, CHECK_VIOLATION);
     });
 
     console.log(`\nRLS suite ok — ${passed} checks passed`);
