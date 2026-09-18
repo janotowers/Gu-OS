@@ -57,7 +57,11 @@ export const ALLOWED_SOURCE_PATHS: readonly AllowedSourcePath[] = [
   {
     store: "firestore",
     path: "users/{legacyUserId}",
-    capabilities: ["legacy_lead_get_context", "property_get_details"],
+    capabilities: [
+      "legacy_lead_get_context",
+      "property_get_details",
+      "legacy_conversation_authority_get",
+    ],
     rationale:
       "Owner principal resolution only. Read to normalize a record's legacy owner so the Organization containment check can run; never read for user data.",
   },
@@ -81,6 +85,20 @@ export const ALLOWED_SOURCE_PATHS: readonly AllowedSourcePath[] = [
     capabilities: ["appointment_get"],
     rationale:
       "Appointment persistence is not atomic across stores (audit 11.3): a Firestore-only read would silently miss appointments that landed only in Mongo. This is the only SL-1 capability that needs Mongo at all. The database is `gu2`, the guv3 runtime database - NOT `bot`, which has no `appointments` collection. Confirmed with the Traditional Gu team on 2026-09-04 after first-hand observation; the pre-issuance scope had assumed `bot`.",
+  },
+  {
+    store: "mongo",
+    path: "gu2.users",
+    capabilities: ["legacy_conversation_authority_get"],
+    rationale:
+      "Per-lead conversation-authority runtime (audit §5.2, §8, §24.6): `bypass_bot` takeover and `last_owner_interaction_wba`, keyed by opaque `lead_id`. Reserved on the SL-1 allowlist for SL-6; added here as the Q17 current-state read. Named `gu2.users` as the guv3 runtime path. SL-1's first-hand inventory also records a `users` collection in `bot`; that is not treated as this capability's store. Hosted T7 confirms or corrects the database placement. Not a C6 path and not a model-tool path.",
+  },
+  {
+    store: "mongo",
+    path: "gu2.gunumbers",
+    capabilities: ["legacy_conversation_authority_get"],
+    rationale:
+      "Per-Gu-number kill switch (audit §24.6): a second, distinct `bypass_bot` on the number record, keyed by `bot_number`. Never conflated with the per-lead takeover on `gu2.users`. Database follows the same guv3 runtime reservation as `gu2.users`; hosted T7 confirms or corrects. Not a C6 path and not a model-tool path.",
   },
 ] as const;
 
@@ -108,9 +126,15 @@ export const DELIBERATELY_EXCLUDED_PATHS: ReadonlyArray<{
   },
   {
     store: "mongo",
-    path: "gu2.users / gu2.deals",
+    path: "gu2.deals",
     reason:
-      "Lead and deal runtime context (`bypass_bot`, `last_owner_interaction_wba`, assignment mirror) is a conversation-authority signal consumed by SL-6, not by an SL-1 read.",
+      "Deal runtime is not an SL-6 authority input and is not an SL-1 read. `gu2.users` left this exclusion when SL-6 added `legacy_conversation_authority_get`; deals stay out.",
+  },
+  {
+    store: "mongo",
+    path: "bot.users",
+    reason:
+      "SL-1 first-hand inventory records a `users` collection in `bot`. Conversation-authority fields (`bypass_bot`, `last_owner_interaction_wba`) are the guv3 runtime named by audit §5.2 as `gu2.users`. Reading both would be a dual-store generic query this capability does not have. If hosted T7 finds the authority fields only in `bot.users`, the allowlist is corrected — they are not read from both.",
   },
   {
     store: "firestore",

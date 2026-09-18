@@ -10,9 +10,9 @@
  * The rules are the human decisions of 2026-09-13, recorded before
  * implementation, transcribed rather than re-interpreted:
  *
- *   D4  pending approval, authority conflict and unknown-outcome effects are
- *       rules over typed inputs with no Organization-Case producer yet — the
- *       live wiring supplies nothing for them (see snapshot.ts);
+ *   D4  pending approval and unknown-outcome effects remain rules over typed
+ *       inputs with no Organization-Case producer yet. Authority conflict is
+ *       now live from SL-6 `authority_resolutions` (see snapshot.ts);
  *   D5  due commitment: open + advisor + a full ISO-8601 instant ≤ t; a
  *       `due_expression` is never due; a malformed `due_at` never fires;
  *   D7  stalled: Organization-owned lead Opportunity, live status, no closure,
@@ -425,7 +425,7 @@ function dueCommitment(snapshot: PortfolioCaseSnapshot, now: Date): AttentionPro
     });
 }
 
-/** Authority conflict — rule only until SL-6 (D4). The uncertainty is literal. */
+/** Authority conflict — live from SL-6 `authority_resolutions`. The uncertainty is literal. */
 function authorityConflict(snapshot: PortfolioCaseSnapshot): AttentionProjection[] {
   const conflict = snapshot.authority_conflict;
   if (!conflict) return [];

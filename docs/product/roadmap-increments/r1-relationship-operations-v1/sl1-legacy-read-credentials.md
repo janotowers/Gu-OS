@@ -33,8 +33,12 @@ The containment TD-5 relies on lives in [`apps/web/src/lib/legacy-gateway/allowl
 | Firestore | `properties/{legacyPropertyId}` | `property_get_details` | the authoritative property record (audit §14.1) |
 | Firestore | `deals/{legacyDealId}/appointments` | `appointment_get` | the Firestore appointment replica; a subcollection of the deal, not a root collection |
 | Mongo | `gu2.appointments` | `appointment_get` | appointment persistence is not atomic across stores (audit §11.3) |
+| Mongo | `gu2.users` | `legacy_conversation_authority_get` (SL-6) | per-lead takeover and `last_owner_interaction_wba` (audit §5.2, §8, §24.6). Resolver-facing; not a model tool and not a C6 path |
+| Mongo | `gu2.gunumbers` | `legacy_conversation_authority_get` (SL-6) | distinct per-number kill switch (audit §24.6) |
 
-Deliberately excluded, with reasons, in the same module: Mongo `property_data` (serving mirror, not authority), `bot.chats` / `gu2.chats` / `gu2.chat_memory` (conversation mirrors — delivery status is read from Firestore), `gu2.users` / `gu2.deals` (conversation-authority signals belonging to SL-6), Firestore `users_sellers` (dropped before issuance — binding resolves through Gu OS `external_identity_bindings`), and BigQuery (AC-1 keeps it analytical).
+Deliberately excluded, with reasons, in the same module: Mongo `property_data` (serving mirror, not authority), `bot.chats` / `gu2.chats` / `gu2.chat_memory` (conversation mirrors — delivery status is read from Firestore), `gu2.deals` (still unused), `bot.users` (SL-1 first-hand inventory records a `users` collection in `bot`; conversation-authority runtime is the guv3 path named `gu2.users` — hosted T7 confirms or corrects; both are not read), Firestore `users_sellers` (dropped before issuance — binding resolves through Gu OS `external_identity_bindings`), and BigQuery (AC-1 keeps it analytical).
+
+**Database placement, classified rather than guessed.** SL-1's first-hand inventory of 2026-09-04 records that `bot` holds a `users` collection and `gu2` holds the guv3 runtime including `appointments`. Audit §5.2 and the SL-1 allowlist reservation name `gu2.users` as the lead-runtime store for `bypass_bot` / `last_owner_interaction_wba`. Those statements can both be true. SL-6 reads the reserved guv3 paths. That is not a credential widening: the delivered identity already has database-level `read` on `bot` and `gu2`. If hosted evidence finds the authority fields only in `bot`, the allowlist is corrected the same way SL-1 corrected `bot.appointments` → `gu2.appointments`.
 
 Beyond the allowlist, every read is contained by the Organization gate in [`authorization.ts`](../../../../apps/web/src/lib/legacy-gateway/authorization.ts): flags, active membership, the Organization's own `legacy_organization_key` binding, refusal when the requested identity is bound to another Organization, and — after the fetch, before anything is returned — resolution of the record's legacy owner back to the calling Organization.
 
@@ -65,7 +69,7 @@ Two things that are easy to conflate, kept apart for whoever revisits this:
 
 If it is ever narrowed before C6 — which the revalidation does not require — the minimum required Mongo grant is a collection-level `find` on `gu2.appointments`.
 
-The code allowlist follows the confirmed source: it names `gu2.appointments` and nothing else in Mongo.
+The code allowlist follows the confirmed source for SL-1: it names `gu2.appointments`. SL-6 later added `gu2.users` and `gu2.gunumbers` for the conversation-authority read; those paths are not SL-1's and are not C6's.
 
 ## 5. Production boundary — what was read, and under what authority
 
@@ -119,4 +123,4 @@ The credentials retire with the adapters they justify, not later.
 
 **Mechanism:** `disconnectOrganizationToolSecret` blanks the ciphertext while keeping the row, so what was once bound stays auditable and no material remains at rest. Revoking the IAM grant and the Atlas user is the second half and is a human action.
 
-**Interim tightening, if the window lengthens:** narrow the Atlas grant from database-level `read` on `bot` + `gu2` to a collection-level `find` on `gu2.appointments`. Firestore cannot be narrowed by IAM at all; its containment stays the code allowlist plus the per-read Organization binding check, which is the arrangement TD-5 accepted.
+**Interim tightening, if the window lengthens:** narrow the Atlas grant from database-level `read` on `bot` + `gu2` to a collection-level `find` on `gu2.appointments`, plus `gu2.users` and `gu2.gunumbers` while SL-6 remains on `bootstrap_direct`. Firestore cannot be narrowed by IAM at all; its containment stays the code allowlist plus the per-read Organization binding check, which is the arrangement TD-5 accepted.

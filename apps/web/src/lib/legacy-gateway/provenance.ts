@@ -20,6 +20,7 @@ import type {
   LegacyReadFreshness,
   LegacyReadProvenance,
   LegacyReadResult,
+  LegacyReadSourceContribution,
   LegacySourceStore,
 } from "@agents/types";
 import { ageSecondsBetween, normalizeTimestamp } from "./normalize";
@@ -62,6 +63,7 @@ export interface ProvenanceInput {
   freshness: LegacyReadFreshness;
   /** Defaults to the sanctioned shadow-stage adapter. */
   adapter?: LegacyReadAdapter;
+  contributions?: readonly LegacyReadSourceContribution[];
 }
 
 export function buildProvenance(input: ProvenanceInput): LegacyReadProvenance {
@@ -75,6 +77,7 @@ export function buildProvenance(input: ProvenanceInput): LegacyReadProvenance {
     organizationId: input.organizationId,
     bindingState: input.bindingState,
     freshness: input.freshness,
+    ...(input.contributions ? { contributions: input.contributions } : {}),
   };
 }
 

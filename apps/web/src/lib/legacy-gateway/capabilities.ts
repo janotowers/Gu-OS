@@ -1,5 +1,5 @@
 /**
- * The four bounded read capabilities (TD-5, AC-1 6.2 Option C).
+ * Bounded read capabilities (TD-5, AC-1 6.2 Option C; SL-6 / TD-3 Q17).
  *
  * Every one of them follows the same five steps, in this order, and the order
  * is the contract:
@@ -19,6 +19,7 @@
 import type {
   LegacyAppointmentPair,
   LegacyAppointmentView,
+  LegacyConversationAuthority,
   LegacyConversationItem,
   LegacyDealAppointments,
   LegacyDeliveryStatus,
@@ -27,6 +28,7 @@ import type {
   LegacyMessageThread,
   LegacyPropertyDetails,
   LegacyReadResult,
+  LegacyConversationAuthorityRead,
   LegacyRecentMessages,
 } from "@agents/types";
 import {
@@ -54,6 +56,8 @@ import {
   FIRESTORE_APPOINTMENT_CONTRACT,
   LEAD_CONTRACT,
   MONGO_APPOINTMENT_CONTRACT,
+  MONGO_GU_NUMBER_CONTRACT,
+  MONGO_LEAD_RUNTIME_CONTRACT,
   PROPERTY_CONTRACT,
 } from "./source-contracts";
 
@@ -803,4 +807,182 @@ export async function propertyGetDetails(
       }),
     })
   );
+}
+
+// ============================================================
+// legacy_conversation_authority_get (R1 SL-6 / TD-3 Q17)
+// ============================================================
+
+/**
+ * Current conversation-authority inputs. Reports the per-lead takeover and
+ * the distinct per-number kill switch; does not interpret a resume window
+ * and does not return a raw store document.
+ */
+export async function legacyConversationAuthorityGet(
+  input: CapabilityInput & { legacyLeadId: string }
+): Promise<LegacyConversationAuthorityRead> {
+  const capability = "legacy_conversation_authority_get" as const;
+  const { legacyLeadId } = input;
+
+  const gate = await assertPreReadGate({
+    ctx: input.ctx,
+    capability,
+    externalId: legacyLeadId,
+    bindingKind: "legacy_lead",
+    env: input.env,
+  });
+
+  if (!input.readers.mongo) {
+    throw new LegacyReadRefusal(
+      "no_usable_credential",
+      capability,
+      legacyLeadId,
+      "legacy_conversation_authority_get requires Mongo; it does not fall back to a projection"
+    );
+  }
+
+  const usersAllowed = assertAllowedSourcePath({
+    store: "mongo",
+    template: "gu2.users",
+    capability,
+  });
+  const sourcePath = usersAllowed.path;
+
+  const userDocuments = await input.readers.mongo.findLeadRuntimeByLeadId(
+    legacyLeadId
+  );
+  if (userDocuments.length === 0) {
+    throw new LegacyReadRefusal("not_found", capability, legacyLeadId);
+  }
+  if (userDocuments.length > 1) {
+    throw new LegacyReadRefusal(
+      "pairing_ambiguous",
+      capability,
+      legacyLeadId,
+      "two gu2.users records share this lead_id"
+    );
+  }
+
+  const userDocument = userDocuments[0];
+  const userViolations = checkSourceContract({
+    contract: MONGO_LEAD_RUNTIME_CONTRACT,
+    document: userDocument.data,
+    capability,
+    organizationId: input.ctx.organizationId,
+    externalId: legacyLeadId,
+  });
+  if (userViolations.length > 0) {
+    throw new LegacyReadRefusal(
+      "contract_drift",
+      capability,
+      legacyLeadId,
+      `mongo lead runtime ${userDocument.id}: ${userViolations.length} contract violation(s)`
+    );
+  }
+
+  await assertOwnershipContained({
+    ctx: input.ctx,
+    capability,
+    externalId: legacyLeadId,
+    ownerReference: userDocument.data.owner_firebase_id,
+    firestore: input.readers.firestore,
+  });
+
+  let numberKillSwitchActive: boolean | null = null;
+  let guNumberRef: string | null = null;
+  const botNumber = normalizeString(userDocument.data.bot_phone_number);
+  if (botNumber) {
+    assertAllowedSourcePath({
+      store: "mongo",
+      template: "gu2.gunumbers",
+      capability,
+    });
+    const numberDocuments = await input.readers.mongo.findGuNumberByBotNumber(
+      botNumber
+    );
+    if (numberDocuments.length > 1) {
+      throw new LegacyReadRefusal(
+        "pairing_ambiguous",
+        capability,
+        legacyLeadId,
+        "two gu2.gunumbers records share this bot_number"
+      );
+    }
+    if (numberDocuments.length === 1) {
+      const numberDocument = numberDocuments[0];
+      const numberViolations = checkSourceContract({
+        contract: MONGO_GU_NUMBER_CONTRACT,
+        document: numberDocument.data,
+        capability,
+        organizationId: input.ctx.organizationId,
+        externalId: legacyLeadId,
+      });
+      if (numberViolations.length > 0) {
+        throw new LegacyReadRefusal(
+          "contract_drift",
+          capability,
+          legacyLeadId,
+          `mongo gunumber ${numberDocument.id}: ${numberViolations.length} contract violation(s)`
+        );
+      }
+      numberKillSwitchActive = normalizeBoolean(numberDocument.data.bypass_bot);
+      guNumberRef = normalizeString(numberDocument.data.bot_number) ?? botNumber;
+    }
+  }
+
+  const readAt = new Date().toISOString();
+  const leadFreshness = buildFreshness(readAt, {
+    candidates: [
+      {
+        field: "last_owner_interaction_wba",
+        value: userDocument.data.last_owner_interaction_wba,
+      },
+    ],
+  });
+  const numberFreshness = buildFreshness(readAt, { candidates: [] });
+  const value: LegacyConversationAuthority = {
+    legacyLeadId,
+    leadTakeoverActive: normalizeBoolean(userDocument.data.bypass_bot),
+    lastOwnerInteractionAt: normalizeTimestamp(
+      userDocument.data.last_owner_interaction_wba
+    ),
+    numberKillSwitchActive,
+    guNumberRef,
+  };
+
+  const contributions = [
+    {
+      field: "leadTakeoverActive",
+      sourcePath,
+      sourceUpdatedAt: leadFreshness.sourceUpdatedAt,
+      sourceUpdatedAtField: leadFreshness.sourceUpdatedAtField,
+    },
+    ...(botNumber
+      ? [
+          {
+            field: "numberKillSwitchActive",
+            sourcePath: "gu2.gunumbers",
+            sourceUpdatedAt: numberFreshness.sourceUpdatedAt,
+            sourceUpdatedAtField: numberFreshness.sourceUpdatedAtField,
+          },
+        ]
+      : []),
+  ];
+
+  return {
+    ...withProvenance(
+      value,
+      buildProvenance({
+        store: "mongo",
+        sourcePath,
+        externalId: legacyLeadId,
+        capability,
+        organizationId: input.ctx.organizationId,
+        bindingState: gate.bindingState,
+        freshness: leadFreshness,
+        contributions,
+      })
+    ),
+    observedOwnerRef: normalizeString(userDocument.data.owner_firebase_id),
+  };
 }

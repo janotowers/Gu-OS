@@ -262,6 +262,17 @@ export function createFirestoreReader(params: {
   };
 }
 
+/**
+ * Database named by the SL-6 allowlist for conversation-authority runtime.
+ * Hardcoded rather than taken from the appointment secret's `database` field
+ * so the path the capability reads is the path the allowlist named.
+ *
+ * Classified, not guessed: audit §5.2 and the SL-1 reservation name
+ * `gu2.users`; SL-1 first-hand inventory also records `users` in `bot`.
+ * This adapter reads the reserved guv3 path. Hosted T7 confirms or corrects.
+ */
+const CONVERSATION_AUTHORITY_MONGO_DATABASE = "gu2";
+
 export function createMongoReader(params: {
   organizationId: string;
   credentials: MongoAdapterCredentials;
@@ -275,6 +286,32 @@ export function createMongoReader(params: {
         .find({ deal_id: legacyDealId })
         // One past the bound, for the same reason as the Firestore side.
         .limit(APPOINTMENT_SCAN_LIMIT + 1)
+        .toArray();
+      return documents.map((document) => ({
+        id: String(document._id),
+        data: document,
+      }));
+    },
+    async findLeadRuntimeByLeadId(legacyLeadId) {
+      const client = await loadMongo(params.organizationId, params.credentials);
+      const documents = await client
+        .db(CONVERSATION_AUTHORITY_MONGO_DATABASE)
+        .collection("users")
+        .find({ lead_id: legacyLeadId })
+        .limit(2)
+        .toArray();
+      return documents.map((document) => ({
+        id: String(document._id),
+        data: document,
+      }));
+    },
+    async findGuNumberByBotNumber(botNumber) {
+      const client = await loadMongo(params.organizationId, params.credentials);
+      const documents = await client
+        .db(CONVERSATION_AUTHORITY_MONGO_DATABASE)
+        .collection("gunumbers")
+        .find({ bot_number: botNumber })
+        .limit(2)
         .toArray();
       return documents.map((document) => ({
         id: String(document._id),

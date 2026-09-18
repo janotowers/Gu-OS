@@ -2,7 +2,7 @@
  * Ports for the two bootstrap source stores.
  *
  * These interfaces are narrow on purpose. They expose exactly the reads the
- * four capabilities perform and nothing that could be composed into a generic
+ * named capabilities perform and nothing that could be composed into a generic
  * CRUD surface: there is no `query(collection, filter)`, no `list()`, no
  * `write()`. A new read shape means a new named method, reviewed against the
  * allowlist - which is the point.
@@ -60,11 +60,24 @@ export interface LegacyMongoReader {
    * `APPOINTMENT_SCAN_LIMIT + 1` documents, for the same reason.
    */
   findAppointmentsByDeal(legacyDealId: string): Promise<RawDocument[]>;
+  /**
+   * `gu2.users` filtered to one opaque `lead_id`. At most two documents so
+   * the caller can tell a unique match from an ambiguous one without a
+   * generic collection scan.
+   */
+  findLeadRuntimeByLeadId(legacyLeadId: string): Promise<RawDocument[]>;
+  /**
+   * `gu2.gunumbers` filtered to one `bot_number`. At most two documents,
+   * for the same uniqueness reason as the lead-runtime read.
+   */
+  findGuNumberByBotNumber(botNumber: string): Promise<RawDocument[]>;
 }
 
 /**
- * What a capability is handed. Mongo is optional because only one capability
- * needs it, and a Mongo outage must not take down the three that do not.
+ * What a capability is handed. Mongo is optional for the first-wave reads:
+ * only `appointment_get` among them needs it, and a Mongo outage must not
+ * take down the three that do not. `legacy_conversation_authority_get`
+ * requires Mongo and refuses rather than answering without it.
  */
 export interface LegacySourceReaders {
   firestore: LegacyFirestoreReader;

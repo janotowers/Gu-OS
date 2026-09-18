@@ -11,11 +11,13 @@
  * later. When C1 ships, only the producer changes.
  *
  * **What this module deliberately does not do: discover leads.** Finding lead
- * ids Gu OS has never seen would need a listing read, and SL-1's capability
+ * ids Gu OS has never seen would need a listing read, and SL-1's first-wave
  * vocabulary is closed — `legacy_lead_get_context`,
  * `legacy_lead_get_recent_messages`, `appointment_get`, `property_get_details`
  * — with widening it declared a capability-surface change that belongs to a
- * Slice rather than a call site. So the caller supplies which leads to evaluate.
+ * Slice rather than a call site. SL-6 later added a resolver-facing authority
+ * read; it is not a listing or discovery capability. So the caller supplies
+ * which leads to evaluate.
  * Continuous discovery arrives with C1 event forwarding (SL-5) or with a
  * separately decided bounded discovery capability; it is named here rather than
  * smuggled in as a generic read.

@@ -49,7 +49,7 @@ export type DurableRef =
   | { kind: "approval_request"; id: string }
   /** An external effect operation (TD-6). No producer before SL-9. */
   | { kind: "external_effect_operation"; id: string }
-  /** An authority resolution (TD-3). No producer before SL-6. */
+  /** An authority resolution (TD-3). Produced by SL-6. */
   | { kind: "authority_resolution"; id: string };
 
 export type DurableRefKind = DurableRef["kind"];

@@ -1,10 +1,13 @@
 /**
- * Recorded source contracts for the four SL-1 capabilities (TD-5).
+ * Recorded source contracts for the SL-1 first-wave capabilities (TD-5) and
+ * the SL-6 conversation-authority read (TD-3 Q17).
  *
- * These are not guesses from documentation. Every field name, kind and
- * required/optional decision below was taken first-hand from the live
- * Traditional Gu stores on 2026-09-04, through the read identities issued for
- * this Slice, with the sample sizes recorded per contract.
+ * The SL-1 contracts below are not guesses from documentation. Every field
+ * name, kind and required/optional decision on those was taken first-hand
+ * from the live Traditional Gu stores on 2026-09-04, through the read
+ * identities issued for that Slice, with the sample sizes recorded per
+ * contract. The SL-6 contracts are **code-derived**, not a hosted sample —
+ * that limitation is recorded on those contracts, not hidden.
  *
  * How `required` was decided, because it is the whole difference between a
  * useful alarm and one operators learn to ignore:
@@ -230,6 +233,78 @@ export const MONGO_APPOINTMENT_CONTRACT: SourceContract = {
   },
 };
 
+/**
+ * `gu2.users` — conversation-authority lead runtime (SL-6 / TD-3 Q17).
+ *
+ * Not a first-hand hosted sample. Field names and kinds are taken from
+ * current Traditional Gu writers as of 2026-09-17 (`find_one("users",
+ * {"lead_id": lead_id})`, `bypass_bot`, `last_owner_interaction_wba`,
+ * `bot_phone_number`, `owner_firebase_id`). No field is required: without
+ * a sample we cannot claim every document carries it, and absence of the
+ * authority flags is ordinary (Gu still holds the conversation).
+ *
+ * `lead_id` is opaque and compared whole. `bypass_bot` here is the
+ * per-lead takeover, never the per-number kill switch.
+ */
+export const MONGO_LEAD_RUNTIME_CONTRACT: SourceContract = {
+  id: "mongo.gu2.users.v1",
+  store: "mongo",
+  path: "gu2.users",
+  fields: {
+    lead_id: {
+      kinds: ["string"],
+      required: false,
+      note: "Opaque composite key. Lookup key; compared whole, never parsed.",
+    },
+    bypass_bot: {
+      kinds: ["boolean"],
+      required: false,
+      note: "Per-lead same-thread takeover. Distinct from gunumbers.bypass_bot.",
+    },
+    last_owner_interaction_wba: {
+      kinds: ["timestamp", "string"],
+      required: false,
+      note: "Last same-thread owner interaction. Resume-window interpretation is the oracle's, not this contract's.",
+    },
+    bot_phone_number: {
+      kinds: ["string"],
+      required: false,
+      note: "Gu-number used to look up the distinct per-number kill switch.",
+    },
+    owner_firebase_id: {
+      kinds: ["string"],
+      required: false,
+      note: "Legacy owner principal for Organization containment.",
+    },
+  },
+};
+
+/**
+ * `gu2.gunumbers` — per-Gu-number kill switch (SL-6 / TD-3 Q17).
+ *
+ * Code-derived from Traditional Gu `gunumbers` lookups keyed by
+ * `bot_number`, as of 2026-09-17. Not a first-hand hosted sample. No
+ * field is required. `bypass_bot` here is the per-number kill switch,
+ * never the per-lead takeover.
+ */
+export const MONGO_GU_NUMBER_CONTRACT: SourceContract = {
+  id: "mongo.gu2.gunumbers.v1",
+  store: "mongo",
+  path: "gu2.gunumbers",
+  fields: {
+    bot_number: {
+      kinds: ["string"],
+      required: false,
+      note: "Opaque Gu-number identity. Lookup key.",
+    },
+    bypass_bot: {
+      kinds: ["boolean"],
+      required: false,
+      note: "Per-number kill switch. Distinct from users.bypass_bot.",
+    },
+  },
+};
+
 export const SOURCE_CONTRACTS = {
   lead: LEAD_CONTRACT,
   user: USER_CONTRACT,
@@ -238,4 +313,6 @@ export const SOURCE_CONTRACTS = {
   property: PROPERTY_CONTRACT,
   firestoreAppointment: FIRESTORE_APPOINTMENT_CONTRACT,
   mongoAppointment: MONGO_APPOINTMENT_CONTRACT,
+  mongoLeadRuntime: MONGO_LEAD_RUNTIME_CONTRACT,
+  mongoGuNumber: MONGO_GU_NUMBER_CONTRACT,
 } as const;
