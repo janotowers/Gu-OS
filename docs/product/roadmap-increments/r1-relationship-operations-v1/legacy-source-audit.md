@@ -1,6 +1,6 @@
 # R1 Relationship Operations — Traditional Gu Legacy Source Audit
 
-> **Version:** v0.3  
+> **Version:** v0.5 — §24.3 gains the exact per-path store ordering (verified 2026-09-17), which [ADR-112](../../../adr/ADR-112-cross-repo-integration-events.md) §7 depends on  
 > **Status:** Complete for R1 architecture/Technical-Plan entry — v0.2 full audit (2026-08-28) plus targeted drift revalidation (2026-08-31); source-verified legacy contracts and risks; exact adapter/API/schema mechanics remain Technical Design  
 > **Roadmap Increment:** R1 — Relationship Operations v1  
 > **Audit date:** 2026-08-28 (original full audit)  
@@ -8,6 +8,7 @@
 > **Gu OS repository:** `janotowers/10x-builders-agent`, `main`  
 > **Traditional Gu repositories audited (v0.2 baseline):** `UnggaMX/ungga-full`, `gcp/main` at `ae9f107a1d53c8bc25a327bece5701aac192ac49`; `UnggaMX/ungga-landing`, `main` at `77e3dc7fb562f9b249a5d5ec7f8f159e6f2ccdfa`  
 > **Revalidated through (2026-08-31):** `UnggaMX/ungga-full`, `gcp/main` at `c88792530152c0c91a1e74c59e26a416103e68ff`; `UnggaMX/ungga-landing`, `main` at `82cab192bec2f23a0709c57ce06204d21007a179`  
+> **Contract-precision revalidation (2026-09-17):** `UnggaMX/ungga-full`, `gcp/main` at `3fdb16ca3469b5f9c667613839af384ec1f4800e`; `UnggaMX/ungga-landing`, `main` at `ce60cb22e999d004990f7685e2a08d7512f73504` — scoped to the C1/C2/C6 emission, read and durability seams; see §24  
 > **Companion Architecture Analysis:** `docs/product/roadmap-increments/r1-relationship-operations-v1/architecture-analysis.md`  
 > **S1 behavioral contract:** `docs/product/operating-domains/relationship-operations/specs/lead-opportunity-lifecycle.md`  
 > **Shared-kernel mapping:** `docs/product/roadmap-increments/r1-relationship-operations-v1/r1-concept-shared-kernel-mapping.md`  
@@ -996,3 +997,184 @@ Performed from the Gu OS side as a **targeted R1-relevant drift revalidation**, 
 ## 23.4 Architectural conclusion
 
 > **The observed drift does NOT contradict S1–S4, does NOT reopen AC-1 through AC-10, and does NOT reopen ADR-106 through ADR-110.** The advisor-linked WhatsApp pilot in fact supports accepted direction: it begins to reduce the off-thread evidence gap ADR-107 already anticipates, and it supplies a source-verified mapping for the advisor human-WhatsApp endpoint identity dimension of ADR-106. The multi-thread conversation store and delivery-status writeback **strengthen the need for the bounded operational gateway** (business-semantic, thread-aware, provenance-preserving reads rather than raw store access) and add useful **evidence, identity and delivery seams** for Technical Design. `advisor_wa` capture remains evidence, never authority; `waProbe` remains best-effort and must not become load-bearing for Gu OS correctness.
+
+---
+
+# 24. Contract-precision revalidation — 2026-09-17
+
+## 24.1 Method, scope and why this section exists
+
+This is the third pass over the Traditional Gu sources, and it has a narrower purpose than either predecessor. §1–§22 established **what the legacy system is**; §23 confirmed those contracts had not drifted. §24 establishes **the specific mechanics C1, C2 and C6 must be implemented against**, because a cross-repo contract that names the wrong writer, the wrong identifier or a durability guarantee the source cannot provide fails at integration rather than at review.
+
+Method:
+
+1. current heads resolved through the GitHub API; the §23 revalidation heads confirmed as **ancestors** of the current heads for both repositories (`compare` reports `ahead` with no rewrite), so history is fast-forward and §23's classifications stand;
+2. read-only inspection through the authorized API path — recursive trees plus per-file reads pinned to the named branches — and code search used only as a pointer, then confirmed on the pinned branch;
+3. scope limited to four question sets: every writer that mutates lead assignment, every writer that mutates appointments, the message-ingress and authority seams, and the existing durability/transaction primitives;
+4. `UnggaMX/ungga-full` `gcp/stage` and `gcp/main` verified **identical** at inspection time (`compare` returns zero commits and zero files in both directions), which is why search results indexed on the default branch are exact for `gcp/main`.
+
+| Repo / branch | §23 head (2026-08-31) | This head (2026-09-17) | Commits since | History |
+|---|---|---|---|---|
+| `UnggaMX/ungga-full` @ `gcp/main` | `c8879253` | `3fdb16ca` | 48 | fast-forward |
+| `UnggaMX/ungga-landing` @ `main` | `82cab192` | `ce60cb22` | 99 | fast-forward |
+
+**Everything in §24 is observed current-state legacy reality, and the precedence statements are explicitly transitional.** None of it is a Gu OS architecture invariant, and none of it licenses preserving duplicated legacy persistence permanently. Gu OS may eventually own some of these capabilities; when it does, the precedence recorded here is retired, not reinterpreted.
+
+## 24.2 Transitional source precedence
+
+**Traditional Gu appointment authority (current): Mongo `appointments` (the `gu2` runtime database) is the primary operational representation. The Firestore `deals/{deal}/appointments` representation is a secondary/replicated representation. Divergence between them remains observable and is never silently reconciled. This precedence is transitional and may change when appointment ownership migrates to Gu OS.**
+
+§24.3 gives the evidence, and it is stronger than "primary": the majority of appointment writers never touch Firestore at all.
+
+**Legacy Lead: for substantive lead information Mongo is currently the more complete and preferred representation where equivalent information exists in both stores. Mongo is NOT a superset of Firestore.** Firestore remains necessary for legacy operational semantics that have no Mongo equivalent — organization containment, advisor relationships, assignment state and conversation structures. The real source model is **asymmetric and capability-specific**, and the tempting simplification — *lead → Mongo, appointment → Mongo, everything else → Firestore* — is wrong in both directions. §24.4 quantifies the asymmetry.
+
+**Analytical mirrors.** The BigQuery mirror deliberately draws from seven source datasets — Firestore `users`, Gu numbers, `properties`, `deals` and `messages`; Mongo `leads` and `appointments`. This is **evidence of current practical source preference and nothing more.** §18 and §20 item 13 already bind it: BigQuery mirrors are delayed analytical copies, for analytics and evaluation only, never live operational authority. **The analytical selection must not become a platform invariant** — it is a reporting convenience, it lags, and it was chosen for query shape rather than for authority. (Within `ungga-landing`, BigQuery is used only against Google's own `billing_export` dataset for GCP cost reporting; the business-data mirror is configured outside both application repositories. `architecture-analysis.md` §4.8 enumerates the mirrored tables and defers operational truth to this audit.)
+
+## 24.3 Appointments: fourteen writers, nine of them Mongo-only
+
+**Mongo is the only defensible source of appointment state, because the advisor-facing lifecycle never reaches Firestore.** Confirmation, advisor-side reschedule, reminder outcomes and the post-visit survey are all Mongo-only writers. Nine of the fourteen writers found touch Mongo alone; **none touches Firestore alone** for the appointment document itself.
+
+| Writer family | Stores | Logical operation |
+|---|---|---|
+| Prospect-conversation appointment generator | Calendar + Firestore + Mongo | creation |
+| Standby-graph generator (after advisor takeover) | Calendar + Firestore + Mongo | creation |
+| Prospect-side update | Calendar + Mongo, Firestore **best-effort** | reschedule |
+| Prospect-side cancel | Firestore **delete** + Mongo tombstone | cancellation |
+| Advisor confirm (agent tool, and the `ts-services` route) | Mongo only | confirmation |
+| Advisor reschedule | Mongo only | reschedule |
+| Visit-tracker status / survey writers | Mongo only | status transition, post-visit outcome |
+| Owner-phone sync (TS and Python twins) | Mongo only | backfill |
+| `jobFilter` reminder writers | Mongo only | reminder bookkeeping |
+
+Four mechanics matter for the contracts:
+
+**Persistence is not atomic, and the code does not try to make it so.** No writer in either language opens a transaction, session or batch for appointment data; every dual-store write is sequential best-effort. The creation path performs Calendar, then Firestore, then Mongo, and checks the two failure flags **after both writes** — so a Firestore failure still leaves the Mongo insert committed and the Calendar event created. The reschedule path is more asymmetric still: its Firestore update sits inside a swallowed `try/except` and a missing Firestore document is a logged warning, not an error, while Mongo is always attempted. This confirms §11.2 and §11.3 and sharpens them: **Firestore is genuinely optional on the update paths, not merely occasionally unlucky.**
+
+**The exact store ordering per path — verified 2026-09-17 against `src/guv3/gu/agents/prospect/appointment_assistant/nodes/tools.py` @ `gcp/main`, because the C1 event contract turns out to depend on it.** Whether Mongo is written *last* decides whether the secondary outcomes are already known when the canonical mutation commits:
+
+| Path | Ordering | Mongo last? |
+|---|---|---|
+| `appointment_generator` (creation) | Calendar → Firestore → Mongo | **yes** |
+| `cancel_appointment` | Firestore appointment delete → Firestore `propertiesShown` delete → Calendar delete → Mongo tombstone | **yes** |
+| `update_appointment` (prospect reschedule) | Firestore → **Mongo** → Calendar → **Mongo again** | **no** |
+| The nine Mongo-only writers | Mongo alone | trivially |
+
+So **thirteen of the fourteen writers put the canonical Mongo write last or write nothing else**, and exactly one — the prospect-side reschedule — commits Mongo while its Calendar outcome is still unknown. That path then issues a *second* `update_one` on the appointment after the Calendar call, to set `rescheduled`, `owner_notified` and the status resets. **The logical reschedule is therefore not one Mongo write but two, with a Calendar effect between them**, which is why [ADR-112](../../../adr/ADR-112-cross-repo-integration-events.md) §7 cannot treat "the canonical mutation committed" as "the event is complete", and why that second write is where it lands finalization.
+
+**A related latent defect on that same path, recorded as observation rather than repaired here.** `update_appointment` refreshes `args["google_event_id"]` from the Calendar response *after* both Mongo updates have been composed, and neither update writes that field. If the Calendar API ever returned a different event id on update, nothing would persist it and Mongo would silently keep the stale one. Today the call patches the existing event in place and normally returns the same id, so this is a latent rather than active fault — but it is the same orphan-Calendar family as §11.4 and belongs to Traditional Gu, not to a Gu OS contract.
+
+**Cancellation makes the two stores describe different sets of appointments.** The Firestore document is deleted; Mongo retains a tombstone. Any read contract must therefore treat presence/absence per store as information, not as an error to be smoothed over.
+
+**`google_event_id` is written to BOTH stores, not to Firestore alone.** The Mongo insert carries it in the same field set as the Firestore write. This **corrects a Gu OS-side error rather than the audit**: the C6 appointment type asserted the field was "present only in the Firestore replica" and the Mongo normalizer hard-coded it to null, which meant the orphan-Calendar signal of §11.4 was invisible on exactly the store that survives when Firestore persistence fails. Repaired 2026-09-17 with fixture and selftest coverage. Firestore's genuine exclusives are different and narrower: the `propertiesShown.cita` back-pointer, and the owner-level Calendar connection state on the user document, which has no Mongo counterpart.
+
+**The appointment business key is stable across reschedule, but is not present on all historical Firestore records.** Every writer queries on a client-minted `appointment_id` UUID and updates in place — a reschedule never creates a new record, which is why a `rescheduled` flag exists at all. The Mongo `_id` and the Firestore auto-id are incidental. The nuance for C6: the SL-1 recording found `appointment_id` on only 63 of 126 sampled Firestore appointment documents, which is why the Gu OS gateway pairs the two stores on property + date + hour rather than on the business key. **So the business key is reliable for events emitted going forward (C1) but not for pairing historical records (C6).**
+
+## 24.4 Assignment: thirteen writers, no common seam, and a partial Mongo mirror
+
+§6.1 recorded `/guard-lead-one` as the current on-demand assignment path and §6.2 recorded the batch path as deprecated. Both stand. What §24 adds is that **`/guard-lead-one` is not the sole assignment writer** — it is one of thirteen, spread across two runtimes.
+
+The writer families, by the policy they implement: guardia/time-based (on-demand, plus the deprecated batch path); carrusel; manual carrusel; property-driven and property-carrusel; explicit/manual; a backfill that parks unassigned leads on the principal; an offboarding cascade that reassigns an advisor's leads when they are removed; lead creation, which initializes assignment state; a lead re-keying job that carries assignment across new documents; and a Python tool path that writes the Mongo owner fields directly.
+
+**The Firestore/Mongo asymmetry is real, and it is writer-dependent rather than uniform.** Firestore carries the operational assignment metadata: `assigned`, `assignedTo`, `assigned_at`, `assignment_type`, `assignation_type`, `new_assignment`. Writers update one or more of the global `leads/{lead}` document, the principal's `users/{owner}/user_leads/{lead}`, and the advisor's copied `user_leads` representation. The corresponding Mongo `users` projection carries `owner_phone_number`, `owner_name`, `owner_last_name` — and **some writers also mirror `assigned`/`assignedTo` there while others do not.** So Mongo's assignment mirror is partial and stale by construction, in ways that are specific rather than incidental:
+
+- several writers update only `owner_phone_number` in Mongo, leaving the name and assignment fields stale;
+- three writers read a source field for the advisor's surname that **no writer in the repository produces**, so that Mongo field is always empty on those paths;
+- the offboarding cascade changes the Firestore `assignedTo` of every affected lead and **touches no Mongo at all**, leaving the removed advisor's contact details in the Mongo projection;
+- a brand-new lead has **no** `assigned`/`assignedTo` keys in Mongo until an assignment writer runs.
+
+**Consequences for the contracts, all of which follow from the above rather than from preference:** C6 lead context may **compose** Mongo substantive lead data with Firestore operational assignment and ownership metadata, and no read contract may discard Firestore assignment state merely because Mongo is the preferred substantive source. (Today the Gu OS `legacy_lead_get_context` capability reads Firestore only, so this composition is an **addition** to the C6 contract, not a preservation of current behavior.) And C1 `assignment_change` **must originate from actual assignment mutation semantics at the writers**, never be inferred from Mongo `users` changes, from the Mongo owner name or phone, or from a single role literal.
+
+**The previous assignee is usually not reconstructable at mutation time.** Only three writers read the prior value: the on-demand guard path reads it as a sticky gate, the property-by-assignment path refuses when the lead is already assigned, and the offboarding cascade uses the previous assignee **as its query key**. The remaining writers either filter on `assigned == false` — so "no previous assignee" is true by construction — or overwrite without looking. **There is no assignment history anywhere**: no history collection, no per-lead subcollection, and the only per-mutation timestamps are three differently-named fields, each overwritten in place. This is why [ADR-112](../../../adr/ADR-112-cross-repo-integration-events.md) preserves absence instead of fabricating a previous assignee, and why it needs a fourth operation value for "an assignee was set without the prior state being established".
+
+**"Carrusel" is round-robin with legacy eligibility behavior, and there are two incompatible implementations of it.** One is round-robin over an explicit per-advisor `order` integer with a persisted counter on the principal document, wrap-around, an owner-level kill switch, and skipping of advisors whose root status is not active. The other, under the *same* configured strategy label, ranks by workload and cycles advisors through a `cold` flag until the cohort is exhausted and resets. They share no state. Neither is pure mathematical round-robin, and a contract that assumed a generic algorithm would be wrong about both.
+
+**Two vocabularies exist for the configured strategy field, written by two different repositories.** The `ungga-full` selector writes one set of values; `ungga-landing`'s assignment-type endpoint allows a different, overlapping set, including a value the `ungga-full` selector can never produce but one writer requires. **C1 must therefore carry the legacy policy value as provenance rather than as a closed enumeration**, which is what ADR-112 does.
+
+**There is no shared emission seam today.** Each writer open-codes its own Firestore write set and its own Mongo call with a different field list. There is no shared assignment service, no Firestore trigger on leads, no Mongo change stream, and no Pub/Sub publish on the assignment path. Notably, a helper that would have propagated advisor changes to appointments exists in both runtimes with **every call site commented out**, and an internal design note documents that propagation as implemented — that note is stale, and it also lists only four of the thirteen writers.
+
+## 24.5 Organization, advisor and role semantics
+
+§4.2 recorded the organization/principal bridge and §4.3 recorded that legacy claims are not sufficient authorization. Both stand. §24 adds the role vocabulary in full, because C1 and C2 must not propagate it.
+
+Treat assignment as **three separate concerns**, never collapsed: organization membership and advisor eligibility; the legacy policy that chooses an advisor; and the resulting durable lead→advisor assignment. Traditional Gu owns the first two in this phase; Gu OS consumes only the third, as a semantic event.
+
+Organizations contain sub-users/advisors linked to an owning principal through root `users` documents, an `organization_id` reference, a `users_sellers` projection under the principal, and related advisor projections. `organization_id` is inconsistently typed across writers — a document reference on most paths, a plain string on at least one — which §4.2 already flagged as drift.
+
+**The role vocabulary is internally inconsistent, and no single literal may become a Gu OS invariant.** The literals present in the code are at least `seller`, `vendedor`, `admin`, `super-admin` and `staff`, plus a **second, independent** role axis with its own values. The invitation path — the normal way an advisor is added — writes one literal; the CRM import paths write another for the same concept. The only eligibility predicate that actually reads roles compares against `admin` and `super-admin`, and **no writer ever produces `admin`**, while **nothing anywhere reads the two advisor literals as a gate**. The sharpest counterexample to keying anything on a literal: the offboarding cascade sets a *removed* advisor's role to `super-admin` with an inactive status and a self-referencing organization, so **`super-admin` does not reliably identify the organization principal** even though that is its usual meaning.
+
+**Role must therefore be normalized semantically at the integration boundary**, and `role_user == vendedor` is not the criterion for advisor eligibility. The actual predicates, where they exist, combine membership in the principal's advisor projection, a valid ordering ordinal, an active root-document status, an owner-level enable switch and — on one path — a role-plus-preference exclusion. Status itself is written with inconsistent capitalization and works only because consumers lowercase before comparing. Several paths apply **no** eligibility predicate at all and assign to whatever user the caller names. Two structural traps worth recording: an invited advisor starts in a pending status and is invisible to every automatic policy until something activates them, and an advisor added through the admin path gets no ordering ordinal and is permanently invisible to the ordinal-based policies.
+
+## 24.6 Message ingress, authority seam and delivery status
+
+§7.1 recorded that the provider message ID is available at ingress and §7.2 that routing is queue-based with early acknowledgement. Both stand, with three additions.
+
+**The provider id is available at ingress but not persisted there.** The ingress component extracts, filters and publishes; it writes to no datastore. Persistence happens downstream, and the id appears under **four different field names** across the stores, plus one place it is absent entirely: the Firestore conversation entries written by Gu itself carry no provider id. This has two direct consequences. For C6, per-message `wamid` is null for Gu-written messages and present mainly on entries written by the owner-app and off-thread capture paths — and the failure-writeback path that matches on it can therefore only mark the entries that carry it. For C1, it is why [ADR-112](../../../adr/ADR-112-cross-repo-integration-events.md) §2 records a poll-versus-webhook duplication hazard for the overlap window of the SL-5 cutover.
+
+**Inbound webhook authenticity is effectively unverified today.** Only the one-time subscription handshake is enforced. An HMAC verifier exists in the ingress component but **the line that installs it is commented out**; as written it implements SHA-1 against the legacy provider header, and it returns silently when the header is absent, so an unsigned request would pass. The body parser is plain JSON with no verify callback, and **no raw-body-preserving middleware exists anywhere in the repository.** The Python ingress has the same gap. This is recorded for two reasons: [ADR-111](../../../adr/ADR-111-legacy-service-auth-v1.md)'s body-hash-over-raw-bytes rule requires new middleware rather than an existing facility, and the gap is a standing finding in its own right that TD-13 does not fix (TD-13 governs the Gu OS boundary, not Meta's webhook).
+
+**Same-thread takeover and off-thread capture remain sharply distinct**, confirming §8 and §9.1.1. Same-thread advisor activity arrives as a provider echo, sets `bypass_bot` with the interaction timestamp, and suppresses Gu for a **five-minute** window cleared by a scheduled sweep — which also confirms §8.3's point that any user-facing "about six minutes" is an approximation. The off-thread capture writes to its own thread document and its own Mongo array and **contains no occurrence of the bypass field at all**: it is an observation channel with zero control-flow effect. There is additionally a second, coarser `bypass_bot` on the Gu-number record, a per-number kill switch distinct from the per-lead takeover flag; conflating the two would produce a contract that pauses an entire number when it meant to yield one conversation.
+
+**The seam where Gu decides whether to act** is the per-lead branch immediately before the agent is invoked, after a provider-id dedup guard. Available in scope at that point: the full Mongo lead runtime document, the Gu-number record, the ingress envelope with the provider id and the synthetic-flag set, and the composite lead identity. **There is no organization entity in scope** — the tenant boundary is reachable only as the principal's uid via the lead, or via the bot number. This is the C2 insertion point, and that missing organization entity is why C2's request must carry refs the resolver maps rather than an organization claim.
+
+**Per-message delivery status is thinner than the C6 type implies.** Message records carry no delivery-status field. Failures are written back into the Firestore conversation entry as a status and an error code, per §15.7. But `sent`/`delivered`/`read` transitions exist **only** in a separate Mongo billing-observation collection keyed by provider id, which no conversational logic reads. So of the C6 delivery-status vocabulary, `failed` is available from the allowlisted conversation path and `delivered`/`read` are **not obtainable from it at all** — a C6 endpoint that must expose them has to read the billing collection, and that is a deliberate scope decision rather than a detail.
+
+## 24.7 Existing durability and transaction primitives
+
+**There is no durable integration-event, outbox or event-log mechanism anywhere in `ungga-full`.** No collection of pending events with delivery state and attempts. This is a genuinely new primitive for C1, not an adaptation of an existing one.
+
+The closest patterns the codebase already trusts, in descending order of durability: **Pub/Sub with dead-letter topics**, which is the load-bearing retry mechanism; a narrow **template-retry queue** in Mongo, upserted by provider id, which is the one real application-level retry queue and the idiom a new outbox should feel like; and a **processed-message ledger** keyed by provider id, which is the existing precedent for at-ingress idempotency.
+
+Two caveats make Pub/Sub insufficient on its own, and both are load-bearing for [ADR-112](../../../adr/ADR-112-cross-repo-integration-events.md) §6: the two main consumers **acknowledge the message before performing the work** (they spawn a thread and return), so redelivery does not cover application failure after the ack; and one of the two dead-letter topics has **no subscription**, so messages exhausting delivery there are lost without trace. **Pub/Sub alone therefore does not eliminate the mutation-to-publish window** — it is a delivery leg, usable after a durable record exists.
+
+**Transaction capability differs by store, and this is the constraint that shapes C1's atomicity.**
+
+| Store | Multi-document transaction | Evidence |
+|---|---|---|
+| Firestore | **Available and demonstrated** | a working `runTransaction` read-then-conditional-write lease pattern exists in the repository |
+| Mongo (TypeScript) | **Not possible** | all TS access goes through the Atlas **Data API** over HTTP, which is stateless and cannot join a session |
+| Mongo (Python) | **Not demonstrated** | PyMongo could open a session, but no session or transaction usage exists anywhere in the repository |
+
+So a business-write-plus-event-write **can** be made atomic on the Firestore-oriented assignment paths and **cannot** be, today, on the Mongo-oriented appointment paths. ADR-112 §7 states that asymmetry rather than averaging it into a single claim.
+
+## 24.8 `ungga-landing` is a privileged writer, not a front end
+
+**This is the finding that most changes the shape of the cross-repo work, and it corrects an assumption rather than the audit.** §9 already recorded that `ungga-landing` sends WhatsApp messages and synthesizes a webhook, and §4.1/§16 recorded it as the authentication and authorization surface. §24 establishes the wider scope: it is a server-rendered application with roughly 127 API route handlers and **privileged direct access to both systems of record** — the Firestore Admin SDK, so security rules do not apply to it, and a direct Mongo client.
+
+It directly mutates state all three contracts care about:
+
+- **the organization's lead-assignment policy** — the configured strategy, the guardia roster and the carrusel ordering, written straight to the principal's Firestore documents;
+- **property→advisor assignment**, which *is* lead routing under the property-driven strategy;
+- **appointments** — confirmation and reschedule, written directly to the canonical Mongo collection;
+- **bot-reply authority** — the pause flags on the Gu-number record in both stores, per-lead blacklisting, and `bypass_bot` stamped onto the conversation turn it writes;
+- **manual lead assignment**, by permission-gated proxy to the `ungga-full` assignment endpoint.
+
+It does **not** create leads; lead origination from the public portal is a WhatsApp deep link, and the backend creates the lead. It has **no** event-emission infrastructure of any kind.
+
+Two incidental observations, recorded because they bear on §16's standing authorization risks rather than on the contracts: several internal admin routes mutate business state, and staff impersonation permits writes to everything except billing paths, despite an in-code comment asserting it is read-only. **Neither is in scope for C1/C2/C6 and neither is repaired by them**; they belong to the §16 risk set.
+
+## 24.9 Deployment and secret topology
+
+Ten separately deployed runtimes in `ungga-full` (nine Cloud Run services plus one Cloud Function), each with its own build and workflow; `ungga-landing` deploys separately on Firebase App Hosting. The ingress component runs in a different region from everything else.
+
+Secrets reach the three estates by **three different mechanisms**: `ungga-full` resolves them at build time from a secrets manager into an environment file and ships them as Cloud Run environment variables, with service-account JSON written into the build context — so **secrets are baked into revisions and rotation requires a redeploy**; `ungga-landing` maps environment variables to Secret Manager references; Gu OS uses CI environment secrets plus encrypted database rows for the legacy read credentials. This is recorded for one reason only: [ADR-111](../../../adr/ADR-111-legacy-service-auth-v1.md) requires two key ids to be valid concurrently, and build-time baking is why overlapping validity is a necessity rather than a convenience.
+
+**No secret values were read or recorded.** Only mechanisms and variable names.
+
+## 24.10 Classification and conclusion
+
+| Audited contract | Classification after §24 |
+|---|---|
+| §6 organization ownership vs sticky assignment | **VALID WITH MATERIAL EXTENSION** — `/guard-lead-one` is current and sticky, but is one of thirteen writers; no common emission seam; no assignment history; previous assignee usually unreconstructable (§24.4) |
+| §7 inbound identity, provider IDs, queue routing | **VALID WITH CLARIFICATION** — the provider id is available at ingress but not persisted there, and appears under four field names, absent from Gu-written Firestore conversation entries (§24.6) |
+| §8 / §9.1.1 same-thread takeover vs off-thread evidence | **STILL VALID (reinforced)** — five-minute window confirmed; off-thread capture contains no bypass write at all; a second per-number kill switch distinguished (§24.6) |
+| §10.1 multi-thread conversation persistence | **STILL VALID** — thread distinction confirmed; delivery-status availability narrowed (§24.6) |
+| §11.2 / §11.3 appointment partial persistence, Calendar orphan risk | **STILL VALID (sharpened)** — Mongo primary, nine of fourteen writers Mongo-only, Firestore optional on update paths, cancellation asymmetric; `google_event_id` in **both** stores (§24.3) |
+| §14 property Firestore-original / Mongo-serving | **STILL VALID** — untouched by this pass |
+| §15.7 delivery-status writeback | **VALID WITH CLARIFICATION** — failure writeback confirmed; `delivered`/`read` exist only in a billing-observation collection (§24.6) |
+| §16 authorization risks | **STILL VALID; risk set extended** — admin-surface mutations and write-capable staff impersonation (§24.8) |
+| §18 source-of-record matrix | **VALID WITH TRANSITIONAL PRECEDENCE ADDED** — appointment and lead precedence stated explicitly; BigQuery reaffirmed analytical-only (§24.2) |
+| §21 open question: appointment read precedence when stores disagree | **STILL OPEN** — narrowed by §24.3 but not answered; C1/C6 keep divergence visible rather than resolving it |
+| — Durable publication primitives | **NEW FINDING** — no outbox exists; Pub/Sub acks before work; atomicity available in Firestore, not in Mongo (§24.7) |
+| — `ungga-landing` scope | **NEW FINDING** — a privileged writer of assignment policy, appointments and bot authority (§24.8) |
+
+> **§24 does not contradict S1–S4, does not reopen AC-1 through AC-10, and does not reopen ADR-106 through ADR-110.** It contradicts exactly one thing, and that thing is on the Gu OS side: the C6 appointment contract's claim that Calendar effect evidence is Firestore-only, now repaired. Everything else is additive precision. Three findings change what the cross-repo contracts can promise rather than what they mean — the absence of any durable publication primitive, the store-dependent limit on atomicity, and the absence of a common assignment emission seam — and all three are carried into [ADR-111](../../../adr/ADR-111-legacy-service-auth-v1.md) and [ADR-112](../../../adr/ADR-112-cross-repo-integration-events.md) as stated constraints rather than smoothed over. **The precedence recorded in §24.2 is transitional throughout: it describes where truth currently lives in a system Gu OS is migrating from, and it must not be read as a durable Gu OS invariant.**

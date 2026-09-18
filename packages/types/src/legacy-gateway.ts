@@ -219,8 +219,10 @@ export interface LegacyAppointmentView {
   createdAt: string | null;
   finished: boolean | null;
   /**
-   * Present only in the Firestore replica. Non-null means an external Calendar
-   * effect exists, which is the orphan risk audit 11.4 describes.
+   * Non-null means an external Calendar effect exists, which is the orphan risk
+   * audit 11.4 describes. Written by the legacy appointment creators to BOTH
+   * stores, so it is read from both: treating it as Firestore-only blinded the
+   * orphan check on the store that is actually canonical (audit 24.3).
    */
   googleEventId: string | null;
 }

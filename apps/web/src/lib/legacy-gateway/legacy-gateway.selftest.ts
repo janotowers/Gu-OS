@@ -379,8 +379,12 @@ async function testAppointments(): Promise<void> {
   assert.equal(firestoreOnly.storesDisagree, false);
   assert.ok(firestoreOnly.disagreements[0].includes("present only in firestore"));
 
-  // The orphan-Calendar signal survives normalization.
+  // The orphan-Calendar signal survives normalization, from EITHER store. The
+  // legacy creators write `google_event_id` to both, so reading it only from the
+  // Firestore replica went blind to a Calendar effect recorded in the canonical
+  // store - which is the only place it appears when Firestore persistence failed.
   assert.equal(disagreeing.firestore?.googleEventId, "synthetic-calendar-event-1");
+  assert.equal(mongoOnly.mongo?.googleEventId, "synthetic-calendar-event-mongo-only");
 
   // A Mongo outage must not take the capability down; it must say so instead.
   const withoutMongo = await appointmentGet({

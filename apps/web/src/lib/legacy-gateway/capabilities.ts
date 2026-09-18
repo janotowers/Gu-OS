@@ -399,7 +399,7 @@ function mongoAppointmentView(
     rawHour: hour,
     createdAt: normalizeTimestamp(document.data.created_time),
     finished: normalizeBoolean(document.data.finished),
-    googleEventId: null,
+    googleEventId: normalizeString(document.data.google_event_id),
   };
 }
 
