@@ -87,6 +87,7 @@ import {
   evaluateOrganizationLegacyTargetBinding,
   evaluateSafeRawFailureDiagnostic,
   organizationLegacyTargetAllowsCapability,
+  attachEvidenceHygiene,
   evaluateEvidenceHygiene,
   evaluateEvidencePins,
   evaluateFailSafePersistAdmission,
@@ -904,6 +905,7 @@ async function runEvidenceHosted(params: {
   });
   const hygiene = evaluateEvidenceHygiene(evidence);
   record("hygiene", "durable evidence omits prohibited raw data", hygiene.ok, hygiene.reason);
+  attachEvidenceHygiene(evidence, hygiene);
   if (params.jsonPath) {
     writeFileSync(params.jsonPath, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
     console.log(`\nwrote ${params.jsonPath}`);

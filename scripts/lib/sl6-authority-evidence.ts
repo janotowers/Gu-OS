@@ -1622,6 +1622,78 @@ export function evaluateEvidenceHygiene(value: unknown): {
   return { ok: true, reason: "durable evidence omits prohibited raw data" };
 }
 
+export function computeAssertionCounts(results: readonly Sl6Check[]): {
+  passed: number;
+  failed: number;
+  total: number;
+} {
+  const passed = results.filter((check) => check.ok).length;
+  const failed = results.filter((check) => !check.ok).length;
+  return {
+    passed,
+    failed,
+    total: results.length,
+  };
+}
+
+export function evaluateAssertionCountCoherence(assertions: {
+  passed: number;
+  failed: number;
+  total: number;
+  results: readonly Sl6Check[];
+}): { ok: boolean; reason: string } {
+  const counted = computeAssertionCounts(assertions.results);
+  if (assertions.results.length !== assertions.total) {
+    return {
+      ok: false,
+      reason: `assertion results.length (${assertions.results.length}) !== total (${assertions.total})`,
+    };
+  }
+  if (assertions.passed + assertions.failed !== assertions.total) {
+    return {
+      ok: false,
+      reason: `assertion passed (${assertions.passed}) + failed (${assertions.failed}) !== total (${assertions.total})`,
+    };
+  }
+  if (
+    assertions.passed !== counted.passed ||
+    assertions.failed !== counted.failed ||
+    assertions.total !== counted.total
+  ) {
+    return {
+      ok: false,
+      reason: "assertion counters do not match the serialized results",
+    };
+  }
+  return {
+    ok: true,
+    reason: "assertion counters match the serialized results",
+  };
+}
+
+export function finalizeAssertionCounts(
+  evidence: Sl6DurableEvidence
+): Sl6DurableEvidence {
+  const counted = computeAssertionCounts(evidence.assertions.results);
+  evidence.assertions.passed = counted.passed;
+  evidence.assertions.failed = counted.failed;
+  evidence.assertions.total = counted.total;
+  return evidence;
+}
+
+export function attachEvidenceHygiene(
+  evidence: Sl6DurableEvidence,
+  hygiene: { ok: boolean; reason: string }
+): Sl6DurableEvidence {
+  evidence.assertions.results.push({
+    assertion: "hygiene",
+    label: "durable evidence omits prohibited raw data",
+    ok: hygiene.ok,
+    detail: hygiene.reason,
+  });
+  return finalizeAssertionCounts(evidence);
+}
+
 export function buildDurableEvidence(input: {
   ranAt: string;
   productSha: string;
@@ -1653,7 +1725,8 @@ export function buildDurableEvidence(input: {
     executionCompleted: input.executionCompleted,
     items,
   });
-  const passed = input.checks.filter((check) => check.ok).length;
+  const results = input.checks.slice();
+  const counted = computeAssertionCounts(results);
   return {
     slice: SL6_SLICE,
     releaseScope: SL6_RELEASE_SCOPE,
@@ -1681,10 +1754,10 @@ export function buildDurableEvidence(input: {
       c2EndpointInvoked: false,
     },
     assertions: {
-      passed,
-      failed: input.checks.length - passed,
-      total: input.checks.length,
-      results: input.checks,
+      passed: counted.passed,
+      failed: counted.failed,
+      total: counted.total,
+      results,
     },
     rs2: {
       executionCompleted: overall.executionCompleted,

@@ -1,0 +1,114 @@
+{
+  "slice": "SL-6",
+  "releaseScope": "RS-2",
+  "ranAt": "2026-09-19T14:57:41.631Z",
+  "productSha": "12ed79ec05f5228a243695a026889f28e18280af",
+  "productShaProvenance": "SUPPORTED_BY_DELIVERY_WORKFLOW_NOT_MECHANICALLY_PINNED",
+  "productShaDeliveryWorkflow": "35385218918",
+  "verifierSha": "f577a1111146241bab698b26d24efb271cca2f33",
+  "guOsEnvironment": "staging",
+  "projectRef": "wdtjqlbsxwiijasicint",
+  "legacyEnvironment": "stage",
+  "frozenConversationSetDigest": "sha256:030c803d3f858b80",
+  "conversations": [
+    {
+      "organizationDigest": "sha256:eab41f21d4c319b6",
+      "caseDigest": "sha256:e0207649dd597c74",
+      "leadDigest": "sha256:29ee6eeedebe3f5f",
+      "bindingDigest": "sha256:88a380572b11de43",
+      "productVerdict": "unknown",
+      "oracleVerdict": null,
+      "oracleReason": "lead_takeover_not_boolean",
+      "agreed": true,
+      "takeoverHumanActiveObserved": false,
+      "unknownOrConflictingObserved": true,
+      "persistenceAdmitted": true,
+      "persistenceExercised": true,
+      "portfolioMustSurfaceAuthorityConflict": true,
+      "sourcePath": "gu2.users",
+      "adapter": "bootstrap_direct"
+    }
+  ],
+  "sourcePlacement": {
+    "configuredAllowlist": [
+      "gu2.users",
+      "gu2.gunumbers"
+    ],
+    "comparisonPaths": [
+      "bot.users"
+    ],
+    "observedPlacement": null,
+    "conclusion": "not_concluded"
+  },
+  "containment": {
+    "traditionalGuWrites": {
+      "value": 0,
+      "basis": "structural"
+    },
+    "traditionalGuWriteClientsOpened": {
+      "value": 0,
+      "basis": "structural"
+    },
+    "runtimeAuthorityMutated": false,
+    "enforcementInvoked": false,
+    "c2EndpointInvoked": false
+  },
+  "assertions": {
+    "passed": 3,
+    "failed": 0,
+    "total": 3,
+    "results": [
+      {
+        "assertion": "legacy-target",
+        "label": "Organization-scoped Firestore identity matches the declared legacy environment",
+        "ok": true,
+        "detail": "Organization Firestore project matches the declared legacy environment"
+      },
+      {
+        "assertion": "placement",
+        "label": "configured allowlist recorded; placement is not concluded until a confirming observation",
+        "ok": true,
+        "detail": "configured allowlist and observed placement are recorded separately; gu2.users is not concluded as correct before a confirming capability read"
+      },
+      {
+        "assertion": "SA-6.11",
+        "label": "runtime_authority is unchanged for the frozen member",
+        "ok": true,
+        "detail": "before=legacy after=legacy"
+      },
+      {
+        "assertion": "hygiene",
+        "label": "durable evidence omits prohibited raw data",
+        "ok": true,
+        "detail": "durable evidence omits prohibited raw data"
+      }
+    ]
+  },
+  "rs2": {
+    "executionCompleted": true,
+    "items": [
+      {
+        "id": "rs2_1_named_equivalence",
+        "status": "SATISFIED",
+        "detail": "named-conversation equivalence records exist (agreement or recorded divergence)"
+      },
+      {
+        "id": "rs2_2_takeover_variation",
+        "status": "CONDITIONED_UNAVAILABLE",
+        "detail": "no takeover/human_active variation observed; all-agreement must not be overstated"
+      },
+      {
+        "id": "rs2_3_unknown_conflicting",
+        "status": "SATISFIED",
+        "detail": "a real unknown/conflicting result persisted and surfaced through authority_conflict"
+      },
+      {
+        "id": "rs2_4_containment",
+        "status": "SATISFIED",
+        "detail": "hosted containment holds (no Traditional Gu write; runtime_authority unchanged; no enforcement)"
+      }
+    ],
+    "requiredRs2FullySatisfied": true,
+    "sliceDoneClaim": "not_claimed"
+  }
+}

@@ -17,11 +17,13 @@ import {
   SL6_PRODUCT_SHA_DELIVERY_WORKFLOW,
   SL6_PRODUCT_SHA_PROVENANCE,
   SL6_STAGING_PROJECT_REF,
+  attachEvidenceHygiene,
   bindingIdentityDigest,
   buildDiscoveryReport,
   buildDurableEvidence,
   DISCOVERY_INVENTORY_BANNER,
   DISCOVERY_NOT_RS2_BANNER,
+  evaluateAssertionCountCoherence,
   evaluateBindingDiscovery,
   evaluateBoundedPlacementProbeObservation,
   evaluateCapabilityBookkeepingState,
@@ -30,6 +32,7 @@ import {
   evaluateOrganizationLegacyTargetBinding,
   evaluateSafeRawFailureDiagnostic,
   evaluateEvidencePins,
+  finalizeAssertionCounts,
   evaluateFailSafePersistAdmission,
   evaluateFrozenMemberPins,
   evaluateGenuineFailSafeCandidate,
@@ -521,6 +524,111 @@ function testHygieneAndArtifact(): void {
   assert.equal(evidence.containment.traditionalGuWrites.basis, "structural");
   assert.equal(evaluateEvidenceHygiene({ password: "secret" }).ok, false);
   console.log("  ok  hygiene: durable evidence uses digests and omits prohibited raw data");
+}
+
+function fixtureEvidenceChecks(checks: Parameters<typeof buildDurableEvidence>[0]["checks"]) {
+  return buildDurableEvidence({
+    ranAt: "2026-09-19T14:00:00.000Z",
+    productSha: SL6_EXPECTED_STAGING_PRODUCT_SHA,
+    verifierSha: VERIFIER_SHA,
+    guOsEnvironment: SL6_HOSTED_ENVIRONMENT,
+    projectRef: SL6_STAGING_PROJECT_REF,
+    legacyEnvironment: "stage",
+    frozenConversationSetDigest: frozenConversationSetDigest(frozenSet().members),
+    conversations: [
+      {
+        organizationDigest: evidenceDigest(ORG),
+        caseDigest: evidenceDigest(CASE_A),
+        leadDigest: evidenceDigest(LEAD_A),
+        bindingDigest: member(CASE_A, LEAD_A).expectedBindingDigest,
+        productVerdict: "unknown",
+        oracleVerdict: null,
+        oracleReason: "lead_takeover_not_boolean",
+        agreed: true,
+        takeoverHumanActiveObserved: false,
+        unknownOrConflictingObserved: true,
+        persistenceAdmitted: true,
+        persistenceExercised: true,
+        portfolioMustSurfaceAuthorityConflict: true,
+        sourcePath: "gu2.users",
+        adapter: "bootstrap_direct",
+      },
+    ],
+    observedPlacement: null,
+    runtimeAuthorityMutated: false,
+    checks,
+    executionCompleted: true,
+    namedEquivalenceRecords: 1,
+    unexplainedMissingEquivalence: false,
+    takeoverHumanActiveObserved: false,
+    unknownOrConflictingPersistedAndSurfaced: true,
+  });
+}
+
+function testAssertionCountCoherence(): void {
+  const priorChecks = [
+    { assertion: "legacy-target", label: "legacy target bound", ok: true },
+    {
+      assertion: "placement",
+      label: "configured allowlist recorded; placement is not concluded",
+      ok: true,
+    },
+    { assertion: "SA-6.11", label: "runtime_authority is unchanged", ok: true },
+  ];
+
+  // Historical defect: counters were computed, then hygiene was appended to the
+  // same results array. That serialized four passing rows with passed/total = 3.
+  const historicalStale = {
+    passed: 3,
+    failed: 0,
+    total: 3,
+    results: [
+      ...priorChecks,
+      {
+        assertion: "hygiene",
+        label: "durable evidence omits prohibited raw data",
+        ok: true,
+        detail: "durable evidence omits prohibited raw data",
+      },
+    ],
+  };
+  assert.equal(historicalStale.results.length, 4);
+  assert.equal(historicalStale.total, 3);
+  assert.equal(evaluateAssertionCountCoherence(historicalStale).ok, false);
+
+  const evidence = fixtureEvidenceChecks(priorChecks);
+  const hygiene = evaluateEvidenceHygiene(evidence);
+  assert.equal(hygiene.ok, true);
+  attachEvidenceHygiene(evidence, hygiene);
+
+  assert.equal(
+    evidence.assertions.results.some((result) => result.assertion === "hygiene"),
+    true
+  );
+  assert.equal(evidence.assertions.results.length, evidence.assertions.total);
+  assert.equal(
+    evidence.assertions.passed + evidence.assertions.failed,
+    evidence.assertions.total
+  );
+  assert.equal(evidence.assertions.failed, 0);
+  assert.equal(evidence.assertions.passed, evidence.assertions.total);
+  assert.equal(evidence.assertions.total, 4);
+  assert.equal(evaluateAssertionCountCoherence(evidence.assertions).ok, true);
+
+  const repaired = finalizeAssertionCounts({
+    ...evidence,
+    assertions: {
+      passed: 3,
+      failed: 0,
+      total: 3,
+      results: evidence.assertions.results.slice(),
+    },
+  });
+  assert.equal(evaluateAssertionCountCoherence(repaired.assertions).ok, true);
+  assert.equal(repaired.assertions.total, repaired.assertions.results.length);
+  console.log(
+    "  ok  assertion counts: hygiene included and counters match results after seal"
+  );
 }
 
 function testProvenance(): void {
@@ -1409,6 +1517,7 @@ function main(): void {
   testPortfolioReadback();
   testRs2Semantics();
   testHygieneAndArtifact();
+  testAssertionCountCoherence();
   testProvenance();
   testHostedSafetyGate();
   testSourceContractsAndBinding();
