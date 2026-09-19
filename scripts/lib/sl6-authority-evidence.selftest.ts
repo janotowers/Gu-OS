@@ -18,13 +18,22 @@ import {
   SL6_PRODUCT_SHA_PROVENANCE,
   SL6_STAGING_PROJECT_REF,
   bindingIdentityDigest,
+  buildDiscoveryReport,
   buildDurableEvidence,
+  DISCOVERY_INVENTORY_BANNER,
+  DISCOVERY_NOT_RS2_BANNER,
+  evaluateBindingDiscovery,
+  evaluateBoundedPlacementProbeObservation,
+  evaluateDiscoveryHygiene,
   evaluateEvidenceHygiene,
   evaluateEvidencePins,
   evaluateFailSafePersistAdmission,
   evaluateFrozenMemberPins,
+  evaluateGenuineFailSafeCandidate,
+  evaluateGovernedAdmissionObservation,
   evaluateIndependentEquivalence,
   evaluateOracleIndependenceSources,
+  evaluatePlacementProbeAdmission,
   evaluatePortfolioAuthorityConflictReadback,
   evaluateProductShaProvenance,
   evaluateRequiredRs2Satisfaction,
@@ -43,6 +52,7 @@ import {
   type FrozenConversationMember,
   type PersistAdmissionInput,
   type ProductAuthorityObservation,
+  type Sl6DiscoveryCandidateReport,
 } from "./sl6-authority-evidence";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -221,6 +231,9 @@ function testPhaseSafety(): void {
 
   const mixed = parseSl6AuthorityArgs(evidenceArgv(["--case-id", CASE_A]));
   assert.equal(mixed.ok, false);
+  const discoverJson = parseSl6AuthorityArgs(discoverArgv(["--json", "out.json"]));
+  assert.equal(discoverJson.ok, false);
+  assert.match(discoverJson.reason, /not RS-2 evidence/);
   console.log("  ok  phase safety: discover cannot persist; evidence requires frozen set; auto-select refused");
 }
 
@@ -660,7 +673,12 @@ function testSourceContractsAndBinding(): void {
   );
   assert.equal(/attachExternalConversationBinding\s*\(/.test(runnerSource), false);
   assert.equal(/backfillAdmittedLegacyLeadIdentity\s*\(/.test(runnerSource), false);
+  assert.equal(/recordAuthorityResolutionObservation\s*\(/.test(runnerSource), false);
   assert.equal(SL6_CANONICAL_BINDING_HELPER, "backfillAdmittedLegacyLeadIdentity");
+  assert.match(runnerSource, /prepareGatewayProcessEnv/);
+  assert.match(runnerSource, /evaluatePlacementProbeAdmission/);
+  assert.match(runnerSource, /openHostedLegacyTargetAfterProbeAdmission/);
+  assert.match(runnerSource, /not RS-2 evidence/);
   console.log("  ok  source contracts: oracle independence, gated clients, no second attach caller");
 }
 
@@ -670,6 +688,30 @@ function testPlacementAndTree(): void {
   assert.deepEqual(placement.configuredAllowlist, ["gu2.users", "gu2.gunumbers"]);
   assert.deepEqual(placement.comparisonPaths, ["bot.users"]);
   assert.equal(
+    evaluateSourcePlacementObservation({
+      observedPlacement: ["gu2.users"],
+    }).conclusion,
+    "not_concluded"
+  );
+  const confirmed = evaluateSourcePlacementObservation({
+    observedPlacement: null,
+    capabilitySucceeded: true,
+    fieldContributions: [{ field: "leadTakeoverActive", sourcePath: "gu2.users" }],
+  });
+  assert.equal(confirmed.conclusion, "confirmed");
+  const mismatch = evaluateSourcePlacementObservation({
+    observedPlacement: null,
+    capabilitySucceeded: true,
+    fieldContributions: [{ field: "leadTakeoverActive", sourcePath: "bot.users" }],
+  });
+  assert.equal(mismatch.conclusion, "mismatch");
+  const missingField = evaluateSourcePlacementObservation({
+    observedPlacement: ["gu2.users"],
+    capabilitySucceeded: true,
+    fieldContributions: [],
+  });
+  assert.equal(missingField.conclusion, "not_concluded");
+  assert.equal(
     evaluateTrackedTreeMatchesHead({ unstagedStatus: 1, stagedStatus: 0 }).ok,
     false
   );
@@ -677,7 +719,272 @@ function testPlacementAndTree(): void {
     evaluateTrackedTreeMatchesHead({ unstagedStatus: 0, stagedStatus: 0 }).ok,
     true
   );
-  console.log("  ok  placement is not concluded before discovery; dirty tree fails the guard");
+  console.log("  ok  placement: capability provenance confirms, mismatch, or stays not_concluded");
+}
+
+function admittedObservation(
+  overrides: Partial<Parameters<typeof evaluateGovernedAdmissionObservation>[0]> = {}
+) {
+  return evaluateGovernedAdmissionObservation({
+    caseFound: true,
+    caseInOrganization: true,
+    caseId: CASE_A,
+    caseType: "lead_opportunity",
+    contextLegacyLeadId: LEAD_A,
+    contextSourceEventId: "source-event-synthetic",
+    sourceEventFound: true,
+    sourceSystem: "traditional_gu",
+    sourceEventStatus: "completed",
+    disposition: "admitted",
+    admittedCaseId: CASE_A,
+    externalLeadRef: LEAD_A,
+    ...overrides,
+  });
+}
+
+function boundRow() {
+  return {
+    provider: "whatsapp_business",
+    threadKind: "gu",
+    status: "active",
+    organizationId: ORG,
+    caseId: CASE_A,
+    opaqueLeadRef: LEAD_A,
+  };
+}
+
+function testAdmissionAndBinding(): void {
+  const admitted = admittedObservation();
+  assert.equal(admitted.classification, "admitted");
+  assert.equal(admitted.admittedEligible, true);
+
+  assert.equal(admittedObservation({ caseFound: false }).classification, "missing");
+  assert.equal(
+    admittedObservation({ caseInOrganization: false }).classification,
+    "invalid"
+  );
+  const notAdmitted = admittedObservation({ disposition: "rejected" });
+  assert.equal(notAdmitted.classification, "not_admitted");
+  assert.equal(notAdmitted.admittedEligible, false);
+
+  const bound = evaluateBindingDiscovery({
+    admittedEligible: true,
+    bindings: [boundRow()],
+  });
+  assert.equal(bound.bound, true);
+  assert.equal(bound.t7_3Candidate, false);
+
+  const unbound = evaluateBindingDiscovery({
+    admittedEligible: true,
+    bindings: [],
+  });
+  assert.equal(unbound.bound, false);
+  assert.equal(unbound.t7_3Candidate, true);
+  assert.equal(
+    evaluateGenuineFailSafeCandidate({
+      bindingPresent: false,
+      bound: false,
+      legacyReadSucceeded: false,
+      productVerdict: "conflicting",
+    }).genuineUnknownOrConflictingCandidate,
+    false
+  );
+
+  const notAdmittedUnbound = evaluateBindingDiscovery({
+    admittedEligible: false,
+    bindings: [],
+  });
+  assert.equal(notAdmittedUnbound.t7_3Candidate, false);
+  console.log("  ok  admission/binding: admitted+bound is discoverable; unbound is T7-3 and not RS-2 #3");
+}
+
+function testDiscoveryClassification(): void {
+  const agreement = evaluateIndependentEquivalence({
+    id: "agreement",
+    product: product(),
+    oracleInputs: {
+      leadTakeoverActive: false,
+      lastOwnerInteractionAt: null,
+      numberKillSwitchActive: false,
+      observedAt: "2026-09-18T12:00:00.000Z",
+    },
+  });
+  assert.equal(agreement.equivalence.agreed, true);
+  assert.equal(agreement.oracle.humanActive, false);
+
+  const takeover = evaluateIndependentEquivalence({
+    id: "takeover",
+    product: product({
+      conversationAuthority: "human_active",
+      humanActive: true,
+    }),
+    oracleInputs: {
+      leadTakeoverActive: true,
+      lastOwnerInteractionAt: "2026-09-18T11:58:00.000Z",
+      numberKillSwitchActive: null,
+      observedAt: "2026-09-18T12:00:00.000Z",
+    },
+  });
+  assert.equal(takeover.oracle.humanActive, true);
+  assert.equal(takeover.equivalence.agreed, true);
+
+  const unknown = evaluateGenuineFailSafeCandidate({
+    bindingPresent: true,
+    bound: true,
+    legacyReadSucceeded: true,
+    productVerdict: "unknown",
+  });
+  assert.equal(unknown.genuineUnknownOrConflictingCandidate, true);
+  const conflicting = evaluateGenuineFailSafeCandidate({
+    bindingPresent: true,
+    bound: true,
+    legacyReadSucceeded: true,
+    productVerdict: "conflicting",
+  });
+  assert.equal(conflicting.genuineUnknownOrConflictingCandidate, true);
+  assert.equal(
+    evaluateGenuineFailSafeCandidate({
+      bindingPresent: true,
+      bound: true,
+      legacyReadSucceeded: false,
+      productVerdict: "unknown",
+    }).genuineUnknownOrConflictingCandidate,
+    false
+  );
+  console.log("  ok  discovery classification: agreement, takeover, genuine fail-safe, failed-read exclusion");
+}
+
+function happyProbeAdmission(
+  overrides: Partial<Parameters<typeof evaluatePlacementProbeAdmission>[0]> = {}
+) {
+  return evaluatePlacementProbeAdmission({
+    phase: "discover",
+    safetyGateOk: true,
+    targetName: SL6_HOSTED_ENVIRONMENT,
+    targetProjectRef: SL6_STAGING_PROJECT_REF,
+    legacyEnv: "stage",
+    organizationId: ORG,
+    namedCaseCount: 1,
+    trackedTreeMatchesHead: true,
+    verifierShaOk: true,
+    capabilityAttempted: true,
+    placementConclusion: "not_concluded",
+    capabilityFailureKind: "not_found",
+    readOnly: true,
+    ...overrides,
+  });
+}
+
+function testPlacementProbeGate(): void {
+  assert.equal(happyProbeAdmission().admitted, true);
+  assert.equal(happyProbeAdmission({ capabilityAttempted: false }).admitted, false);
+  assert.equal(happyProbeAdmission({ legacyEnv: null }).admitted, false);
+  assert.equal(happyProbeAdmission({ legacyEnv: "prod" }).admitted, false);
+  assert.equal(happyProbeAdmission({ namedCaseCount: 0 }).admitted, false);
+  assert.equal(happyProbeAdmission({ trackedTreeMatchesHead: false }).admitted, false);
+  assert.equal(happyProbeAdmission({ verifierShaOk: false }).admitted, false);
+  assert.equal(happyProbeAdmission({ phase: "evidence" }).admitted, false);
+  assert.equal(
+    happyProbeAdmission({ placementConclusion: "confirmed" }).admitted,
+    false
+  );
+  assert.equal(
+    happyProbeAdmission({ capabilityFailureKind: "no_usable_credential" }).admitted,
+    false
+  );
+  assert.equal(
+    happyProbeAdmission({ capabilityFailureKind: "missing_binding" }).admitted,
+    false
+  );
+
+  const configured = evaluateBoundedPlacementProbeObservation({
+    paths: [
+      {
+        path: "gu2.users",
+        collectionExists: true,
+        namedLeadExists: true,
+        takeoverFieldPresent: true,
+        lastOwnerFieldPresent: true,
+        boundedCount: 1,
+      },
+      {
+        path: "bot.users",
+        collectionExists: true,
+        namedLeadExists: false,
+        takeoverFieldPresent: false,
+        lastOwnerFieldPresent: false,
+        boundedCount: 0,
+      },
+    ],
+  });
+  assert.equal(configured.conclusion, "confirmed");
+  const comparisonOnly = evaluateBoundedPlacementProbeObservation({
+    paths: [
+      {
+        path: "gu2.users",
+        collectionExists: true,
+        namedLeadExists: false,
+        takeoverFieldPresent: false,
+        lastOwnerFieldPresent: false,
+        boundedCount: 0,
+      },
+      {
+        path: "bot.users",
+        collectionExists: true,
+        namedLeadExists: true,
+        takeoverFieldPresent: true,
+        lastOwnerFieldPresent: true,
+        boundedCount: 1,
+      },
+    ],
+  });
+  assert.equal(comparisonOnly.conclusion, "mismatch");
+  console.log("  ok  placement-probe gate: capability-first, stage-only, named Cases, clean tree; no auto-correction");
+}
+
+function discoveryCandidate(
+  overrides: Partial<Sl6DiscoveryCandidateReport> = {}
+): Sl6DiscoveryCandidateReport {
+  return {
+    caseDigest: evidenceDigest(CASE_A),
+    leadDigest: evidenceDigest(LEAD_A),
+    bindingDigest: bindingIdentityDigest(boundRow()),
+    admittedEligible: true,
+    admissionClassification: "admitted",
+    bindingPresent: true,
+    t73Candidate: false,
+    legacyReadSucceeded: true,
+    legacyReadFailureKind: null,
+    placementConclusion: "confirmed",
+    placementReason: "capability provenance confirms the configured takeover source",
+    takeoverHumanActiveObserved: false,
+    killSwitchObserved: false,
+    productOutcome: "gu",
+    oracleOutcome: false,
+    oracleReason: "legacy_bypass_bot_false",
+    agreed: true,
+    genuineUnknownOrConflictingCandidate: false,
+    incidentalCredentialUsageBookkeepingPossible: true,
+    ...overrides,
+  };
+}
+
+function testDiscoveryOutputHygiene(): void {
+  const report = buildDiscoveryReport([discoveryCandidate()]);
+  assert.deepEqual(report.banners, [DISCOVERY_INVENTORY_BANNER, DISCOVERY_NOT_RS2_BANNER]);
+  assert.equal(report.inventoryEqualsSelection, false);
+  assert.equal(report.notRs2Evidence, true);
+  assert.equal(report.rs2ItemsSatisfied.length, 0);
+  assert.equal(report.sliceDoneClaim, "not_claimed");
+  const hygiene = evaluateDiscoveryHygiene(report);
+  assert.equal(hygiene.ok, true);
+  const serialized = JSON.stringify(report);
+  assert.equal(serialized.includes(LEAD_A), false);
+  assert.equal(serialized.includes(CASE_A), false);
+  assert.equal(serialized.includes("inventory != selection"), true);
+  assert.equal(serialized.includes("not RS-2 evidence"), true);
+  assert.equal(serialized.includes("password"), false);
+  console.log("  ok  discovery output: digest-oriented, inventory != selection, not RS-2 evidence");
 }
 
 function testHostedLeakageSurface(): void {
@@ -706,6 +1013,10 @@ function main(): void {
   testHostedSafetyGate();
   testSourceContractsAndBinding();
   testPlacementAndTree();
+  testAdmissionAndBinding();
+  testDiscoveryClassification();
+  testPlacementProbeGate();
+  testDiscoveryOutputHygiene();
   testHostedLeakageSurface();
   console.log("sl6 authority evidence selftest: ok");
 }

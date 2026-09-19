@@ -3,9 +3,10 @@
  *
  * Two phases, and they are not interchangeable:
  *
- *   --phase discover  inventories operator-named candidates read-only.
- *                     inventory != selection. A candidate is not a final
- *                     evidence member. Discover cannot persist.
+ *   --phase discover  inventories and classifies operator-named candidates
+ *                     read-only. inventory != selection. not RS-2 evidence.
+ *                     A candidate is not a final evidence member.
+ *                     Discover cannot persist, backfill, attach, or freeze.
  *
  *   --phase evidence  evaluates an explicit frozen --conversations-file.
  *                     This runner never auto-selects a Case.
@@ -39,11 +40,13 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import {
   getOperationalCase,
   getOrganizationById,
+  getSourceEventById,
   listAuthorityResolutionsForCases,
   listConversationBindingsForCase,
   type DbClient,
@@ -51,16 +54,17 @@ import {
 import type {
   AuthorityResolution,
   InteractionAuthorityResolution,
-  OperationalCase,
 } from "@agents/types";
 import { resolveInteractionAuthority } from "../apps/web/src/lib/relationship-authority/resolve";
 import { persistFailSafeAuthorityResolution } from "../apps/web/src/lib/relationship-authority/persist";
 import { readLegacyConversationAuthority } from "../apps/web/src/lib/legacy-gateway";
 import type { GatewayCallerContext } from "../apps/web/src/lib/legacy-gateway/authorization";
+import { isLegacyReadRefusal } from "../apps/web/src/lib/legacy-gateway/errors";
 import {
   assertBinding,
   describeTarget,
   parseTargetArgs,
+  resolveEncryptionKeyForTarget,
   resolveTarget,
   type TargetEnv,
 } from "./lib/target-env";
@@ -70,12 +74,21 @@ import {
 } from "./lib/legacy-target";
 import {
   bindingIdentityDigest,
+  buildDiscoveryReport,
   buildDurableEvidence,
+  DISCOVERY_INVENTORY_BANNER,
+  DISCOVERY_NOT_RS2_BANNER,
+  evaluateBindingDiscovery,
+  evaluateBoundedPlacementProbeObservation,
+  evaluateDiscoveryHygiene,
   evaluateEvidenceHygiene,
   evaluateEvidencePins,
   evaluateFailSafePersistAdmission,
   evaluateFrozenMemberPins,
+  evaluateGenuineFailSafeCandidate,
+  evaluateGovernedAdmissionObservation,
   evaluateIndependentEquivalence,
+  evaluatePlacementProbeAdmission,
   evaluatePortfolioAuthorityConflictReadback,
   evaluateProductShaProvenance,
   evaluateSl6HostedSafetyGate,
@@ -85,6 +98,7 @@ import {
   evidenceDigest,
   frozenConversationSetDigest,
   inspectTrackedWorkingTree,
+  opaqueContextId,
   parseFrozenConversationManifest,
   SL6_CANONICAL_BINDING_HELPER,
   SL6_EXPECTED_STAGING_PRODUCT_SHA,
@@ -92,10 +106,13 @@ import {
   SL6_PRODUCT_SHA_DELIVERY_WORKFLOW,
   SL6_PRODUCT_SHA_PROVENANCE,
   SL6_STAGING_PROJECT_REF,
+  type BoundedPlacementPathObservation,
   type FrozenConversationMember,
   type ObservedConversationPins,
   type Sl6Check,
+  type Sl6DiscoveryCandidateReport,
   type Sl6DurableEvidence,
+  type Sl6LegacyReadFailureKind,
 } from "./lib/sl6-authority-evidence";
 
 const checks: Sl6Check[] = [];
@@ -160,6 +177,94 @@ export function openHostedLegacyTarget(argv: string[]): LegacySourceTarget {
     })(),
     requireMongo: true,
   });
+}
+
+function openHostedLegacyTargetAfterProbeAdmission(
+  argv: string[],
+  admission: { admitted: boolean; reason: string }
+): LegacySourceTarget {
+  if (!admission.admitted) {
+    throw new Error(`FAIL CLOSED - placement probe refused: ${admission.reason}`);
+  }
+  return openHostedLegacyTarget(argv);
+}
+
+function prepareGatewayProcessEnv(argv: string[], target: TargetEnv): void {
+  process.env.ENCRYPTION_KEY = resolveEncryptionKeyForTarget(
+    parseTargetArgs(argv).envFile,
+    target.name
+  );
+  process.env.LEGACY_GATEWAY_ENABLED = "true";
+}
+
+function classifyLegacyReadFailure(error: unknown): Sl6LegacyReadFailureKind {
+  if (isLegacyReadRefusal(error)) {
+    if (error.reason === "not_found") return "not_found";
+    if (error.reason === "no_usable_credential") return "no_usable_credential";
+    if (error.reason === "gateway_disabled") return "gateway_disabled";
+    return "capability_failed";
+  }
+  return "other";
+}
+
+async function observeBoundedPlacementProbe(
+  target: LegacySourceTarget,
+  opaqueLeadRef: string
+): Promise<BoundedPlacementPathObservation[]> {
+  if (!target.mongo) {
+    throw new Error("FAIL CLOSED - placement probe requires a configured Mongo identity");
+  }
+  const require_ = createRequire(import.meta.url);
+  const { MongoClient } = require_("mongodb") as typeof import("mongodb");
+  const client = new MongoClient(target.mongo.checkUri ?? target.mongo.uri, {
+    serverSelectionTimeoutMS: 15000,
+  });
+  const specs = [
+    { path: "gu2.users" as const, database: "gu2", collection: "users" },
+    { path: "bot.users" as const, database: "bot", collection: "users" },
+  ];
+  try {
+    await client.connect();
+    const observed: BoundedPlacementPathObservation[] = [];
+    for (const spec of specs) {
+      const db = client.db(spec.database);
+      const named = await db
+        .listCollections({ name: spec.collection }, { nameOnly: true })
+        .toArray();
+      const collectionExists = named.length > 0;
+      let namedLeadExists = false;
+      let takeoverFieldPresent = false;
+      let lastOwnerFieldPresent = false;
+      let boundedCount = 0;
+      if (collectionExists) {
+        const rows = await db
+          .collection(spec.collection)
+          .find({ lead_id: opaqueLeadRef })
+          .project({ bypass_bot: 1, last_owner_interaction_wba: 1 })
+          .limit(2)
+          .toArray();
+        boundedCount = rows.length;
+        namedLeadExists = rows.length > 0;
+        takeoverFieldPresent = rows.some((row) =>
+          Object.prototype.hasOwnProperty.call(row, "bypass_bot")
+        );
+        lastOwnerFieldPresent = rows.some((row) =>
+          Object.prototype.hasOwnProperty.call(row, "last_owner_interaction_wba")
+        );
+      }
+      observed.push({
+        path: spec.path,
+        collectionExists,
+        namedLeadExists,
+        takeoverFieldPresent,
+        lastOwnerFieldPresent,
+        boundedCount,
+      });
+    }
+    return observed;
+  } finally {
+    await client.close();
+  }
 }
 
 function loadFrozenManifest(path: string) {
@@ -358,14 +463,193 @@ async function evaluateOneConversation(params: {
   };
 }
 
+async function classifyDiscoverCandidate(params: {
+  db: DbClient;
+  organizationId: string;
+  caseId: string;
+}): Promise<
+  Sl6DiscoveryCandidateReport & {
+    probeLeadRef: string | null;
+    capabilityAttempted: boolean;
+    capabilityFailureKind: Sl6LegacyReadFailureKind | null;
+  }
+> {
+  const opportunity = await getOperationalCase(params.db, params.caseId);
+  const inOrg = opportunity?.organization_id === params.organizationId;
+  const contextLegacyLeadId = opaqueContextId(opportunity?.context_jsonb, "legacy_lead_id");
+  const contextSourceEventId = opaqueContextId(
+    opportunity?.context_jsonb,
+    "source_event_id"
+  );
+  const sourceEvent =
+    inOrg && contextSourceEventId
+      ? await getSourceEventById(params.db, params.organizationId, contextSourceEventId)
+      : null;
+  const admission = evaluateGovernedAdmissionObservation({
+    caseFound: Boolean(opportunity),
+    caseInOrganization: Boolean(inOrg && opportunity),
+    caseId: opportunity?.id ?? params.caseId,
+    caseType: opportunity?.case_type ?? null,
+    contextLegacyLeadId,
+    contextSourceEventId,
+    sourceEventFound: Boolean(sourceEvent),
+    sourceSystem: sourceEvent?.source_system ?? null,
+    sourceEventStatus: sourceEvent?.status ?? null,
+    disposition:
+      typeof sourceEvent?.decision_jsonb?.disposition === "string"
+        ? sourceEvent.decision_jsonb.disposition
+        : null,
+    admittedCaseId: sourceEvent?.admitted_case_id ?? null,
+    externalLeadRef: sourceEvent?.external_lead_ref ?? null,
+  });
+  const bindingRows = inOrg
+    ? (
+        await listConversationBindingsForCase(params.db, {
+          organizationId: params.organizationId,
+          caseId: params.caseId,
+        })
+      ).map((row) => ({
+        provider: row.provider,
+        threadKind: row.thread_kind,
+        status: row.status,
+        organizationId: row.organization_id,
+        caseId: row.case_id,
+        opaqueLeadRef: row.external_conversation_ref,
+      }))
+    : [];
+  const binding = evaluateBindingDiscovery({
+    admittedEligible: admission.admittedEligible,
+    bindings: bindingRows,
+  });
+
+  let legacyReadSucceeded = false;
+  let legacyReadFailureKind: Sl6LegacyReadFailureKind | null = binding.bound
+    ? null
+    : binding.ambiguous
+      ? "ambiguous_binding"
+      : "missing_binding";
+  let capabilityAttempted = false;
+  let productOutcome: Sl6DiscoveryCandidateReport["productOutcome"] = null;
+  let oracleOutcome: boolean | null = null;
+  let oracleReason: string | null = null;
+  let agreed: boolean | null = null;
+  let takeoverHumanActiveObserved: boolean | null = null;
+  let killSwitchObserved: boolean | null = null;
+  let incidentalCredentialUsageBookkeepingPossible = false;
+  let placement = evaluateSourcePlacementObservation({ observedPlacement: null });
+
+  if (binding.bound && binding.opaqueLeadRef) {
+    const ctx: GatewayCallerContext = {
+      db: params.db,
+      organizationId: params.organizationId,
+    };
+    try {
+      capabilityAttempted = true;
+      const current = await readLegacyConversationAuthority(ctx, binding.opaqueLeadRef);
+      incidentalCredentialUsageBookkeepingPossible = true;
+      const resolution = await resolveInteractionAuthority({
+        ctx,
+        refs: {
+          legacyLeadId: binding.opaqueLeadRef,
+          caseId: params.caseId,
+        },
+        readCurrent: async () => current,
+      });
+      const { oracle, equivalence } = evaluateIndependentEquivalence({
+        id: evidenceDigest(params.caseId),
+        product: {
+          conversationAuthority: resolution.conversationAuthority,
+          humanActive: resolution.humanActive,
+          observedOwnerRef: resolution.observedOwnerRef,
+          answeredFrom: resolution.answeredFrom,
+          failSafeReason: resolution.failSafeReason,
+        },
+        oracleInputs: {
+          leadTakeoverActive: current.value.leadTakeoverActive,
+          lastOwnerInteractionAt: current.value.lastOwnerInteractionAt,
+          numberKillSwitchActive: current.value.numberKillSwitchActive,
+          observedAt: current.provenance.freshness.readAt,
+        },
+      });
+      legacyReadSucceeded = true;
+      legacyReadFailureKind = null;
+      productOutcome = resolution.conversationAuthority;
+      oracleOutcome = oracle.humanActive;
+      oracleReason = oracle.reason;
+      agreed = equivalence.agreed;
+      takeoverHumanActiveObserved =
+        resolution.humanActive === true || oracle.humanActive === true;
+      killSwitchObserved = current.value.numberKillSwitchActive;
+      placement = evaluateSourcePlacementObservation({
+        observedPlacement: null,
+        capabilitySucceeded: true,
+        fieldContributions: current.provenance.contributions ?? [],
+      });
+      if (placement.conclusion === "not_concluded") {
+        legacyReadFailureKind = "unconfirmed_fields";
+      }
+    } catch (error) {
+      legacyReadSucceeded = false;
+      legacyReadFailureKind = classifyLegacyReadFailure(error);
+      placement = evaluateSourcePlacementObservation({
+        observedPlacement: null,
+        capabilitySucceeded: false,
+      });
+    }
+  }
+
+  const failSafe = evaluateGenuineFailSafeCandidate({
+    bindingPresent: binding.bindingPresent,
+    bound: binding.bound,
+    legacyReadSucceeded,
+    productVerdict: productOutcome,
+  });
+
+  return {
+    caseDigest: evidenceDigest(params.caseId),
+    leadDigest: binding.opaqueLeadRef
+      ? evidenceDigest(binding.opaqueLeadRef)
+      : admission.admissionLeadRef
+        ? evidenceDigest(admission.admissionLeadRef)
+        : null,
+    bindingDigest: binding.bindingDigest,
+    admittedEligible: admission.admittedEligible,
+    admissionClassification: admission.classification,
+    bindingPresent: binding.bindingPresent,
+    t73Candidate: binding.t7_3Candidate,
+    legacyReadSucceeded,
+    legacyReadFailureKind,
+    placementConclusion: placement.conclusion,
+    placementReason: placement.reason,
+    takeoverHumanActiveObserved,
+    killSwitchObserved,
+    productOutcome,
+    oracleOutcome,
+    oracleReason,
+    agreed,
+    genuineUnknownOrConflictingCandidate: failSafe.genuineUnknownOrConflictingCandidate,
+    incidentalCredentialUsageBookkeepingPossible,
+    probeLeadRef: binding.bound ? binding.opaqueLeadRef : null,
+    capabilityAttempted,
+    capabilityFailureKind: capabilityAttempted ? legacyReadFailureKind : null,
+  };
+}
+
 async function runDiscoverHosted(params: {
   db: DbClient;
   organizationId: string;
   inventoryCaseIds: string[];
+  argv: string[];
+  safetyGateOk: boolean;
+  targetName: string;
+  targetProjectRef: string;
+  legacyEnv: string;
+  trackedTreeMatchesHead: boolean;
+  verifierShaOk: boolean;
 }): Promise<void> {
-  // discover cannot persist — inventory != selection. A candidate is not a
-  // final evidence member. T7-3 binding preparation stays
-  // backfillAdmittedLegacyLeadIdentity and is not executed here.
+  // discover cannot persist — inventory != selection. not RS-2 evidence.
+  // T7-3 binding preparation stays backfillAdmittedLegacyLeadIdentity and
+  // is not executed here.
   void SL6_CANONICAL_BINDING_HELPER;
   const organization = await getOrganizationById(params.db, params.organizationId);
   record(
@@ -378,28 +662,85 @@ async function runDiscoverHosted(params: {
     throw new Error("FAIL CLOSED - Organization not found");
   }
 
+  const classified = [];
   for (const caseId of params.inventoryCaseIds) {
-    const opportunity = await getOperationalCase(params.db, caseId);
-    const inOrg = opportunity?.organization_id === params.organizationId;
-    const bindings = inOrg
-      ? await listConversationBindingsForCase(params.db, {
-          organizationId: params.organizationId,
-          caseId,
-        })
-      : [];
-    const gu = bindings.filter((row) => row.thread_kind === "gu" && row.status === "active");
-    record(
-      "discover",
-      "inventoried an operator-named candidate (not a final evidence member)",
-      Boolean(opportunity && inOrg),
-      opportunity && inOrg
-        ? `case=${evidenceDigest(caseId)} bindings=${gu.length} runtime=${opportunity.runtime_authority ?? "null"}`
-        : "missing or foreign Case"
+    classified.push(
+      await classifyDiscoverCandidate({
+        db: params.db,
+        organizationId: params.organizationId,
+        caseId,
+      })
     );
   }
-  console.log(
-    "\ninventory != selection. This discover output is not a frozen conversation set."
+
+  const capabilityAttempted = classified.some((row) => row.capabilityAttempted);
+  const probeCandidates = classified.filter(
+    (row) =>
+      row.capabilityAttempted &&
+      row.placementConclusion !== "confirmed" &&
+      row.probeLeadRef
   );
+  if (probeCandidates.length > 0) {
+    const probeAdmission = evaluatePlacementProbeAdmission({
+      phase: "discover",
+      safetyGateOk: params.safetyGateOk,
+      targetName: params.targetName,
+      targetProjectRef: params.targetProjectRef,
+      legacyEnv: params.legacyEnv,
+      organizationId: params.organizationId,
+      namedCaseCount: params.inventoryCaseIds.length,
+      trackedTreeMatchesHead: params.trackedTreeMatchesHead,
+      verifierShaOk: params.verifierShaOk,
+      capabilityAttempted,
+      placementConclusion: "not_concluded",
+      capabilityFailureKind: probeCandidates[0]?.capabilityFailureKind ?? null,
+      readOnly: true,
+    });
+    if (probeAdmission.admitted) {
+      const legacyTarget = openHostedLegacyTargetAfterProbeAdmission(
+        params.argv,
+        probeAdmission
+      );
+      for (const row of probeCandidates) {
+        if (!row.probeLeadRef) continue;
+        const paths = await observeBoundedPlacementProbe(legacyTarget, row.probeLeadRef);
+        const probed = evaluateBoundedPlacementProbeObservation({ paths });
+        row.placementConclusion = probed.conclusion;
+        row.placementReason = probed.reason;
+      }
+    } else {
+      record(
+        "discover",
+        "placement probe remained closed",
+        true,
+        probeAdmission.reason
+      );
+    }
+  }
+
+  const report = buildDiscoveryReport(
+    classified.map(
+      ({
+        probeLeadRef: _probeLeadRef,
+        capabilityAttempted: _capabilityAttempted,
+        capabilityFailureKind: _capabilityFailureKind,
+        ...candidate
+      }) => candidate
+    )
+  );
+  const hygiene = evaluateDiscoveryHygiene(report);
+  record("hygiene", "discovery report is digest-oriented and non-canonical", hygiene.ok, hygiene.reason);
+  for (const candidate of report.candidates) {
+    record(
+      "discover",
+      "classified an operator-named candidate (not a final evidence member)",
+      true,
+      `case=${candidate.caseDigest} admitted=${candidate.admittedEligible} bound=${candidate.bindingPresent} t7_3=${candidate.t73Candidate} genuine_rs2_3=${candidate.genuineUnknownOrConflictingCandidate}`
+    );
+  }
+  console.log(`\n${DISCOVERY_INVENTORY_BANNER}`);
+  console.log(DISCOVERY_NOT_RS2_BANNER);
+  console.log(JSON.stringify(report, null, 2));
 }
 
 async function runEvidenceHosted(params: {
@@ -526,18 +867,19 @@ async function main(): Promise<void> {
   console.log(`phase: ${safetyGate.args.phase}`);
   console.log("traditional_gu write clients: not opened (structural)\n");
 
+  prepareGatewayProcessEnv(argv, target);
   const db = openHostedGuOsClient(target);
-  // openHostedLegacyTarget exists for later placement probes. T7-1 does not
-  // call it: the safety gate already required --legacy-env stage, and product
-  // reads go through the existing gateway when evidence later executes.
+  // openHostedLegacyTarget is only reachable through
+  // openHostedLegacyTargetAfterProbeAdmission after evaluatePlacementProbeAdmission.
+  // Product reads go through the existing gateway.
   const legacyEnvironment = "stage";
   const placement = evaluateSourcePlacementObservation({
     observedPlacement: null,
   });
   record(
     "placement",
-    "configured allowlist recorded; placement is not concluded",
-    placement.conclusion === "not_concluded",
+    "configured allowlist recorded; placement is not concluded until a confirming observation",
+    placement.conclusion === "not_concluded" || placement.conclusion === "confirmed",
     placement.reason
   );
 
@@ -546,6 +888,13 @@ async function main(): Promise<void> {
       db,
       organizationId: safetyGate.args.organizationId,
       inventoryCaseIds: safetyGate.args.inventoryCaseIds,
+      argv,
+      safetyGateOk: safetyGate.ok,
+      targetName: target.name,
+      targetProjectRef: target.projectRef,
+      legacyEnv: "stage",
+      trackedTreeMatchesHead: true,
+      verifierShaOk: true,
     });
     return;
   }
