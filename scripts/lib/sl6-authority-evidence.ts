@@ -10,6 +10,9 @@
  * Oracle authority is produced by `observeLegacyTakeover`.
  * Equivalence is recorded by `recordAuthorityEquivalence`.
  * This file invents none of those algorithms.
+ *
+ * Discovery classification (admission, binding, T7-3, placement, genuine
+ * fail-safe candidacy) is also I/O-free. Hosted reads stay in the runner.
  */
 
 import { createHash } from "node:crypto";
@@ -69,6 +72,27 @@ export const AUTO_SELECT_FLAGS = [
 ] as const;
 
 export type Sl6Phase = "discover" | "evidence";
+
+export type Sl6AdmissionClassification =
+  | "admitted"
+  | "not_admitted"
+  | "missing"
+  | "invalid";
+
+export type Sl6PlacementConclusion = "confirmed" | "not_concluded" | "mismatch";
+
+export type Sl6LegacyReadFailureKind =
+  | "missing_binding"
+  | "capability_failed"
+  | "not_found"
+  | "no_usable_credential"
+  | "gateway_disabled"
+  | "unconfirmed_fields"
+  | "ambiguous_binding"
+  | "other";
+
+export const DISCOVERY_INVENTORY_BANNER = "inventory != selection" as const;
+export const DISCOVERY_NOT_RS2_BANNER = "not RS-2 evidence" as const;
 
 export type Rs2ItemId =
   | "rs2_1_named_equivalence"
@@ -320,6 +344,13 @@ export function parseSl6AuthorityArgs(argv: string[]): Sl6AuthorityArgs {
     }
   }
 
+  const jsonPath = parseNamedArg(argv, "--json") ?? null;
+  if (phaseRaw === "discover" && jsonPath) {
+    return fail(
+      "discover does not write durable evidence JSON; inventory is not RS-2 evidence"
+    );
+  }
+
   return {
     ok: true,
     reason:
@@ -332,7 +363,7 @@ export function parseSl6AuthorityArgs(argv: string[]): Sl6AuthorityArgs {
     productSha: parseNamedArg(argv, "--product-sha") ?? null,
     acknowledgeDurableWrite: argv.includes("--acknowledge-durable-write"),
     acknowledgeFailSafePersist: argv.includes("--acknowledge-fail-safe-persist"),
-    jsonPath: parseNamedArg(argv, "--json") ?? null,
+    jsonPath,
     organizationId: parseNamedArg(argv, "--organization") ?? null,
   };
 }
@@ -633,21 +664,563 @@ export function evaluateSourcePlacementObservation(input: {
   configuredAllowlist?: readonly string[];
   comparisonPaths?: readonly string[];
   observedPlacement: string[] | null;
+  capabilitySucceeded?: boolean;
+  fieldContributions?: readonly { field: string; sourcePath: string }[];
 }): {
   configuredAllowlist: readonly string[];
   comparisonPaths: readonly string[];
   observedPlacement: string[] | null;
-  conclusion: "not_concluded";
+  conclusion: Sl6PlacementConclusion;
   reason: string;
 } {
+  const configuredAllowlist =
+    input.configuredAllowlist ?? CONFIGURED_AUTHORITY_SOURCE_ALLOWLIST;
+  const comparisonPaths = input.comparisonPaths ?? COMPARISON_AUTHORITY_PLACEMENT_PATHS;
+  const contributions = input.fieldContributions ?? [];
+  const observedPlacement =
+    input.observedPlacement ??
+    (contributions.length > 0
+      ? [...new Set(contributions.map((item) => item.sourcePath))]
+      : null);
+
+  if (!input.capabilitySucceeded) {
+    return {
+      configuredAllowlist,
+      comparisonPaths,
+      observedPlacement,
+      conclusion: "not_concluded",
+      reason:
+        "configured allowlist and observed placement are recorded separately; gu2.users is not concluded as correct before a confirming capability read",
+    };
+  }
+
+  const takeover = contributions.find((item) => item.field === "leadTakeoverActive");
+  if (!takeover?.sourcePath) {
+    return {
+      configuredAllowlist,
+      comparisonPaths,
+      observedPlacement,
+      conclusion: "not_concluded",
+      reason: "capability succeeded but the takeover-field contribution is missing",
+    };
+  }
+
+  const onAllowlist = (configuredAllowlist as readonly string[]).includes(
+    takeover.sourcePath
+  );
+  const onComparison = (comparisonPaths as readonly string[]).includes(
+    takeover.sourcePath
+  );
+  if (!onAllowlist) {
+    return {
+      configuredAllowlist,
+      comparisonPaths,
+      observedPlacement,
+      conclusion: "mismatch",
+      reason: onComparison
+        ? "takeover field was observed on a comparison path, not the configured allowlist"
+        : "takeover field source is not on the configured allowlist",
+    };
+  }
+
   return {
-    configuredAllowlist: input.configuredAllowlist ?? CONFIGURED_AUTHORITY_SOURCE_ALLOWLIST,
-    comparisonPaths: input.comparisonPaths ?? COMPARISON_AUTHORITY_PLACEMENT_PATHS,
-    observedPlacement: input.observedPlacement,
-    conclusion: "not_concluded",
-    reason:
-      "configured allowlist and observed placement are recorded separately; gu2.users is not concluded as correct before discovery",
+    configuredAllowlist,
+    comparisonPaths,
+    observedPlacement,
+    conclusion: "confirmed",
+    reason: "capability provenance confirms the configured takeover source",
   };
+}
+
+export function opaqueContextId(
+  context: Record<string, unknown> | null | undefined,
+  key: string
+): string | null {
+  if (!context) return null;
+  const raw = context[key];
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed || null;
+}
+
+export interface GovernedAdmissionObservation {
+  caseFound: boolean;
+  caseInOrganization: boolean;
+  caseId: string | null;
+  caseType: string | null;
+  contextLegacyLeadId: string | null;
+  contextSourceEventId: string | null;
+  sourceEventFound: boolean;
+  sourceSystem: string | null;
+  sourceEventStatus: string | null;
+  disposition: string | null;
+  admittedCaseId: string | null;
+  externalLeadRef: string | null;
+}
+
+export function evaluateGovernedAdmissionObservation(
+  observation: GovernedAdmissionObservation
+): {
+  classification: Sl6AdmissionClassification;
+  admittedEligible: boolean;
+  admissionLeadRef: string | null;
+  reason: string;
+} {
+  if (!observation.caseFound) {
+    return {
+      classification: "missing",
+      admittedEligible: false,
+      admissionLeadRef: null,
+      reason: "named Case was not found",
+    };
+  }
+  if (!observation.caseInOrganization) {
+    return {
+      classification: "invalid",
+      admittedEligible: false,
+      admissionLeadRef: null,
+      reason: "named Case is missing or not in the declared Organization",
+    };
+  }
+  if (observation.caseType !== "lead_opportunity") {
+    return {
+      classification: "not_admitted",
+      admittedEligible: false,
+      admissionLeadRef: null,
+      reason: "Case is not a lead_opportunity",
+    };
+  }
+  if (!observation.contextLegacyLeadId || !observation.contextSourceEventId) {
+    return {
+      classification: "not_admitted",
+      admittedEligible: false,
+      admissionLeadRef: null,
+      reason: "Case is not proven governed admission",
+    };
+  }
+  if (
+    !observation.sourceEventFound ||
+    observation.sourceSystem !== "traditional_gu" ||
+    observation.sourceEventStatus !== "completed" ||
+    observation.disposition !== "admitted" ||
+    observation.admittedCaseId !== observation.caseId ||
+    observation.externalLeadRef !== observation.contextLegacyLeadId
+  ) {
+    return {
+      classification: "not_admitted",
+      admittedEligible: false,
+      admissionLeadRef: null,
+      reason: "source event is not governed admitted evidence for this Case",
+    };
+  }
+  return {
+    classification: "admitted",
+    admittedEligible: true,
+    admissionLeadRef: observation.contextLegacyLeadId,
+    reason: "Case is a governed-admitted lead_opportunity",
+  };
+}
+
+export interface ObservedBindingRow {
+  provider: string;
+  threadKind: string;
+  status: string;
+  organizationId: string;
+  caseId: string;
+  opaqueLeadRef: string;
+}
+
+export function evaluateBindingDiscovery(input: {
+  admittedEligible: boolean;
+  bindings: readonly ObservedBindingRow[];
+}): {
+  bound: boolean;
+  bindingPresent: boolean;
+  ambiguous: boolean;
+  opaqueLeadRef: string | null;
+  bindingDigest: string | null;
+  t7_3Candidate: boolean;
+  reason: string;
+} {
+  const expected = input.bindings.filter(
+    (row) =>
+      row.provider === "whatsapp_business" &&
+      row.threadKind === "gu" &&
+      row.status === "active"
+  );
+  if (expected.length === 0) {
+    return {
+      bound: false,
+      bindingPresent: false,
+      ambiguous: false,
+      opaqueLeadRef: null,
+      bindingDigest: null,
+      t7_3Candidate: input.admittedEligible,
+      reason: input.admittedEligible
+        ? "admitted Case lacks the required active gu binding; T7-3 candidate"
+        : "no active gu binding",
+    };
+  }
+  if (expected.length > 1) {
+    return {
+      bound: false,
+      bindingPresent: true,
+      ambiguous: true,
+      opaqueLeadRef: null,
+      bindingDigest: null,
+      t7_3Candidate: false,
+      reason: "multiple active gu bindings; mapping is ambiguous and is not T7-3",
+    };
+  }
+  const [row] = expected;
+  return {
+    bound: true,
+    bindingPresent: true,
+    ambiguous: false,
+    opaqueLeadRef: row.opaqueLeadRef,
+    bindingDigest: bindingIdentityDigest(row),
+    t7_3Candidate: false,
+    reason: "exactly one active whatsapp_business/gu binding",
+  };
+}
+
+export function evaluateGenuineFailSafeCandidate(input: {
+  bindingPresent: boolean;
+  bound: boolean;
+  legacyReadSucceeded: boolean;
+  productVerdict: InteractionConversationVerdict | null;
+}): { genuineUnknownOrConflictingCandidate: boolean; reason: string } {
+  if (!input.bound || !input.bindingPresent) {
+    return {
+      genuineUnknownOrConflictingCandidate: false,
+      reason:
+        "unbound or missing binding is a T7-3/discovery prerequisite, not RS-2 #3 authority-state evidence",
+    };
+  }
+  if (!input.legacyReadSucceeded) {
+    return {
+      genuineUnknownOrConflictingCandidate: false,
+      reason:
+        "a failed or incomplete bounded read is a discovery issue, not genuine unknown/conflicting evidence",
+    };
+  }
+  if (
+    input.productVerdict !== "unknown" &&
+    input.productVerdict !== "conflicting"
+  ) {
+    return {
+      genuineUnknownOrConflictingCandidate: false,
+      reason: "product resolver did not return unknown or conflicting",
+    };
+  }
+  return {
+    genuineUnknownOrConflictingCandidate: true,
+    reason: "bound conversation with a successful bounded read and a fail-safe product verdict",
+  };
+}
+
+export const PLACEMENT_PROBE_ELIGIBLE_UNCERTAINTY = [
+  "not_found",
+  "unconfirmed_fields",
+] as const satisfies readonly Sl6LegacyReadFailureKind[];
+
+export function isPlacementProbeEligibleUncertainty(
+  kind: Sl6LegacyReadFailureKind | null
+): kind is (typeof PLACEMENT_PROBE_ELIGIBLE_UNCERTAINTY)[number] {
+  return kind === "not_found" || kind === "unconfirmed_fields";
+}
+
+export function evaluatePlacementProbeAdmission(input: {
+  phase: Sl6Phase;
+  safetyGateOk: boolean;
+  targetName: string;
+  targetProjectRef: string;
+  legacyEnv: string | null;
+  organizationId: string | null;
+  namedCaseCount: number;
+  trackedTreeMatchesHead: boolean;
+  verifierShaOk: boolean;
+  capabilityAttempted: boolean;
+  placementConclusion: Sl6PlacementConclusion;
+  capabilityFailureKind: Sl6LegacyReadFailureKind | null;
+  readOnly: boolean;
+}): { admitted: boolean; reason: string } {
+  if (input.phase !== "discover") {
+    return { admitted: false, reason: "placement probe is discover-only" };
+  }
+  if (!input.safetyGateOk) {
+    return { admitted: false, reason: "hosted safety gate has not succeeded" };
+  }
+  if (input.targetName !== SL6_HOSTED_ENVIRONMENT) {
+    return { admitted: false, reason: "placement probe requires Gu OS staging" };
+  }
+  if (input.targetProjectRef !== SL6_STAGING_PROJECT_REF) {
+    return { admitted: false, reason: "placement probe requires the expected staging project" };
+  }
+  if (!input.legacyEnv) {
+    return {
+      admitted: false,
+      reason: "--legacy-env is required; there is no default and no fallback to production",
+    };
+  }
+  if (input.legacyEnv !== "stage") {
+    return { admitted: false, reason: "placement probe permits --legacy-env stage only" };
+  }
+  if (!input.organizationId) {
+    return { admitted: false, reason: "explicit --organization is required" };
+  }
+  if (input.namedCaseCount < 1) {
+    return { admitted: false, reason: "placement probe requires operator-named --case-id candidates" };
+  }
+  if (!input.trackedTreeMatchesHead) {
+    return { admitted: false, reason: "tracked verifier tree must match HEAD" };
+  }
+  if (!input.verifierShaOk) {
+    return { admitted: false, reason: "full verifier SHA must be validated" };
+  }
+  if (!input.capabilityAttempted) {
+    return {
+      admitted: false,
+      reason: "capability path must be attempted before a placement probe",
+    };
+  }
+  if (input.placementConclusion === "confirmed") {
+    return { admitted: false, reason: "placement is already confirmed; probe is not needed" };
+  }
+  if (input.placementConclusion === "mismatch") {
+    return {
+      admitted: false,
+      reason:
+        "Path A already concluded a placement mismatch; the probe is not a recheck",
+    };
+  }
+  if (input.placementConclusion !== "not_concluded") {
+    return {
+      admitted: false,
+      reason: "unrecognized placement conclusion is not placement-probe eligible",
+    };
+  }
+  if (!isPlacementProbeEligibleUncertainty(input.capabilityFailureKind)) {
+    return {
+      admitted: false,
+      reason:
+        "capability outcome is not a recognized placement-uncertainty; probe remains closed",
+    };
+  }
+  if (!input.readOnly) {
+    return { admitted: false, reason: "placement probe is read-only" };
+  }
+  return {
+    admitted: true,
+    reason:
+      input.capabilityFailureKind === "not_found"
+        ? "named lead was not found on the configured capability path; bounded placement probe may open"
+        : "capability succeeded without a confirming takeover-field contribution; bounded placement probe may open",
+  };
+}
+
+export interface Sl6PlacementProbeCandidateFacts {
+  candidateKey: string;
+  capabilityAttempted: boolean;
+  capabilityFailureKind: Sl6LegacyReadFailureKind | null;
+  placementConclusion: Sl6PlacementConclusion;
+  probeLeadRef: string | null;
+}
+
+export interface Sl6PlacementProbePlan {
+  openTarget: boolean;
+  openReason: string;
+  admittedKeys: string[];
+  refused: readonly { candidateKey: string; reason: string }[];
+}
+
+export function planDiscoverPlacementProbes(input: {
+  candidates: readonly Sl6PlacementProbeCandidateFacts[];
+  phase: Sl6Phase;
+  safetyGateOk: boolean;
+  targetName: string;
+  targetProjectRef: string;
+  legacyEnv: string | null;
+  organizationId: string | null;
+  namedCaseCount: number;
+  trackedTreeMatchesHead: boolean;
+  verifierShaOk: boolean;
+  readOnly: boolean;
+}): Sl6PlacementProbePlan {
+  const admittedKeys: string[] = [];
+  const refused: { candidateKey: string; reason: string }[] = [];
+  for (const candidate of input.candidates) {
+    const admission = evaluatePlacementProbeAdmission({
+      phase: input.phase,
+      safetyGateOk: input.safetyGateOk,
+      targetName: input.targetName,
+      targetProjectRef: input.targetProjectRef,
+      legacyEnv: input.legacyEnv,
+      organizationId: input.organizationId,
+      namedCaseCount: input.namedCaseCount,
+      trackedTreeMatchesHead: input.trackedTreeMatchesHead,
+      verifierShaOk: input.verifierShaOk,
+      capabilityAttempted: candidate.capabilityAttempted,
+      placementConclusion: candidate.placementConclusion,
+      capabilityFailureKind: candidate.capabilityFailureKind,
+      readOnly: input.readOnly,
+    });
+    if (!admission.admitted) {
+      refused.push({ candidateKey: candidate.candidateKey, reason: admission.reason });
+      continue;
+    }
+    if (!candidate.probeLeadRef) {
+      refused.push({
+        candidateKey: candidate.candidateKey,
+        reason: "placement probe requires a bound lead reference",
+      });
+      continue;
+    }
+    admittedKeys.push(candidate.candidateKey);
+  }
+  return {
+    openTarget: admittedKeys.length > 0,
+    openReason:
+      admittedKeys.length > 0
+        ? "at least one candidate independently admitted for a recognized placement-uncertainty"
+        : (refused[0]?.reason ??
+          "no candidate is independently eligible for a placement probe"),
+    admittedKeys,
+    refused,
+  };
+}
+
+export interface Sl6DiscoveryCandidateReport {
+  caseDigest: string;
+  leadDigest: string | null;
+  bindingDigest: string | null;
+  admittedEligible: boolean;
+  admissionClassification: Sl6AdmissionClassification;
+  bindingPresent: boolean;
+  t73Candidate: boolean;
+  legacyReadSucceeded: boolean;
+  legacyReadFailureKind: Sl6LegacyReadFailureKind | null;
+  placementConclusion: Sl6PlacementConclusion;
+  placementReason: string;
+  takeoverHumanActiveObserved: boolean | null;
+  killSwitchObserved: boolean | null;
+  productOutcome: InteractionConversationVerdict | null;
+  oracleOutcome: boolean | null;
+  oracleReason: string | null;
+  agreed: boolean | null;
+  genuineUnknownOrConflictingCandidate: boolean;
+  incidentalCredentialUsageBookkeepingPossible: boolean;
+}
+
+export interface Sl6DiscoveryReport {
+  inventoryEqualsSelection: false;
+  notRs2Evidence: true;
+  banners: readonly [
+    typeof DISCOVERY_INVENTORY_BANNER,
+    typeof DISCOVERY_NOT_RS2_BANNER,
+  ];
+  rs2ItemsSatisfied: [];
+  sliceDoneClaim: "not_claimed";
+  t7CompleteClaim: false;
+  incidentalCredentialUsageBookkeeping: "possible_on_capability_read";
+  candidates: Sl6DiscoveryCandidateReport[];
+}
+
+export interface BoundedPlacementPathObservation {
+  path: "gu2.users" | "bot.users";
+  collectionExists: boolean;
+  namedLeadExists: boolean;
+  takeoverFieldPresent: boolean;
+  lastOwnerFieldPresent: boolean;
+  boundedCount: number;
+}
+
+export function evaluateBoundedPlacementProbeObservation(input: {
+  paths: readonly BoundedPlacementPathObservation[];
+  configuredAllowlist?: readonly string[];
+  comparisonPaths?: readonly string[];
+}): {
+  configuredAllowlist: readonly string[];
+  comparisonPaths: readonly string[];
+  observedPlacement: string[] | null;
+  conclusion: Sl6PlacementConclusion;
+  reason: string;
+} {
+  const configuredAllowlist =
+    input.configuredAllowlist ?? CONFIGURED_AUTHORITY_SOURCE_ALLOWLIST;
+  const comparisonPaths = input.comparisonPaths ?? COMPARISON_AUTHORITY_PLACEMENT_PATHS;
+  const confirming = input.paths.filter(
+    (path) => path.namedLeadExists && path.takeoverFieldPresent
+  );
+  const observedPlacement =
+    confirming.length > 0 ? confirming.map((path) => path.path) : null;
+  const configuredHit = confirming.find((path) =>
+    (configuredAllowlist as readonly string[]).includes(path.path)
+  );
+  const comparisonHit = confirming.find((path) =>
+    (comparisonPaths as readonly string[]).includes(path.path)
+  );
+  if (configuredHit) {
+    return {
+      configuredAllowlist,
+      comparisonPaths,
+      observedPlacement,
+      conclusion: "confirmed",
+      reason: "bounded probe observed takeover-field presence on the configured source",
+    };
+  }
+  if (comparisonHit) {
+    return {
+      configuredAllowlist,
+      comparisonPaths,
+      observedPlacement,
+      conclusion: "mismatch",
+      reason: "bounded probe observed takeover-field presence only on a comparison path",
+    };
+  }
+  return {
+    configuredAllowlist,
+    comparisonPaths,
+    observedPlacement,
+    conclusion: "not_concluded",
+    reason: "bounded probe did not observe a confirming takeover-field placement",
+  };
+}
+
+export function buildDiscoveryReport(
+  candidates: Sl6DiscoveryCandidateReport[]
+): Sl6DiscoveryReport {
+  return {
+    inventoryEqualsSelection: false,
+    notRs2Evidence: true,
+    banners: [DISCOVERY_INVENTORY_BANNER, DISCOVERY_NOT_RS2_BANNER],
+    rs2ItemsSatisfied: [],
+    sliceDoneClaim: "not_claimed",
+    t7CompleteClaim: false,
+    incidentalCredentialUsageBookkeeping: "possible_on_capability_read",
+    candidates,
+  };
+}
+
+export function evaluateDiscoveryHygiene(report: Sl6DiscoveryReport): {
+  ok: boolean;
+  reason: string;
+} {
+  if (
+    !report.banners.includes(DISCOVERY_INVENTORY_BANNER) ||
+    !report.banners.includes(DISCOVERY_NOT_RS2_BANNER) ||
+    report.inventoryEqualsSelection !== false ||
+    report.notRs2Evidence !== true ||
+    report.rs2ItemsSatisfied.length !== 0 ||
+    report.sliceDoneClaim !== "not_claimed" ||
+    report.t7CompleteClaim !== false
+  ) {
+    return {
+      ok: false,
+      reason: "discovery report is missing required non-canonical banners or claims RS-2/T7 completion",
+    };
+  }
+  return evaluateEvidenceHygiene(report);
 }
 
 export function normalizeExpectedProductSha(
@@ -1005,6 +1578,17 @@ export function evaluateSl6EvaluatorSourceContract(source: string): Sl6Check[] {
     !/attachExternalConversationBinding\s*\(/.test(source),
     "T7 is not a binding caller"
   );
+  add(
+    "placement-probe planner evaluates each candidate independently against an allowlist",
+    source.includes("function planDiscoverPlacementProbes(") &&
+      source.includes("for (const candidate of input.candidates)") &&
+      source.includes("evaluatePlacementProbeAdmission(") &&
+      source.includes("function isPlacementProbeEligibleUncertainty(") &&
+      source.includes('kind === "not_found"') &&
+      source.includes('kind === "unconfirmed_fields"') &&
+      !source.includes("PLACEMENT_PROBE_BLOCKING_FAILURES"),
+    "deny-by-default Path B"
+  );
   return checks;
 }
 
@@ -1087,9 +1671,39 @@ export function evaluateSl6VerifierSourceContract(source: string): Sl6Check[] {
     "single binding path preserved"
   );
   add(
-    "does not call backfillAdmittedLegacyLeadIdentity in T7-1",
+    "does not call backfillAdmittedLegacyLeadIdentity",
     !/backfillAdmittedLegacyLeadIdentity\s*\(/.test(source),
     "T7-3 binding preparation is not executed here"
+  );
+  add(
+    "does not call recordAuthorityResolutionObservation",
+    !/recordAuthorityResolutionObservation\s*\(/.test(source),
+    "discovery/evidence do not close incidents through the observation helper"
+  );
+  const prepareGateway = source.indexOf("prepareGatewayProcessEnv(argv, target)");
+  const gatewayEnable = source.indexOf('process.env.LEGACY_GATEWAY_ENABLED = "true"');
+  add(
+    "prepares process-local encryption key and gateway flag before hosted clients",
+    prepareGateway >= 0 &&
+      gatewayEnable >= 0 &&
+      openClientCall >= 0 &&
+      source.includes("resolveEncryptionKeyForTarget(") &&
+      prepareGateway < openClientCall,
+    "verify-admission pattern"
+  );
+  const probeGate = source.indexOf("const probePlan = planDiscoverPlacementProbes(");
+  const probeOpen = source.indexOf(
+    "const legacyTarget = openHostedLegacyTargetAfterProbeAdmission("
+  );
+  add(
+    "placement-probe target opening is gated by per-candidate planDiscoverPlacementProbes",
+    probeGate >= 0 &&
+      probeOpen >= 0 &&
+      probeGate < probeOpen &&
+      !source.includes("probeCandidates[0]") &&
+      source.includes("probePlan.openTarget") &&
+      source.includes("probePlan.admittedKeys"),
+    "call-site hardening"
   );
   add(
     "does not invoke C2, pause, suppress, or send",
@@ -1101,7 +1715,9 @@ export function evaluateSl6VerifierSourceContract(source: string): Sl6Check[] {
   );
   add(
     "never auto-selects a Case",
-    source.includes("never auto-selects") && source.includes("inventory != selection"),
+    source.includes("never auto-selects") &&
+      source.includes("inventory != selection") &&
+      source.includes("not RS-2 evidence"),
     "auto-select flags are refused"
   );
   add(
