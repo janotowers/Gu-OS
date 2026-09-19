@@ -38,6 +38,7 @@ import {
   inspectTrackedWorkingTree,
   type TrackedTreeInspection,
 } from "./sl15-identity-evidence";
+import { LEGACY_FIRESTORE_PROJECTS } from "./legacy-target";
 
 export const SL6_SLICE = "SL-6";
 export const SL6_RELEASE_SCOPE = "RS-2";
@@ -90,6 +91,39 @@ export type Sl6LegacyReadFailureKind =
   | "unconfirmed_fields"
   | "ambiguous_binding"
   | "other";
+
+export type Sl6OrgLegacyTargetClassification =
+  | "bound"
+  | "missing"
+  | "inactive_or_unusable"
+  | "target_mismatch";
+
+export type Sl6CredentialBookkeepingState = "not_attempted" | "possible";
+
+export type Sl6RawFailureFamily =
+  | "mongo_driver"
+  | "firestore_driver"
+  | "gu_os_or_supabase"
+  | "module_load"
+  | "unexpected";
+
+export interface Sl6OrgLegacyTargetObservation {
+  classification: Sl6OrgLegacyTargetClassification;
+  declaredLegacyEnv: string | null;
+  expectedFirestoreProject: string | null;
+  configuredFirestoreProject: string | null;
+  configuredClientEmail: string | null;
+  firestoreStatus: string | null;
+  mongoPresent: boolean;
+  mongoStatus: string | null;
+  reason: string;
+}
+
+export interface Sl6SafeRawFailureDiagnostic {
+  family: Sl6RawFailureFamily;
+  errorName: string | null;
+  errorCode: string | number | null;
+}
 
 export const DISCOVERY_INVENTORY_BANNER = "inventory != selection" as const;
 export const DISCOVERY_NOT_RS2_BANNER = "not RS-2 evidence" as const;
@@ -232,7 +266,7 @@ export interface Sl6DurableEvidence {
 }
 
 const PROHIBITED_EVIDENCE_KEY =
-  /secret|password|token|authorization|api[_-]?key|mongo.?uri|private[_-]?key|env[_-]?file|conversations-file|opaqueLeadRef|legacyLeadId|phone/i;
+  /secret|password|token|authorization|api[_-]?key|mongo.?uri|private[_-]?key|env[_-]?file|conversations-file|opaqueLeadRef|legacyLeadId|phone|^(message|stack|stackTrace|uri)$/i;
 
 export function evidenceDigest(value: string): string {
   return `sha256:${createHash("sha256").update(value, "utf8").digest("hex").slice(0, 16)}`;
@@ -919,6 +953,147 @@ export function evaluateGenuineFailSafeCandidate(input: {
   };
 }
 
+export function expectedFirestoreProjectForLegacyEnv(
+  declaredLegacyEnv: string | null
+): string | null {
+  if (declaredLegacyEnv === "stage" || declaredLegacyEnv === "prod") {
+    return LEGACY_FIRESTORE_PROJECTS[declaredLegacyEnv];
+  }
+  return null;
+}
+
+export function evaluateOrganizationLegacyTargetBinding(input: {
+  declaredLegacyEnv: string | null;
+  firestorePresent: boolean;
+  firestoreStatus: string | null;
+  firestoreProjectId: string | null;
+  firestoreClientEmail: string | null;
+  mongoPresent: boolean;
+  mongoStatus: string | null;
+}): Sl6OrgLegacyTargetObservation {
+  const declaredLegacyEnv = input.declaredLegacyEnv;
+  const expectedFirestoreProject = expectedFirestoreProjectForLegacyEnv(declaredLegacyEnv);
+  const configuredFirestoreProject = input.firestoreProjectId?.trim() || null;
+  const configuredClientEmail = input.firestoreClientEmail?.trim() || null;
+  const base = {
+    declaredLegacyEnv,
+    expectedFirestoreProject,
+    configuredFirestoreProject,
+    configuredClientEmail,
+    firestoreStatus: input.firestoreStatus,
+    mongoPresent: input.mongoPresent,
+    mongoStatus: input.mongoStatus,
+  };
+  if (!declaredLegacyEnv || !expectedFirestoreProject) {
+    return {
+      ...base,
+      classification: "missing",
+      reason: "declared legacy environment is unknown; Organization target binding fails closed",
+    };
+  }
+  if (!input.firestorePresent) {
+    return {
+      ...base,
+      classification: "missing",
+      reason: "Organization traditional_gu_firestore credential is missing",
+    };
+  }
+  if (input.firestoreStatus !== "active") {
+    return {
+      ...base,
+      classification: "inactive_or_unusable",
+      reason: "Organization traditional_gu_firestore credential is not active",
+    };
+  }
+  if (!configuredFirestoreProject) {
+    return {
+      ...base,
+      classification: "missing",
+      reason: "Firestore project_id is missing from public metadata",
+    };
+  }
+  if (configuredFirestoreProject !== expectedFirestoreProject) {
+    return {
+      ...base,
+      classification: "target_mismatch",
+      reason: `declared ${declaredLegacyEnv} expects Firestore project ${expectedFirestoreProject}; configured ${configuredFirestoreProject}`,
+    };
+  }
+  if (!input.mongoPresent) {
+    return {
+      ...base,
+      classification: "missing",
+      reason: "Organization traditional_gu_mongo credential is missing",
+    };
+  }
+  if (input.mongoStatus !== "active") {
+    return {
+      ...base,
+      classification: "inactive_or_unusable",
+      reason: "Organization traditional_gu_mongo credential is not active",
+    };
+  }
+  return {
+    ...base,
+    classification: "bound",
+    reason: "Organization Firestore project matches the declared legacy environment",
+  };
+}
+
+export function organizationLegacyTargetAllowsCapability(
+  observation: Sl6OrgLegacyTargetObservation
+): boolean {
+  return observation.classification === "bound";
+}
+
+export function evaluateCapabilityBookkeepingState(input: {
+  capabilityInvocationBegan: boolean;
+}): Sl6CredentialBookkeepingState {
+  return input.capabilityInvocationBegan ? "possible" : "not_attempted";
+}
+
+const SAFE_ERROR_NAME = /^[A-Za-z][A-Za-z0-9_]{0,80}$/;
+const SAFE_ERROR_CODE = /^[A-Za-z0-9_.-]{1,40}$/;
+
+function sanitizeSafeErrorCode(value: unknown): string | number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && SAFE_ERROR_CODE.test(value)) return value;
+  return null;
+}
+
+function classifyRawFailureFamily(
+  name: string | null,
+  code: string | number | null
+): Sl6RawFailureFamily {
+  if (name && name.startsWith("Mongo")) return "mongo_driver";
+  if (name && /^(Firestore|Grpc|GoogleError)/.test(name)) return "firestore_driver";
+  if (name && /^(Postgrest|AuthApiError|Supabase)/.test(name)) return "gu_os_or_supabase";
+  if (code === "ERR_MODULE_NOT_FOUND") return "module_load";
+  return "unexpected";
+}
+
+export function evaluateSafeRawFailureDiagnostic(
+  error: unknown
+): Sl6SafeRawFailureDiagnostic {
+  let errorName: string | null = null;
+  let errorCode: string | number | null = null;
+  if (error instanceof Error) {
+    if (SAFE_ERROR_NAME.test(error.name)) errorName = error.name;
+    errorCode = sanitizeSafeErrorCode((error as Error & { code?: unknown }).code);
+  } else if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    if (typeof record.name === "string" && SAFE_ERROR_NAME.test(record.name)) {
+      errorName = record.name;
+    }
+    errorCode = sanitizeSafeErrorCode(record.code);
+  }
+  return {
+    family: classifyRawFailureFamily(errorName, errorCode),
+    errorName,
+    errorCode,
+  };
+}
+
 export const PLACEMENT_PROBE_ELIGIBLE_UNCERTAINTY = [
   "not_found",
   "unconfirmed_fields",
@@ -1100,6 +1275,9 @@ export interface Sl6DiscoveryCandidateReport {
   t73Candidate: boolean;
   legacyReadSucceeded: boolean;
   legacyReadFailureKind: Sl6LegacyReadFailureKind | null;
+  legacyReadFailureFamily: Sl6RawFailureFamily | null;
+  legacyReadErrorName: string | null;
+  legacyReadErrorCode: string | number | null;
   placementConclusion: Sl6PlacementConclusion;
   placementReason: string;
   takeoverHumanActiveObserved: boolean | null;
@@ -1109,7 +1287,7 @@ export interface Sl6DiscoveryCandidateReport {
   oracleReason: string | null;
   agreed: boolean | null;
   genuineUnknownOrConflictingCandidate: boolean;
-  incidentalCredentialUsageBookkeepingPossible: boolean;
+  incidentalCredentialUsageBookkeeping: Sl6CredentialBookkeepingState;
 }
 
 export interface Sl6DiscoveryReport {
@@ -1122,7 +1300,8 @@ export interface Sl6DiscoveryReport {
   rs2ItemsSatisfied: [];
   sliceDoneClaim: "not_claimed";
   t7CompleteClaim: false;
-  incidentalCredentialUsageBookkeeping: "possible_on_capability_read";
+  incidentalCredentialUsageBookkeeping: Sl6CredentialBookkeepingState;
+  organizationLegacyTarget: Sl6OrgLegacyTargetObservation;
   candidates: Sl6DiscoveryCandidateReport[];
 }
 
@@ -1188,7 +1367,8 @@ export function evaluateBoundedPlacementProbeObservation(input: {
 }
 
 export function buildDiscoveryReport(
-  candidates: Sl6DiscoveryCandidateReport[]
+  candidates: Sl6DiscoveryCandidateReport[],
+  organizationLegacyTarget: Sl6OrgLegacyTargetObservation
 ): Sl6DiscoveryReport {
   return {
     inventoryEqualsSelection: false,
@@ -1197,7 +1377,12 @@ export function buildDiscoveryReport(
     rs2ItemsSatisfied: [],
     sliceDoneClaim: "not_claimed",
     t7CompleteClaim: false,
-    incidentalCredentialUsageBookkeeping: "possible_on_capability_read",
+    incidentalCredentialUsageBookkeeping: candidates.some(
+      (candidate) => candidate.incidentalCredentialUsageBookkeeping === "possible"
+    )
+      ? "possible"
+      : "not_attempted",
+    organizationLegacyTarget,
     candidates,
   };
 }
@@ -1533,7 +1718,6 @@ const EVALUATOR_FORBIDDEN_IMPORTS = [
   "mongodb",
   "@google-cloud/firestore",
   "./target-env",
-  "./legacy-target",
   "../relationship-authority/resolve",
   "../../apps/web/src/lib/relationship-authority/resolve",
   "../../apps/web/src/lib/relationship-authority/persist",
@@ -1588,6 +1772,20 @@ export function evaluateSl6EvaluatorSourceContract(source: string): Sl6Check[] {
       source.includes('kind === "unconfirmed_fields"') &&
       !source.includes("PLACEMENT_PROBE_BLOCKING_FAILURES"),
     "deny-by-default Path B"
+  );
+  add(
+    "Organization legacy-target evaluator reuses canonical Firestore project mapping",
+    source.includes("function evaluateOrganizationLegacyTargetBinding(") &&
+      source.includes("LEGACY_FIRESTORE_PROJECTS") &&
+      !source.includes("resolveLegacyTarget("),
+    "stage -> unggafb; prod mapping exists; no env-file target resolution"
+  );
+  add(
+    "raw-failure diagnostic does not retain message or stack",
+    source.includes("function evaluateSafeRawFailureDiagnostic(") &&
+      !/error\.message/.test(source) &&
+      !/error\.stack/.test(source),
+    "metadata-only diagnostics"
   );
   return checks;
 }
@@ -1680,16 +1878,70 @@ export function evaluateSl6VerifierSourceContract(source: string): Sl6Check[] {
     !/recordAuthorityResolutionObservation\s*\(/.test(source),
     "discovery/evidence do not close incidents through the observation helper"
   );
-  const prepareGateway = source.indexOf("prepareGatewayProcessEnv(argv, target)");
-  const gatewayEnable = source.indexOf('process.env.LEGACY_GATEWAY_ENABLED = "true"');
+  const mainSource = source.slice(source.indexOf("async function main("));
+  const helperStart = source.indexOf("async function observeOrganizationLegacyTarget(");
+  const helperEnd = source.indexOf("async function observeBoundedPlacementProbe(");
+  const helperSource =
+    helperStart >= 0 && helperEnd > helperStart
+      ? source.slice(helperStart, helperEnd)
+      : "";
+  const openClientMain = mainSource.indexOf("const db = openHostedGuOsClient(target)");
+  const orgExistsMain = mainSource.indexOf("getOrganizationById(");
+  const observeTargetMain = mainSource.indexOf("observeOrganizationLegacyTarget(");
+  const prepareGatewayMain = mainSource.indexOf("prepareGatewayProcessEnv(argv, target)");
+  const publicSecretHelper = helperSource.indexOf("getOrganizationToolSecretPublic(");
+  const evaluateBindHelper = helperSource.indexOf(
+    "evaluateOrganizationLegacyTargetBinding("
+  );
   add(
-    "prepares process-local encryption key and gateway flag before hosted clients",
-    prepareGateway >= 0 &&
-      gatewayEnable >= 0 &&
-      openClientCall >= 0 &&
+    "prepares process-local encryption key after Organization legacy-target binding",
+    openClientMain >= 0 &&
+      orgExistsMain >= 0 &&
+      observeTargetMain >= 0 &&
+      prepareGatewayMain >= 0 &&
+      publicSecretHelper >= 0 &&
+      evaluateBindHelper >= 0 &&
+      openClientMain < orgExistsMain &&
+      orgExistsMain < observeTargetMain &&
+      observeTargetMain < prepareGatewayMain &&
+      publicSecretHelper < evaluateBindHelper &&
+      helperSource.includes('provider: "traditional_gu_firestore"') &&
+      helperSource.includes('provider: "traditional_gu_mongo"') &&
+      !helperSource.includes("getOrganizationToolSecretForRuntime(") &&
       source.includes("resolveEncryptionKeyForTarget(") &&
-      prepareGateway < openClientCall,
-    "verify-admission pattern"
+      source.includes('process.env.LEGACY_GATEWAY_ENABLED = "true"'),
+    "declared legacy-env binds Organization Firestore before decrypt/capability"
+  );
+  const classifyStart = source.indexOf("async function classifyDiscoverCandidate(");
+  const classifyEnd = source.indexOf("async function runDiscoverHosted(");
+  const classifySource =
+    classifyStart >= 0 && classifyEnd > classifyStart
+      ? source.slice(classifyStart, classifyEnd)
+      : "";
+  const classifyGuard = classifySource.indexOf(
+    "binding.bound && binding.opaqueLeadRef && params.capabilityAuthorized"
+  );
+  const classifyRead = classifySource.indexOf("readLegacyConversationAuthority(");
+  const evidenceFnStart = source.indexOf("async function evaluateOneConversation(");
+  const evidenceFnEnd = source.indexOf("async function classifyDiscoverCandidate(");
+  const evidenceFnSource =
+    evidenceFnStart >= 0 && evidenceFnEnd > evidenceFnStart
+      ? source.slice(evidenceFnStart, evidenceFnEnd)
+      : "";
+  const evidenceGuard = evidenceFnSource.indexOf("if (!params.capabilityAuthorized)");
+  const evidenceRead = evidenceFnSource.indexOf("readLegacyConversationAuthority(");
+  add(
+    "capability reads are gated by capabilityAuthorized after target binding",
+    classifyGuard >= 0 &&
+      classifyRead >= 0 &&
+      classifyGuard < classifyRead &&
+      evidenceGuard >= 0 &&
+      evidenceRead >= 0 &&
+      evidenceGuard < evidenceRead &&
+      mainSource.includes("organizationLegacyTargetAllowsCapability(") &&
+      mainSource.includes("capabilityAuthorized: false") &&
+      mainSource.includes("capabilityAuthorized: true"),
+    "no Organization-scoped capability before target binding"
   );
   const probeGate = source.indexOf("const probePlan = planDiscoverPlacementProbes(");
   const probeOpen = source.indexOf(

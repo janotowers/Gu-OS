@@ -46,10 +46,12 @@ import { createClient } from "@supabase/supabase-js";
 import {
   getOperationalCase,
   getOrganizationById,
+  getOrganizationToolSecretPublic,
   getSourceEventById,
   listAuthorityResolutionsForCases,
   listConversationBindingsForCase,
   type DbClient,
+  type OrganizationToolSecretPublic,
 } from "@agents/db";
 import type {
   AuthorityResolution,
@@ -80,7 +82,11 @@ import {
   DISCOVERY_NOT_RS2_BANNER,
   evaluateBindingDiscovery,
   evaluateBoundedPlacementProbeObservation,
+  evaluateCapabilityBookkeepingState,
   evaluateDiscoveryHygiene,
+  evaluateOrganizationLegacyTargetBinding,
+  evaluateSafeRawFailureDiagnostic,
+  organizationLegacyTargetAllowsCapability,
   evaluateEvidenceHygiene,
   evaluateEvidencePins,
   evaluateFailSafePersistAdmission,
@@ -100,6 +106,7 @@ import {
   inspectTrackedWorkingTree,
   opaqueContextId,
   parseFrozenConversationManifest,
+  parseNamedArg,
   SL6_CANONICAL_BINDING_HELPER,
   SL6_EXPECTED_STAGING_PRODUCT_SHA,
   SL6_HOSTED_ENVIRONMENT,
@@ -110,9 +117,12 @@ import {
   type FrozenConversationMember,
   type ObservedConversationPins,
   type Sl6Check,
+  type Sl6CredentialBookkeepingState,
   type Sl6DiscoveryCandidateReport,
   type Sl6DurableEvidence,
   type Sl6LegacyReadFailureKind,
+  type Sl6OrgLegacyTargetObservation,
+  type Sl6RawFailureFamily,
 } from "./lib/sl6-authority-evidence";
 
 const checks: Sl6Check[] = [];
@@ -208,6 +218,51 @@ function classifyLegacyReadFailure(error: unknown): Sl6LegacyReadFailureKind {
     return "capability_failed";
   }
   return "other";
+}
+
+function publicSecretIdentity(row: OrganizationToolSecretPublic | null): {
+  present: boolean;
+  status: string | null;
+  projectId: string | null;
+  clientEmail: string | null;
+} {
+  const config = (row?.config_jsonb ?? {}) as Record<string, unknown>;
+  const text = (value: unknown): string | null =>
+    typeof value === "string" && value.trim() ? value.trim() : null;
+  return {
+    present: Boolean(row),
+    status: row?.status ?? null,
+    projectId: text(config.project_id),
+    clientEmail: text(config.client_email),
+  };
+}
+
+async function observeOrganizationLegacyTarget(
+  db: DbClient,
+  organizationId: string,
+  declaredLegacyEnv: string
+): Promise<Sl6OrgLegacyTargetObservation> {
+  const firestore = publicSecretIdentity(
+    await getOrganizationToolSecretPublic(db, {
+      organizationId,
+      provider: "traditional_gu_firestore",
+    })
+  );
+  const mongo = publicSecretIdentity(
+    await getOrganizationToolSecretPublic(db, {
+      organizationId,
+      provider: "traditional_gu_mongo",
+    })
+  );
+  return evaluateOrganizationLegacyTargetBinding({
+    declaredLegacyEnv,
+    firestorePresent: firestore.present,
+    firestoreStatus: firestore.status,
+    firestoreProjectId: firestore.projectId,
+    firestoreClientEmail: firestore.clientEmail,
+    mongoPresent: mongo.present,
+    mongoStatus: mongo.status,
+  });
 }
 
 async function observeBoundedPlacementProbe(
@@ -342,6 +397,7 @@ async function evaluateOneConversation(params: {
   acknowledgeDurableWrite: boolean;
   acknowledgeFailSafePersist: boolean;
   ranAt: string;
+  capabilityAuthorized: boolean;
 }): Promise<Sl6DurableEvidence["conversations"][number]> {
   const opportunity = await getOperationalCase(params.db, params.member.caseId);
   if (!opportunity || opportunity.organization_id !== params.member.organizationId) {
@@ -374,6 +430,11 @@ async function evaluateOneConversation(params: {
   }
 
   const runtimeBefore = opportunity.runtime_authority ?? null;
+  if (!params.capabilityAuthorized) {
+    throw new Error(
+      "FAIL CLOSED - Organization legacy target is not bound; evidence cannot open the capability"
+    );
+  }
   const current = await readLegacyConversationAuthority(
     params.ctx,
     params.member.opaqueLeadRef
@@ -470,6 +531,7 @@ async function classifyDiscoverCandidate(params: {
   db: DbClient;
   organizationId: string;
   caseId: string;
+  capabilityAuthorized: boolean;
 }): Promise<
   Sl6DiscoveryCandidateReport & {
     probeLeadRef: string | null;
@@ -538,18 +600,24 @@ async function classifyDiscoverCandidate(params: {
   let agreed: boolean | null = null;
   let takeoverHumanActiveObserved: boolean | null = null;
   let killSwitchObserved: boolean | null = null;
-  let incidentalCredentialUsageBookkeepingPossible = false;
+  let incidentalCredentialUsageBookkeeping: Sl6CredentialBookkeepingState =
+    "not_attempted";
+  let legacyReadFailureFamily: Sl6RawFailureFamily | null = null;
+  let legacyReadErrorName: string | null = null;
+  let legacyReadErrorCode: string | number | null = null;
   let placement = evaluateSourcePlacementObservation({ observedPlacement: null });
 
-  if (binding.bound && binding.opaqueLeadRef) {
+  if (binding.bound && binding.opaqueLeadRef && params.capabilityAuthorized) {
     const ctx: GatewayCallerContext = {
       db: params.db,
       organizationId: params.organizationId,
     };
     try {
       capabilityAttempted = true;
+      incidentalCredentialUsageBookkeeping = evaluateCapabilityBookkeepingState({
+        capabilityInvocationBegan: true,
+      });
       const current = await readLegacyConversationAuthority(ctx, binding.opaqueLeadRef);
-      incidentalCredentialUsageBookkeepingPossible = true;
       const resolution = await resolveInteractionAuthority({
         ctx,
         refs: {
@@ -594,6 +662,12 @@ async function classifyDiscoverCandidate(params: {
     } catch (error) {
       legacyReadSucceeded = false;
       legacyReadFailureKind = classifyLegacyReadFailure(error);
+      if (legacyReadFailureKind === "other") {
+        const diagnostic = evaluateSafeRawFailureDiagnostic(error);
+        legacyReadFailureFamily = diagnostic.family;
+        legacyReadErrorName = diagnostic.errorName;
+        legacyReadErrorCode = diagnostic.errorCode;
+      }
       placement = evaluateSourcePlacementObservation({
         observedPlacement: null,
         capabilitySucceeded: false,
@@ -622,6 +696,9 @@ async function classifyDiscoverCandidate(params: {
     t73Candidate: binding.t7_3Candidate,
     legacyReadSucceeded,
     legacyReadFailureKind,
+    legacyReadFailureFamily,
+    legacyReadErrorName,
+    legacyReadErrorCode,
     placementConclusion: placement.conclusion,
     placementReason: placement.reason,
     takeoverHumanActiveObserved,
@@ -631,7 +708,7 @@ async function classifyDiscoverCandidate(params: {
     oracleReason,
     agreed,
     genuineUnknownOrConflictingCandidate: failSafe.genuineUnknownOrConflictingCandidate,
-    incidentalCredentialUsageBookkeepingPossible,
+    incidentalCredentialUsageBookkeeping,
     probeLeadRef: binding.bound ? binding.opaqueLeadRef : null,
     capabilityAttempted,
     capabilityFailureKind: capabilityAttempted ? legacyReadFailureKind : null,
@@ -649,6 +726,8 @@ async function runDiscoverHosted(params: {
   legacyEnv: string;
   trackedTreeMatchesHead: boolean;
   verifierShaOk: boolean;
+  capabilityAuthorized: boolean;
+  organizationLegacyTarget: Sl6OrgLegacyTargetObservation;
 }): Promise<void> {
   // discover cannot persist — inventory != selection. not RS-2 evidence.
   // T7-3 binding preparation stays backfillAdmittedLegacyLeadIdentity and
@@ -672,6 +751,7 @@ async function runDiscoverHosted(params: {
         db: params.db,
         organizationId: params.organizationId,
         caseId,
+        capabilityAuthorized: params.capabilityAuthorized,
       })
     );
   }
@@ -737,7 +817,8 @@ async function runDiscoverHosted(params: {
         capabilityFailureKind: _capabilityFailureKind,
         ...candidate
       }) => candidate
-    )
+    ),
+    params.organizationLegacyTarget
   );
   const hygiene = evaluateDiscoveryHygiene(report);
   record("hygiene", "discovery report is digest-oriented and non-canonical", hygiene.ok, hygiene.reason);
@@ -767,6 +848,7 @@ async function runEvidenceHosted(params: {
   legacyEnvironment: string;
   jsonPath: string | null;
   observedPlacement: string[] | null;
+  capabilityAuthorized: boolean;
 }): Promise<Sl6DurableEvidence> {
   const manifest = loadFrozenManifest(params.conversationsFile);
   if (manifest.organizationId !== params.organizationId) {
@@ -787,6 +869,7 @@ async function runEvidenceHosted(params: {
         acknowledgeDurableWrite: params.acknowledgeDurableWrite,
         acknowledgeFailSafePersist: params.acknowledgeFailSafePersist,
         ranAt: params.ranAt,
+        capabilityAuthorized: params.capabilityAuthorized,
       })
     );
   }
@@ -878,12 +961,68 @@ async function main(): Promise<void> {
   console.log(`phase: ${safetyGate.args.phase}`);
   console.log("traditional_gu write clients: not opened (structural)\n");
 
-  prepareGatewayProcessEnv(argv, target);
   const db = openHostedGuOsClient(target);
   // openHostedLegacyTarget is only reachable through
   // openHostedLegacyTargetAfterProbeAdmission after planDiscoverPlacementProbes.
   // Product reads go through the existing gateway.
-  const legacyEnvironment = "stage";
+  const declaredLegacyEnv = parseNamedArg(argv, "--legacy-env") ?? "";
+  const organization = await getOrganizationById(db, safetyGate.args.organizationId);
+  if (!organization) {
+    throw new Error("FAIL CLOSED - Organization not found");
+  }
+  const organizationLegacyTarget = await observeOrganizationLegacyTarget(
+    db,
+    safetyGate.args.organizationId,
+    declaredLegacyEnv
+  );
+  record(
+    "legacy-target",
+    "Organization-scoped Firestore identity matches the declared legacy environment",
+    organizationLegacyTargetAllowsCapability(organizationLegacyTarget),
+    organizationLegacyTarget.reason
+  );
+  const capabilityAuthorized = organizationLegacyTargetAllowsCapability(
+    organizationLegacyTarget
+  );
+  if (!capabilityAuthorized) {
+    console.log("declared_legacy_env: " + (organizationLegacyTarget.declaredLegacyEnv ?? "none"));
+    console.log(
+      "expected_firestore_project: " +
+        (organizationLegacyTarget.expectedFirestoreProject ?? "none")
+    );
+    console.log(
+      "configured_firestore_project: " +
+        (organizationLegacyTarget.configuredFirestoreProject ?? "none")
+    );
+    console.log(
+      "configured_client_email: " +
+        (organizationLegacyTarget.configuredClientEmail ?? "none")
+    );
+    console.log("firestore_status: " + (organizationLegacyTarget.firestoreStatus ?? "none"));
+    console.log("mongo_present: " + String(organizationLegacyTarget.mongoPresent));
+    console.log("mongo_status: " + (organizationLegacyTarget.mongoStatus ?? "none"));
+    console.log("organization_legacy_target: " + organizationLegacyTarget.classification);
+    if (safetyGate.args.phase === "discover") {
+      await runDiscoverHosted({
+        db,
+        organizationId: safetyGate.args.organizationId,
+        inventoryCaseIds: safetyGate.args.inventoryCaseIds,
+        argv,
+        safetyGateOk: safetyGate.ok,
+        targetName: target.name,
+        targetProjectRef: target.projectRef,
+        legacyEnv: declaredLegacyEnv,
+        trackedTreeMatchesHead: true,
+        verifierShaOk: true,
+        capabilityAuthorized: false,
+        organizationLegacyTarget,
+      });
+    }
+    throw new Error(
+      `FAIL CLOSED - Organization legacy target ${organizationLegacyTarget.classification}: ${organizationLegacyTarget.reason}`
+    );
+  }
+  prepareGatewayProcessEnv(argv, target);
   const placement = evaluateSourcePlacementObservation({
     observedPlacement: null,
   });
@@ -903,9 +1042,11 @@ async function main(): Promise<void> {
       safetyGateOk: safetyGate.ok,
       targetName: target.name,
       targetProjectRef: target.projectRef,
-      legacyEnv: "stage",
+      legacyEnv: declaredLegacyEnv,
       trackedTreeMatchesHead: true,
       verifierShaOk: true,
+      capabilityAuthorized: true,
+      organizationLegacyTarget,
     });
     return;
   }
@@ -923,9 +1064,10 @@ async function main(): Promise<void> {
     productSha: product.productSha,
     verifierSha,
     projectRef: target.projectRef,
-    legacyEnvironment,
+    legacyEnvironment: declaredLegacyEnv,
     jsonPath: safetyGate.args.jsonPath,
     observedPlacement: placement.observedPlacement,
+    capabilityAuthorized: true,
   });
   console.log(
     `\nverify-sl6-authority: executionCompleted=${evidence.rs2.executionCompleted} ` +
