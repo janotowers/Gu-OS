@@ -232,6 +232,10 @@ checkDeep(
   effectsUnresolvedAtDurability(withGap[0]),
   ["calendar"]
 );
+// NOTE (rev 5): the two figures below describe the audit's §24.3 ORDERING table and are
+// NOT the emission denominator. Rev 5 establishes that the "fourteen / nine" tally counted
+// two dead owner-phone-sync writers as live and omitted ungga-landing's two writers
+// entirely. The authoritative emitting set is ADR-112 §5A, modelled separately below.
 check("§24.3: the table covers nine writer families", WRITER_FAMILIES.length, 9);
 check("§24.3: five writers touch more than Mongo, which the audit's totals imply", AUDIT_TOTAL_WRITERS - AUDIT_MONGO_ONLY_WRITERS, 5);
 checkTrue(
@@ -658,6 +662,321 @@ function pendingRescheduleDoc(ref, eventId) {
     finalizeByWriter(doc, "evt-vocab", { stores: { firestore: "maybe" } }, "2026-09-18T01:00:01Z")
   );
 }
+
+// ---------------------------------------------------------------------------
+// ADR-112 rev 5 §5A -- the emitting set.
+//
+// Rev 4 never said which appointment mutations are events, so §7D's coverage guarantee
+// had no population to quantify over: a test asserting "no appointment write path
+// constructs its update outside the helper" cannot be written until "which paths owe an
+// event" is a closed list. This block is that list, transcribed independently of the ADR
+// so a drift between record and guard fails rather than agrees.
+//
+// The principle: C1 emits for actor-driven business lifecycle transitions of an
+// appointment. Scheduled notification bookkeeping does not.
+// ---------------------------------------------------------------------------
+
+const EMIT = "emit";
+const BOOKKEEPING = "excluded_bookkeeping";
+const AUDIT_ONLY = "no_event_operational_audit_only";
+const DEAD = "dead_drift_guard";
+const OUT_OF_FIRST_PILOT = "excluded_first_pilot_drift_guard";
+
+const EMITTING_SET = [
+  { id: "create-prospect-conversation", klass: EMIT, operation: "created", bulk: false },
+  { id: "create-standby-graph", klass: EMIT, operation: "created", bulk: false },
+  { id: "reschedule-prospect-side", klass: EMIT, operation: "rescheduled", bulk: false },
+  { id: "cancellation", klass: EMIT, operation: "cancelled", bulk: false },
+  { id: "advisor-confirm-python", klass: EMIT, operation: "confirmed", bulk: false },
+  { id: "advisor-reschedule-python", klass: EMIT, operation: "rescheduled", bulk: false },
+  { id: "advisor-confirm-ts-route", klass: EMIT, operation: "confirmed", bulk: false },
+  { id: "prospect-will-be-contacted-ts-route", klass: EMIT, operation: "status_changed", bulk: false },
+  // Named at rev 5. A per-runtime twin of the row above; coverage misses it if unlisted.
+  { id: "prospect-will-be-contacted-python-twin", klass: EMIT, operation: "status_changed", bulk: false },
+  { id: "visit-lifecycle-status-guv3", klass: EMIT, operation: "status_changed", bulk: false },
+  { id: "satisfaction-outcome-guv3", klass: EMIT, operation: "other", bulk: false },
+  // The one emitting site whose CURRENT source is a bulk write. It emits, so it must fan out.
+  { id: "finished-survey-sweep", klass: EMIT, operation: "status_changed", bulk: true },
+  { id: "landing-advisor-confirm", klass: EMIT, operation: "confirmed", bulk: false },
+  { id: "landing-advisor-reschedule", klass: EMIT, operation: "rescheduled", bulk: false },
+
+  { id: "satisfaction-survey-sended", klass: BOOKKEEPING, bulk: true },
+  { id: "owner-notified-bulk-reset", klass: BOOKKEEPING, bulk: true },
+  { id: "owner-notified-after-confirm-or-cancel", klass: BOOKKEEPING, bulk: false },
+  { id: "owner-pre-notified", klass: BOOKKEEPING, bulk: true },
+
+  { id: "reset-purge-guv3", klass: AUDIT_ONLY, bulk: false },
+
+  { id: "owner-phone-sync-python", klass: DEAD, bulk: true },
+  { id: "owner-phone-sync-ts-twin", klass: DEAD, bulk: true },
+  { id: "bots-main-create-mongo", klass: DEAD, bulk: false },
+  { id: "bots-main-create-firestore", klass: DEAD, bulk: false },
+
+  { id: "bots-main-visit-tracker-status", klass: OUT_OF_FIRST_PILOT, bulk: false },
+  { id: "bots-main-satisfaction-outcome", klass: OUT_OF_FIRST_PILOT, bulk: false },
+];
+
+const emitters = EMITTING_SET.filter((m) => m.klass === EMIT);
+const nonEmitters = EMITTING_SET.filter((m) => m.klass !== EMIT);
+
+// The coverage test's population is exactly the EMIT rows; everything else is a drift guard.
+const coveragePopulation = emitters.map((m) => m.id);
+const driftGuarded = nonEmitters.map((m) => m.id);
+
+check("§5A: the emitting set is closed and non-empty", coveragePopulation.length, 14);
+check("§5A: every non-emitting row is drift-guarded rather than forgotten", driftGuarded.length, EMITTING_SET.length - 14);
+checkTrue(
+  "§5A: the emitting set and the drift guards partition the enumeration -- no row in both, none in neither",
+  coveragePopulation.length + driftGuarded.length === EMITTING_SET.length &&
+    coveragePopulation.every((id) => !driftGuarded.includes(id))
+);
+
+// The three bookkeeping fields, asserted by name: these are the ones rev 5 excludes.
+for (const id of ["satisfaction-survey-sended", "owner-notified-bulk-reset", "owner-pre-notified"]) {
+  check(`§5A: ${id} is excluded as notification bookkeeping`, EMITTING_SET.find((m) => m.id === id)?.klass, BOOKKEEPING);
+}
+
+// The second write after a confirm/cancel is bookkeeping too -- the obligation rides the
+// STATUS write, not this one. Getting that backwards would emit on the wrong operation.
+check(
+  "§5A: owner_notified written after a status transition is bookkeeping, not a second emission point",
+  EMITTING_SET.find((m) => m.id === "owner-notified-after-confirm-or-cancel")?.klass,
+  BOOKKEEPING
+);
+
+check(
+  "§5A: reset/purge produces no C1 event and takes a producer-side operational audit instead",
+  EMITTING_SET.find((m) => m.id === "reset-purge-guv3")?.klass,
+  AUDIT_ONLY
+);
+
+// Dead paths leave the denominator but keep guards: a coverage test that asserted an
+// emission from a path with no callers would prove nothing, and would break when the dead
+// code was deleted -- for no defect.
+check("§5A: four appointment paths are dead and excluded from the denominator", EMITTING_SET.filter((m) => m.klass === DEAD).length, 4);
+checkTrue(
+  "§5A: no dead path is in the coverage population",
+  EMITTING_SET.filter((m) => m.klass === DEAD).every((m) => !coveragePopulation.includes(m.id))
+);
+
+// bots/main: excluded on an evidence limit, NOT a safety finding. The guard records that
+// the paths stay explicit, so expansion cannot silently bypass C1.
+check(
+  "§5A: bots/main appointment paths are excluded from the first Alebrixe pilot scope",
+  EMITTING_SET.filter((m) => m.klass === OUT_OF_FIRST_PILOT).length,
+  2
+);
+checkTrue(
+  "§5A: the bots/main exclusion is enumerated rather than omitted, so expansion must add it to coverage",
+  EMITTING_SET.filter((m) => m.klass === OUT_OF_FIRST_PILOT).every((m) => driftGuarded.includes(m.id))
+);
+
+// ---------------------------------------------------------------------------
+// §5A -- `finished` emits, so its bulk site cannot stay one bulk event.
+//
+// An event_id identifies ONE logical mutation of ONE entity (§1). A bulk write over a
+// matched set cannot carry one. The requirement is semantic -- fan out per appointment --
+// and deliberately prescribes no particular driver call.
+// ---------------------------------------------------------------------------
+
+function planEmission(mutation, affectedAppointmentRefs) {
+  if (!mutation || mutation.klass !== EMIT) {
+    throw new Error(`${mutation?.id} is not in the emitting set`);
+  }
+  // Conformance is per-appointment obligations, never one obligation for the batch.
+  return affectedAppointmentRefs.map((ref) => ({
+    appointment_ref: ref,
+    event_id: `minted-for:${mutation.id}:${ref}`,
+    obligations: 1,
+  }));
+}
+
+{
+  const sweep = EMITTING_SET.find((m) => m.id === "finished-survey-sweep");
+  check("§5A: `finished` is an event, not bookkeeping", sweep?.klass, EMIT);
+  checkTrue("§5A: and its current source shape is a bulk write", sweep?.bulk === true);
+
+  const refs = ["appt-a", "appt-b", "appt-c"];
+  const planned = planEmission(sweep, refs);
+  check("§5A: a bulk `finished` sweep fans out to one event per appointment", planned.length, refs.length);
+  check(
+    "§5A: each fanned-out event carries exactly one durable obligation",
+    planned.every((e) => e.obligations === 1),
+    true
+  );
+  check(
+    "§5A: the fanned-out event_ids are distinct -- one bulk mutation may not share one event_id",
+    new Set(planned.map((e) => e.event_id)).size,
+    refs.length
+  );
+  checkDeep(
+    "§5A: and each event is bound to its own appointment_ref",
+    planned.map((e) => e.appointment_ref),
+    refs
+  );
+  checkThrows("§5A: a bookkeeping mutation may not be planned for emission", () =>
+    planEmission(EMITTING_SET.find((m) => m.id === "owner-pre-notified"), ["appt-a"])
+  );
+  checkThrows("§5A: a dead path may not be planned for emission", () =>
+    planEmission(EMITTING_SET.find((m) => m.id === "bots-main-create-mongo"), ["appt-a"])
+  );
+  checkThrows("§5A: a bots/main path excluded from first-pilot scope may not be planned for emission", () =>
+    planEmission(EMITTING_SET.find((m) => m.id === "bots-main-visit-tracker-status"), ["appt-a"])
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ADR-112 rev 5 §5 -- appointment identity is the business key, fail-closed.
+//
+// Rev 4 justified this with "every writer queries on that business key", which is false
+// for seven current writers. The rule therefore needs a mechanism, not an assumption.
+// ---------------------------------------------------------------------------
+
+function resolveAppointmentRef(loadedDocument) {
+  const raw = loadedDocument.appointment_id;
+  const businessKey = typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
+  if (businessKey === null) {
+    // Fail closed: no fabricated identifier, no _id fallback, no event.
+    return { emit: false, reason: "appointment_business_key_absent", anomaly: true };
+  }
+  return { emit: true, appointment_ref: businessKey, anomaly: false };
+}
+
+{
+  const withKey = resolveAppointmentRef({ _id: "507f1f77bcf86cd799439011", appointment_id: "b1f0-uuid" });
+  check("§5: appointment_ref is the stable business key", withKey.appointment_ref, "b1f0-uuid");
+  check("§5: and a writer holding the business key emits", withKey.emit, true);
+
+  const keyless = resolveAppointmentRef({ _id: "507f1f77bcf86cd799439011" });
+  check("§5: a missing business key fails closed -- no event", keyless.emit, false);
+  check("§5: and records a coverage/operational anomaly", keyless.anomaly, true);
+  checkTrue("§5: the Mongo _id is never substituted for appointment_ref", keyless.appointment_ref === undefined);
+
+  check("§5: a blank business key is absent, not a value", resolveAppointmentRef({ _id: "abc", appointment_id: "   " }).emit, false);
+
+  // The reason _id is refused is not instability -- it is stable across reschedule. It is
+  // that two identity spaces for one entity cannot be joined afterwards: the dedup key is
+  // derived from external_ref, so one appointment would become two Gu OS entities.
+  const dedupFrom = (externalRef, eventId) => `traditional_gu:appointment_change:${externalRef}:${eventId}`;
+  checkTrue(
+    "§5: an _id-keyed event and a business-key event for ONE appointment would split it into two Gu OS entities",
+    dedupFrom("b1f0-uuid", "evt-1") !== dedupFrom("507f1f77bcf86cd799439011", "evt-2")
+  );
+  check(
+    "§5: two logical mutations of one appointment stay one entity when both use the business key",
+    new Set([dedupFrom("b1f0-uuid", "evt-1").split(":")[2], dedupFrom("b1f0-uuid", "evt-2").split(":")[2]]).size,
+    1
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ADR-112 rev 5 §7 -- assignment obligation placement, per writer family.
+//
+// Rev 4 required "the same Firestore transaction ... at an organization-scoped path".
+// Only two of thirteen writers hold a transaction, three use a batch, six use independent
+// writes, and the two clauses conflict. The repaired invariant: the obligation rides the
+// SAME atomic Firestore operation that establishes that writer's assignment truth.
+// ---------------------------------------------------------------------------
+
+const ATOMIC_PRIMITIVES = ["single_document_set", "batch_update", "transaction_update"];
+const SCOPE_ROUTES = ["document_path", "organization_reference_in_same_write"];
+
+const ASSIGNMENT_WRITERS = [
+  { id: "guard-lead-one", truthDoc: "global_lead", primitive: "single_document_set", orgScope: "organization_reference_in_same_write" },
+  { id: "carrusel-auto-lead", truthDoc: "global_lead", primitive: "single_document_set", orgScope: "organization_reference_in_same_write" },
+  { id: "manual-lead", truthDoc: "global_lead", primitive: "single_document_set", orgScope: "organization_reference_in_same_write" },
+  { id: "c21-properties-assignation", truthDoc: "global_lead", primitive: "single_document_set", orgScope: "organization_reference_in_same_write" },
+  { id: "properties-manual", truthDoc: "global_lead", primitive: "single_document_set", orgScope: "organization_reference_in_same_write" },
+  { id: "lead-creation", truthDoc: "global_lead", primitive: "single_document_set", orgScope: "organization_reference_in_same_write" },
+  { id: "manual-carrusel", truthDoc: "global_lead", primitive: "transaction_update", orgScope: "organization_reference_in_same_write" },
+  { id: "auto-lead-on-property", truthDoc: "global_lead", primitive: "transaction_update", orgScope: "organization_reference_in_same_write" },
+  // The two writers that never touch the global document: their truth IS the org-scoped copy.
+  { id: "period-assignation", truthDoc: "org_scoped_copy", primitive: "batch_update", orgScope: "document_path" },
+  { id: "assign-user-leads-to-owner", truthDoc: "org_scoped_copy", primitive: "batch_update", orgScope: "document_path" },
+  // Exceptional paths a per-lead helper silently misses.
+  { id: "offboarding-cascade", truthDoc: "global_lead", primitive: "single_document_set", orgScope: "organization_reference_in_same_write" },
+  { id: "lead-re-keying", truthDoc: "global_lead", primitive: "single_document_set", orgScope: "organization_reference_in_same_write" },
+];
+
+// Conformance: one atomic operation carrying both the business mutation and the obligation.
+function obligationPlacement(writer) {
+  if (!ATOMIC_PRIMITIVES.includes(writer.primitive)) {
+    throw new Error(`${writer.id}: ${writer.primitive} is not a Firestore atomic primitive`);
+  }
+  return { operations: 1, carries: ["business_mutation", "integration_obligation"], document: writer.truthDoc };
+}
+
+checkTrue(
+  "§7: every assignment writer has an atomic Firestore primitive available",
+  ASSIGNMENT_WRITERS.every((w) => ATOMIC_PRIMITIVES.includes(w.primitive))
+);
+checkTrue(
+  "§7: the obligation rides ONE operation for every writer -- never two independent writes",
+  ASSIGNMENT_WRITERS.every((w) => obligationPlacement(w).operations === 1)
+);
+checkTrue(
+  "§7: and that one operation carries both the business mutation and the obligation",
+  ASSIGNMENT_WRITERS.every((w) => {
+    const p = obligationPlacement(w);
+    return p.carries.includes("business_mutation") && p.carries.includes("integration_obligation");
+  })
+);
+checkThrows("§7: two independent writes are not an atomic primitive and are refused", () =>
+  obligationPlacement({ id: "hypothetical", primitive: "two_independent_writes", truthDoc: "global_lead" })
+);
+
+// There is no universally authoritative assignment document -- asserting one would be the
+// rev 4 error in a new place.
+checkTrue(
+  "§7: the authoritative document is writer-dependent, not universal",
+  new Set(ASSIGNMENT_WRITERS.map((w) => w.truthDoc)).size === 2
+);
+check(
+  "§7: two writers establish assignment truth in the org-scoped copy and never touch the global lead",
+  ASSIGNMENT_WRITERS.filter((w) => w.truthDoc === "org_scoped_copy").length,
+  2
+);
+check(
+  "§7: only two writers hold a Firestore transaction, which is why rev 4's mechanism did not generalise",
+  ASSIGNMENT_WRITERS.filter((w) => w.primitive === "transaction_update").length,
+  2
+);
+check(
+  "§7: and two use a WriteBatch",
+  ASSIGNMENT_WRITERS.filter((w) => w.primitive === "batch_update").length,
+  2
+);
+
+// legacy_scope stays producer-derived, by exactly one of two structural routes.
+checkTrue(
+  "§7: Organization scope is producer-derived by path or by the Organization reference in the same atomic write",
+  ASSIGNMENT_WRITERS.every((w) => SCOPE_ROUTES.includes(w.orgScope))
+);
+checkTrue(
+  "§7: no writer derives legacy_scope from a caller-supplied value",
+  ASSIGNMENT_WRITERS.every((w) => w.orgScope !== "caller_supplied")
+);
+checkTrue(
+  "§7: org-scoped-copy writers get scope structurally from the path",
+  ASSIGNMENT_WRITERS.filter((w) => w.truthDoc === "org_scoped_copy").every((w) => w.orgScope === "document_path")
+);
+
+// An emission inside a Firestore transaction callback must BE the transactional write:
+// Firestore retries callbacks, so a side effect beside it can run more than once.
+function emissionInTransactionBody(kind) {
+  if (kind !== "transactional_write") {
+    throw new Error("a non-transactional side effect in a retried transaction callback may execute more than once");
+  }
+  return "conformant";
+}
+check(
+  "§7: an emission inside a transaction callback must be the transactional write",
+  emissionInTransactionBody("transactional_write"),
+  "conformant"
+);
+checkThrows("§7: a non-transactional side effect in a transaction callback is refused", () =>
+  emissionInTransactionBody("side_effect_http_call")
+);
 
 if (failures.length > 0) {
   console.error(`c1 appointment finalization selftest: ${failures.length} failure(s)\n`);
