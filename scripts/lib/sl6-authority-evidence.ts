@@ -919,12 +919,16 @@ export function evaluateGenuineFailSafeCandidate(input: {
   };
 }
 
-const PLACEMENT_PROBE_BLOCKING_FAILURES: readonly Sl6LegacyReadFailureKind[] = [
-  "missing_binding",
-  "ambiguous_binding",
-  "no_usable_credential",
-  "gateway_disabled",
-];
+export const PLACEMENT_PROBE_ELIGIBLE_UNCERTAINTY = [
+  "not_found",
+  "unconfirmed_fields",
+] as const satisfies readonly Sl6LegacyReadFailureKind[];
+
+export function isPlacementProbeEligibleUncertainty(
+  kind: Sl6LegacyReadFailureKind | null
+): kind is (typeof PLACEMENT_PROBE_ELIGIBLE_UNCERTAINTY)[number] {
+  return kind === "not_found" || kind === "unconfirmed_fields";
+}
 
 export function evaluatePlacementProbeAdmission(input: {
   phase: Sl6Phase;
@@ -983,14 +987,24 @@ export function evaluatePlacementProbeAdmission(input: {
   if (input.placementConclusion === "confirmed") {
     return { admitted: false, reason: "placement is already confirmed; probe is not needed" };
   }
-  if (
-    input.capabilityFailureKind &&
-    PLACEMENT_PROBE_BLOCKING_FAILURES.includes(input.capabilityFailureKind)
-  ) {
+  if (input.placementConclusion === "mismatch") {
     return {
       admitted: false,
       reason:
-        "capability failure is a credential/binding/config issue, not a placement-probe trigger",
+        "Path A already concluded a placement mismatch; the probe is not a recheck",
+    };
+  }
+  if (input.placementConclusion !== "not_concluded") {
+    return {
+      admitted: false,
+      reason: "unrecognized placement conclusion is not placement-probe eligible",
+    };
+  }
+  if (!isPlacementProbeEligibleUncertainty(input.capabilityFailureKind)) {
+    return {
+      admitted: false,
+      reason:
+        "capability outcome is not a recognized placement-uncertainty; probe remains closed",
     };
   }
   if (!input.readOnly) {
@@ -998,7 +1012,81 @@ export function evaluatePlacementProbeAdmission(input: {
   }
   return {
     admitted: true,
-    reason: "placement remains unconfirmed after a capability attempt; bounded probe may open",
+    reason:
+      input.capabilityFailureKind === "not_found"
+        ? "named lead was not found on the configured capability path; bounded placement probe may open"
+        : "capability succeeded without a confirming takeover-field contribution; bounded placement probe may open",
+  };
+}
+
+export interface Sl6PlacementProbeCandidateFacts {
+  candidateKey: string;
+  capabilityAttempted: boolean;
+  capabilityFailureKind: Sl6LegacyReadFailureKind | null;
+  placementConclusion: Sl6PlacementConclusion;
+  probeLeadRef: string | null;
+}
+
+export interface Sl6PlacementProbePlan {
+  openTarget: boolean;
+  openReason: string;
+  admittedKeys: string[];
+  refused: readonly { candidateKey: string; reason: string }[];
+}
+
+export function planDiscoverPlacementProbes(input: {
+  candidates: readonly Sl6PlacementProbeCandidateFacts[];
+  phase: Sl6Phase;
+  safetyGateOk: boolean;
+  targetName: string;
+  targetProjectRef: string;
+  legacyEnv: string | null;
+  organizationId: string | null;
+  namedCaseCount: number;
+  trackedTreeMatchesHead: boolean;
+  verifierShaOk: boolean;
+  readOnly: boolean;
+}): Sl6PlacementProbePlan {
+  const admittedKeys: string[] = [];
+  const refused: { candidateKey: string; reason: string }[] = [];
+  for (const candidate of input.candidates) {
+    const admission = evaluatePlacementProbeAdmission({
+      phase: input.phase,
+      safetyGateOk: input.safetyGateOk,
+      targetName: input.targetName,
+      targetProjectRef: input.targetProjectRef,
+      legacyEnv: input.legacyEnv,
+      organizationId: input.organizationId,
+      namedCaseCount: input.namedCaseCount,
+      trackedTreeMatchesHead: input.trackedTreeMatchesHead,
+      verifierShaOk: input.verifierShaOk,
+      capabilityAttempted: candidate.capabilityAttempted,
+      placementConclusion: candidate.placementConclusion,
+      capabilityFailureKind: candidate.capabilityFailureKind,
+      readOnly: input.readOnly,
+    });
+    if (!admission.admitted) {
+      refused.push({ candidateKey: candidate.candidateKey, reason: admission.reason });
+      continue;
+    }
+    if (!candidate.probeLeadRef) {
+      refused.push({
+        candidateKey: candidate.candidateKey,
+        reason: "placement probe requires a bound lead reference",
+      });
+      continue;
+    }
+    admittedKeys.push(candidate.candidateKey);
+  }
+  return {
+    openTarget: admittedKeys.length > 0,
+    openReason:
+      admittedKeys.length > 0
+        ? "at least one candidate independently admitted for a recognized placement-uncertainty"
+        : (refused[0]?.reason ??
+          "no candidate is independently eligible for a placement probe"),
+    admittedKeys,
+    refused,
   };
 }
 
@@ -1490,6 +1578,17 @@ export function evaluateSl6EvaluatorSourceContract(source: string): Sl6Check[] {
     !/attachExternalConversationBinding\s*\(/.test(source),
     "T7 is not a binding caller"
   );
+  add(
+    "placement-probe planner evaluates each candidate independently against an allowlist",
+    source.includes("function planDiscoverPlacementProbes(") &&
+      source.includes("for (const candidate of input.candidates)") &&
+      source.includes("evaluatePlacementProbeAdmission(") &&
+      source.includes("function isPlacementProbeEligibleUncertainty(") &&
+      source.includes('kind === "not_found"') &&
+      source.includes('kind === "unconfirmed_fields"') &&
+      !source.includes("PLACEMENT_PROBE_BLOCKING_FAILURES"),
+    "deny-by-default Path B"
+  );
   return checks;
 }
 
@@ -1592,13 +1691,18 @@ export function evaluateSl6VerifierSourceContract(source: string): Sl6Check[] {
       prepareGateway < openClientCall,
     "verify-admission pattern"
   );
-  const probeGate = source.indexOf("const probeAdmission = evaluatePlacementProbeAdmission(");
+  const probeGate = source.indexOf("const probePlan = planDiscoverPlacementProbes(");
   const probeOpen = source.indexOf(
     "const legacyTarget = openHostedLegacyTargetAfterProbeAdmission("
   );
   add(
-    "placement-probe target opening is gated by evaluatePlacementProbeAdmission",
-    probeGate >= 0 && probeOpen >= 0 && probeGate < probeOpen,
+    "placement-probe target opening is gated by per-candidate planDiscoverPlacementProbes",
+    probeGate >= 0 &&
+      probeOpen >= 0 &&
+      probeGate < probeOpen &&
+      !source.includes("probeCandidates[0]") &&
+      source.includes("probePlan.openTarget") &&
+      source.includes("probePlan.admittedKeys"),
     "call-site hardening"
   );
   add(

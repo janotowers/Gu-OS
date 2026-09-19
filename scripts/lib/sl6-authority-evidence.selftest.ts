@@ -34,6 +34,7 @@ import {
   evaluateIndependentEquivalence,
   evaluateOracleIndependenceSources,
   evaluatePlacementProbeAdmission,
+  planDiscoverPlacementProbes,
   evaluatePortfolioAuthorityConflictReadback,
   evaluateProductShaProvenance,
   evaluateRequiredRs2Satisfaction,
@@ -676,8 +677,9 @@ function testSourceContractsAndBinding(): void {
   assert.equal(/recordAuthorityResolutionObservation\s*\(/.test(runnerSource), false);
   assert.equal(SL6_CANONICAL_BINDING_HELPER, "backfillAdmittedLegacyLeadIdentity");
   assert.match(runnerSource, /prepareGatewayProcessEnv/);
-  assert.match(runnerSource, /evaluatePlacementProbeAdmission/);
+  assert.match(runnerSource, /planDiscoverPlacementProbes/);
   assert.match(runnerSource, /openHostedLegacyTargetAfterProbeAdmission/);
+  assert.equal(runnerSource.includes("probeCandidates[0]"), false);
   assert.match(runnerSource, /not RS-2 evidence/);
   console.log("  ok  source contracts: oracle independence, gated clients, no second attach caller");
 }
@@ -877,6 +879,10 @@ function happyProbeAdmission(
 
 function testPlacementProbeGate(): void {
   assert.equal(happyProbeAdmission().admitted, true);
+  assert.equal(
+    happyProbeAdmission({ capabilityFailureKind: "unconfirmed_fields" }).admitted,
+    true
+  );
   assert.equal(happyProbeAdmission({ capabilityAttempted: false }).admitted, false);
   assert.equal(happyProbeAdmission({ legacyEnv: null }).admitted, false);
   assert.equal(happyProbeAdmission({ legacyEnv: "prod" }).admitted, false);
@@ -889,11 +895,42 @@ function testPlacementProbeGate(): void {
     false
   );
   assert.equal(
+    happyProbeAdmission({ placementConclusion: "mismatch" }).admitted,
+    false
+  );
+  assert.equal(
+    happyProbeAdmission({ capabilityFailureKind: "capability_failed" }).admitted,
+    false
+  );
+  assert.equal(
+    happyProbeAdmission({ capabilityFailureKind: "other" }).admitted,
+    false
+  );
+  assert.equal(
+    happyProbeAdmission({ capabilityFailureKind: null }).admitted,
+    false
+  );
+  assert.equal(
     happyProbeAdmission({ capabilityFailureKind: "no_usable_credential" }).admitted,
     false
   );
   assert.equal(
+    happyProbeAdmission({ capabilityFailureKind: "gateway_disabled" }).admitted,
+    false
+  );
+  assert.equal(
     happyProbeAdmission({ capabilityFailureKind: "missing_binding" }).admitted,
+    false
+  );
+  assert.equal(
+    happyProbeAdmission({ capabilityFailureKind: "ambiguous_binding" }).admitted,
+    false
+  );
+  assert.equal(
+    happyProbeAdmission({
+      placementConclusion: "mismatch",
+      capabilityFailureKind: "not_found",
+    }).admitted,
     false
   );
 
@@ -940,6 +977,107 @@ function testPlacementProbeGate(): void {
   });
   assert.equal(comparisonOnly.conclusion, "mismatch");
   console.log("  ok  placement-probe gate: capability-first, stage-only, named Cases, clean tree; no auto-correction");
+}
+
+function probePlanGates(
+  overrides: Partial<Parameters<typeof planDiscoverPlacementProbes>[0]> = {}
+) {
+  return planDiscoverPlacementProbes({
+    candidates: [],
+    phase: "discover",
+    safetyGateOk: true,
+    targetName: SL6_HOSTED_ENVIRONMENT,
+    targetProjectRef: SL6_STAGING_PROJECT_REF,
+    legacyEnv: "stage",
+    organizationId: ORG,
+    namedCaseCount: 2,
+    trackedTreeMatchesHead: true,
+    verifierShaOk: true,
+    readOnly: true,
+    ...overrides,
+  });
+}
+
+function probeFacts(
+  candidateKey: string,
+  overrides: Partial<Parameters<typeof planDiscoverPlacementProbes>[0]["candidates"][number]> = {}
+) {
+  return {
+    candidateKey,
+    capabilityAttempted: true,
+    capabilityFailureKind: "not_found" as const,
+    placementConclusion: "not_concluded" as const,
+    probeLeadRef: `opaque-${candidateKey}`,
+    ...overrides,
+  };
+}
+
+function testPlacementProbeCandidateIsolation(): void {
+  const eligibleThenOwnership = probePlanGates({
+    candidates: [
+      probeFacts("A"),
+      probeFacts("B", { capabilityFailureKind: "capability_failed" }),
+    ],
+  });
+  assert.deepEqual(eligibleThenOwnership.admittedKeys, ["A"]);
+  assert.equal(eligibleThenOwnership.openTarget, true);
+  assert.equal(
+    eligibleThenOwnership.refused.some((row) => row.candidateKey === "B"),
+    true
+  );
+
+  const eligibleThenCredential = probePlanGates({
+    candidates: [
+      probeFacts("A", { capabilityFailureKind: "unconfirmed_fields" }),
+      probeFacts("B", { capabilityFailureKind: "no_usable_credential" }),
+    ],
+  });
+  assert.deepEqual(eligibleThenCredential.admittedKeys, ["A"]);
+  assert.equal(
+    eligibleThenCredential.refused.some((row) => row.candidateKey === "B"),
+    true
+  );
+
+  const eligibleThenMismatch = probePlanGates({
+    candidates: [
+      probeFacts("A"),
+      probeFacts("B", {
+        capabilityFailureKind: null,
+        placementConclusion: "mismatch",
+      }),
+    ],
+  });
+  assert.deepEqual(eligibleThenMismatch.admittedKeys, ["A"]);
+  assert.equal(
+    eligibleThenMismatch.refused.some((row) => row.candidateKey === "B"),
+    true
+  );
+
+  const ineligibleFirstDoesNotSuppress = probePlanGates({
+    candidates: [
+      probeFacts("B", { capabilityFailureKind: "capability_failed" }),
+      probeFacts("A"),
+    ],
+  });
+  assert.deepEqual(ineligibleFirstDoesNotSuppress.admittedKeys, ["A"]);
+  assert.equal(ineligibleFirstDoesNotSuppress.openTarget, true);
+
+  const mismatchAndCredentialAlone = probePlanGates({
+    candidates: [
+      probeFacts("mismatch", {
+        capabilityFailureKind: null,
+        placementConclusion: "mismatch",
+      }),
+      probeFacts("credential", { capabilityFailureKind: "no_usable_credential" }),
+      probeFacts("other", { capabilityFailureKind: "other" }),
+    ],
+  });
+  assert.deepEqual(mismatchAndCredentialAlone.admittedKeys, []);
+  assert.equal(mismatchAndCredentialAlone.openTarget, false);
+
+  console.log(
+    "  ok  placement-probe isolation: candidate A eligibility cannot authorize candidate B"
+  );
 }
 
 function discoveryCandidate(
@@ -1016,6 +1154,7 @@ function main(): void {
   testAdmissionAndBinding();
   testDiscoveryClassification();
   testPlacementProbeGate();
+  testPlacementProbeCandidateIsolation();
   testDiscoveryOutputHygiene();
   testHostedLeakageSurface();
   console.log("sl6 authority evidence selftest: ok");

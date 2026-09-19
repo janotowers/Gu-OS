@@ -88,7 +88,7 @@ import {
   evaluateGenuineFailSafeCandidate,
   evaluateGovernedAdmissionObservation,
   evaluateIndependentEquivalence,
-  evaluatePlacementProbeAdmission,
+  planDiscoverPlacementProbes,
   evaluatePortfolioAuthorityConflictReadback,
   evaluateProductShaProvenance,
   evaluateSl6HostedSafetyGate,
@@ -202,6 +202,9 @@ function classifyLegacyReadFailure(error: unknown): Sl6LegacyReadFailureKind {
     if (error.reason === "not_found") return "not_found";
     if (error.reason === "no_usable_credential") return "no_usable_credential";
     if (error.reason === "gateway_disabled") return "gateway_disabled";
+    // ownership_not_contained, organization_not_bound_to_source, contract_drift,
+    // pairing_ambiguous, source_unavailable, and other refusals stay generic.
+    // They are not placement-uncertainty and must not admit Path B.
     return "capability_failed";
   }
   return "other";
@@ -673,49 +676,57 @@ async function runDiscoverHosted(params: {
     );
   }
 
-  const capabilityAttempted = classified.some((row) => row.capabilityAttempted);
-  const probeCandidates = classified.filter(
-    (row) =>
-      row.capabilityAttempted &&
-      row.placementConclusion !== "confirmed" &&
-      row.probeLeadRef
-  );
-  if (probeCandidates.length > 0) {
-    const probeAdmission = evaluatePlacementProbeAdmission({
-      phase: "discover",
-      safetyGateOk: params.safetyGateOk,
-      targetName: params.targetName,
-      targetProjectRef: params.targetProjectRef,
-      legacyEnv: params.legacyEnv,
-      organizationId: params.organizationId,
-      namedCaseCount: params.inventoryCaseIds.length,
-      trackedTreeMatchesHead: params.trackedTreeMatchesHead,
-      verifierShaOk: params.verifierShaOk,
-      capabilityAttempted,
-      placementConclusion: "not_concluded",
-      capabilityFailureKind: probeCandidates[0]?.capabilityFailureKind ?? null,
-      readOnly: true,
-    });
-    if (probeAdmission.admitted) {
-      const legacyTarget = openHostedLegacyTargetAfterProbeAdmission(
-        params.argv,
-        probeAdmission
-      );
-      for (const row of probeCandidates) {
-        if (!row.probeLeadRef) continue;
-        const paths = await observeBoundedPlacementProbe(legacyTarget, row.probeLeadRef);
-        const probed = evaluateBoundedPlacementProbeObservation({ paths });
-        row.placementConclusion = probed.conclusion;
-        row.placementReason = probed.reason;
-      }
-    } else {
+  const probePlan = planDiscoverPlacementProbes({
+    candidates: classified.map((row) => ({
+      candidateKey: row.caseDigest,
+      capabilityAttempted: row.capabilityAttempted,
+      capabilityFailureKind: row.capabilityFailureKind,
+      placementConclusion: row.placementConclusion,
+      probeLeadRef: row.probeLeadRef,
+    })),
+    phase: "discover",
+    safetyGateOk: params.safetyGateOk,
+    targetName: params.targetName,
+    targetProjectRef: params.targetProjectRef,
+    legacyEnv: params.legacyEnv,
+    organizationId: params.organizationId,
+    namedCaseCount: params.inventoryCaseIds.length,
+    trackedTreeMatchesHead: params.trackedTreeMatchesHead,
+    verifierShaOk: params.verifierShaOk,
+    readOnly: true,
+  });
+  const probeAdmission = {
+    admitted: probePlan.openTarget,
+    reason: probePlan.openReason,
+  };
+  if (probeAdmission.admitted) {
+    const legacyTarget = openHostedLegacyTargetAfterProbeAdmission(
+      params.argv,
+      probeAdmission
+    );
+    const admittedKeys = new Set(probePlan.admittedKeys);
+    for (const row of classified) {
+      if (!admittedKeys.has(row.caseDigest) || !row.probeLeadRef) continue;
+      const paths = await observeBoundedPlacementProbe(legacyTarget, row.probeLeadRef);
+      const probed = evaluateBoundedPlacementProbeObservation({ paths });
+      row.placementConclusion = probed.conclusion;
+      row.placementReason = probed.reason;
+    }
+    for (const refused of probePlan.refused) {
       record(
         "discover",
-        "placement probe remained closed",
+        "placement probe remained closed for an independently ineligible candidate",
         true,
-        probeAdmission.reason
+        refused.reason
       );
     }
+  } else if (classified.some((row) => row.capabilityAttempted)) {
+    record(
+      "discover",
+      "placement probe remained closed",
+      true,
+      probeAdmission.reason
+    );
   }
 
   const report = buildDiscoveryReport(
@@ -870,7 +881,7 @@ async function main(): Promise<void> {
   prepareGatewayProcessEnv(argv, target);
   const db = openHostedGuOsClient(target);
   // openHostedLegacyTarget is only reachable through
-  // openHostedLegacyTargetAfterProbeAdmission after evaluatePlacementProbeAdmission.
+  // openHostedLegacyTargetAfterProbeAdmission after planDiscoverPlacementProbes.
   // Product reads go through the existing gateway.
   const legacyEnvironment = "stage";
   const placement = evaluateSourcePlacementObservation({
