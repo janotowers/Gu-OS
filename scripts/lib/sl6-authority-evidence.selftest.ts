@@ -24,8 +24,11 @@ import {
   DISCOVERY_NOT_RS2_BANNER,
   evaluateBindingDiscovery,
   evaluateBoundedPlacementProbeObservation,
+  evaluateCapabilityBookkeepingState,
   evaluateDiscoveryHygiene,
   evaluateEvidenceHygiene,
+  evaluateOrganizationLegacyTargetBinding,
+  evaluateSafeRawFailureDiagnostic,
   evaluateEvidencePins,
   evaluateFailSafePersistAdmission,
   evaluateFrozenMemberPins,
@@ -43,6 +46,8 @@ import {
   evaluateSl6HostedSafetyGate,
   evaluateSl6VerifierSourceContract,
   evaluateSourcePlacementObservation,
+  expectedFirestoreProjectForLegacyEnv,
+  organizationLegacyTargetAllowsCapability,
   evaluateTrackedTreeMatchesHead,
   evaluateVerifierSha,
   evidenceDigest,
@@ -1093,6 +1098,9 @@ function discoveryCandidate(
     t73Candidate: false,
     legacyReadSucceeded: true,
     legacyReadFailureKind: null,
+    legacyReadFailureFamily: null,
+    legacyReadErrorName: null,
+    legacyReadErrorCode: null,
     placementConclusion: "confirmed",
     placementReason: "capability provenance confirms the configured takeover source",
     takeoverHumanActiveObserved: false,
@@ -1102,13 +1110,267 @@ function discoveryCandidate(
     oracleReason: "legacy_bypass_bot_false",
     agreed: true,
     genuineUnknownOrConflictingCandidate: false,
-    incidentalCredentialUsageBookkeepingPossible: true,
+    incidentalCredentialUsageBookkeeping: "possible",
     ...overrides,
   };
 }
 
+function boundOrgTargetInput(
+  overrides: Partial<Parameters<typeof evaluateOrganizationLegacyTargetBinding>[0]> = {}
+) {
+  return {
+    declaredLegacyEnv: "stage",
+    firestorePresent: true,
+    firestoreStatus: "active",
+    firestoreProjectId: "unggafb",
+    firestoreClientEmail: "gu-os-sl1-reader@unggafb.iam.gserviceaccount.com",
+    mongoPresent: true,
+    mongoStatus: "active",
+    ...overrides,
+  };
+}
+
+function boundOrgTarget(
+  overrides: Partial<Parameters<typeof evaluateOrganizationLegacyTargetBinding>[0]> = {}
+) {
+  return evaluateOrganizationLegacyTargetBinding(boundOrgTargetInput(overrides));
+}
+
+function testOrganizationLegacyTargetBinding(): void {
+  assert.equal(expectedFirestoreProjectForLegacyEnv("stage"), "unggafb");
+  assert.equal(expectedFirestoreProjectForLegacyEnv("prod"), "ungga-full");
+  assert.equal(expectedFirestoreProjectForLegacyEnv("production"), null);
+  assert.equal(expectedFirestoreProjectForLegacyEnv(null), null);
+
+  const stageBound = boundOrgTarget();
+  assert.equal(stageBound.classification, "bound");
+  assert.equal(organizationLegacyTargetAllowsCapability(stageBound), true);
+  assert.equal(stageBound.expectedFirestoreProject, "unggafb");
+  assert.equal(stageBound.configuredFirestoreProject, "unggafb");
+
+  const knownMismatch = boundOrgTarget({ firestoreProjectId: "ungga-full" });
+  assert.equal(knownMismatch.classification, "target_mismatch");
+  assert.equal(organizationLegacyTargetAllowsCapability(knownMismatch), false);
+  assert.equal(knownMismatch.expectedFirestoreProject, "unggafb");
+  assert.equal(knownMismatch.configuredFirestoreProject, "ungga-full");
+
+  const missingProvider = boundOrgTarget({ firestorePresent: false, firestoreProjectId: null });
+  assert.equal(missingProvider.classification, "missing");
+  assert.equal(organizationLegacyTargetAllowsCapability(missingProvider), false);
+
+  const inactive = boundOrgTarget({ firestoreStatus: "inactive" });
+  assert.equal(inactive.classification, "inactive_or_unusable");
+  assert.equal(organizationLegacyTargetAllowsCapability(inactive), false);
+
+  const incomplete = boundOrgTarget({ firestoreProjectId: null });
+  assert.equal(incomplete.classification, "missing");
+
+  const unknownEnv = boundOrgTarget({ declaredLegacyEnv: "production" });
+  assert.equal(unknownEnv.classification, "missing");
+  assert.equal(organizationLegacyTargetAllowsCapability(unknownEnv), false);
+
+  const prodBound = boundOrgTarget({
+    declaredLegacyEnv: "prod",
+    firestoreProjectId: "ungga-full",
+    firestoreClientEmail: "gu-os-sl1-reader@ungga-full.iam.gserviceaccount.com",
+  });
+  assert.equal(prodBound.classification, "bound");
+  assert.equal(prodBound.expectedFirestoreProject, "ungga-full");
+  assert.equal(organizationLegacyTargetAllowsCapability(prodBound), true);
+
+  const prodMismatch = boundOrgTarget({
+    declaredLegacyEnv: "prod",
+    firestoreProjectId: "unggafb",
+  });
+  assert.equal(prodMismatch.classification, "target_mismatch");
+
+  const missingMongo = boundOrgTarget({ mongoPresent: false, mongoStatus: null });
+  assert.equal(missingMongo.classification, "missing");
+  const inactiveMongo = boundOrgTarget({ mongoStatus: "error" });
+  assert.equal(inactiveMongo.classification, "inactive_or_unusable");
+  assert.equal(
+    boundOrgTarget().reason.includes("Mongo") || boundOrgTarget().classification === "bound",
+    true
+  );
+  console.log(
+    "  ok  Organization target binding: stage->unggafb, stage+ungga-full mismatch, fail-closed incomplete"
+  );
+}
+
+function testCapabilityBookkeepingState(): void {
+  assert.equal(
+    evaluateCapabilityBookkeepingState({ capabilityInvocationBegan: false }),
+    "not_attempted"
+  );
+  assert.equal(
+    evaluateCapabilityBookkeepingState({ capabilityInvocationBegan: true }),
+    "possible"
+  );
+
+  const notAttempted = buildDiscoveryReport(
+    [
+      discoveryCandidate({
+        legacyReadSucceeded: false,
+        incidentalCredentialUsageBookkeeping: "not_attempted",
+      }),
+    ],
+    boundOrgTarget({ firestoreProjectId: "ungga-full" })
+  );
+  assert.equal(notAttempted.incidentalCredentialUsageBookkeeping, "not_attempted");
+  assert.equal(notAttempted.organizationLegacyTarget.classification, "target_mismatch");
+
+  const succeeded = buildDiscoveryReport(
+    [discoveryCandidate({ incidentalCredentialUsageBookkeeping: "possible" })],
+    boundOrgTarget()
+  );
+  assert.equal(succeeded.incidentalCredentialUsageBookkeeping, "possible");
+
+  const rawFailed = buildDiscoveryReport(
+    [
+      discoveryCandidate({
+        legacyReadSucceeded: false,
+        legacyReadFailureKind: "other",
+        legacyReadFailureFamily: "mongo_driver",
+        legacyReadErrorName: "MongoServerSelectionError",
+        incidentalCredentialUsageBookkeeping: "possible",
+      }),
+    ],
+    boundOrgTarget()
+  );
+  assert.equal(rawFailed.incidentalCredentialUsageBookkeeping, "possible");
+  assert.equal(rawFailed.candidates[0]?.legacyReadFailureKind, "other");
+  console.log(
+    "  ok  bookkeeping: not_attempted until capability begins; raw failure does not reset it"
+  );
+}
+
+function testSafeRawFailureDiagnostics(): void {
+  const mongoSelection = evaluateSafeRawFailureDiagnostic(
+    Object.assign(new Error("mongodb+srv://user:hunter2@cluster.example/gu2"), {
+      name: "MongoServerSelectionError",
+      code: undefined,
+    })
+  );
+  assert.equal(mongoSelection.family, "mongo_driver");
+  assert.equal(mongoSelection.errorName, "MongoServerSelectionError");
+  assert.equal(mongoSelection.errorCode, null);
+  assert.equal("message" in mongoSelection, false);
+  assert.equal("stack" in mongoSelection, false);
+
+  const mongoCoded = evaluateSafeRawFailureDiagnostic(
+    Object.assign(new Error("connection refused"), {
+      name: "MongoNetworkError",
+      code: 50,
+    })
+  );
+  assert.equal(mongoCoded.family, "mongo_driver");
+  assert.equal(mongoCoded.errorCode, 50);
+
+  const firestore = evaluateSafeRawFailureDiagnostic(
+    Object.assign(new Error("7 PERMISSION_DENIED"), { name: "FirestoreError" })
+  );
+  assert.equal(firestore.family, "firestore_driver");
+  assert.equal(firestore.errorName, "FirestoreError");
+
+  const grpc = evaluateSafeRawFailureDiagnostic(
+    Object.assign(new Error("14 UNAVAILABLE"), { name: "GrpcError" })
+  );
+  assert.equal(grpc.family, "firestore_driver");
+
+  const moduleLoad = evaluateSafeRawFailureDiagnostic(
+    Object.assign(new Error("Cannot find package mongodb"), {
+      name: "Error",
+      code: "ERR_MODULE_NOT_FOUND",
+    })
+  );
+  assert.equal(moduleLoad.family, "module_load");
+  assert.equal(moduleLoad.errorCode, "ERR_MODULE_NOT_FOUND");
+
+  const generic = evaluateSafeRawFailureDiagnostic(new Error("unexpected boom"));
+  assert.equal(generic.family, "unexpected");
+  assert.equal(generic.errorName, "Error");
+
+  const thrownObject = evaluateSafeRawFailureDiagnostic({
+    name: "WeirdDriver",
+    message: "mongodb+srv://secret",
+    stack: "secret-stack",
+    uri: "mongodb+srv://cluster",
+  });
+  assert.equal(thrownObject.family, "unexpected");
+  assert.equal(thrownObject.errorName, "WeirdDriver");
+  assert.equal(JSON.stringify(thrownObject).includes("mongodb"), false);
+  assert.equal(JSON.stringify(thrownObject).includes("secret"), false);
+
+  const primitive = evaluateSafeRawFailureDiagnostic(
+    "mongodb+srv://user:password@cluster.example/gu2"
+  );
+  assert.equal(primitive.family, "unexpected");
+  assert.equal(primitive.errorName, null);
+  assert.equal(primitive.errorCode, null);
+  assert.equal(JSON.stringify(primitive).includes("mongodb"), false);
+  assert.equal(JSON.stringify(primitive).includes("password"), false);
+
+  const hygiene = evaluateDiscoveryHygiene(
+    buildDiscoveryReport(
+      [
+        discoveryCandidate({
+          legacyReadSucceeded: false,
+          legacyReadFailureKind: "other",
+          legacyReadFailureFamily: mongoSelection.family,
+          legacyReadErrorName: mongoSelection.errorName,
+          legacyReadErrorCode: mongoSelection.errorCode,
+          incidentalCredentialUsageBookkeeping: "possible",
+        }),
+      ],
+      boundOrgTarget()
+    )
+  );
+  assert.equal(hygiene.ok, true);
+
+  const poisoned = evaluateEvidenceHygiene({
+    ...buildDiscoveryReport([discoveryCandidate()], boundOrgTarget()),
+    message: "raw driver text",
+    stack: "at secret",
+  });
+  assert.equal(poisoned.ok, false);
+  console.log("  ok  raw-failure diagnostics: metadata-only, no message/stack/URI/secrets");
+}
+
+function testCapabilityOrderingSourceContract(): void {
+  const runnerSource = readFileSync(join(REPO, "scripts", "verify-sl6-authority.ts"), "utf8");
+  const checks = evaluateSl6VerifierSourceContract(runnerSource);
+  const ordering = checks.find(
+    (check) =>
+      check.label ===
+      "prepares process-local encryption key after Organization legacy-target binding"
+  );
+  const gated = checks.find(
+    (check) =>
+      check.label === "capability reads are gated by capabilityAuthorized after target binding"
+  );
+  assert.equal(ordering?.ok, true, ordering?.detail);
+  assert.equal(gated?.ok, true, gated?.detail);
+
+  const movedRead = runnerSource.replace(
+    "binding.bound && binding.opaqueLeadRef && params.capabilityAuthorized",
+    "binding.bound && binding.opaqueLeadRef"
+  );
+  assert.equal(
+    evaluateSl6VerifierSourceContract(movedRead).some(
+      (check) =>
+        check.label ===
+          "capability reads are gated by capabilityAuthorized after target binding" &&
+        !check.ok
+    ),
+    true
+  );
+  console.log(
+    "  ok  ordering source-contract: capability cannot precede Organization target binding"
+  );
+}
+
 function testDiscoveryOutputHygiene(): void {
-  const report = buildDiscoveryReport([discoveryCandidate()]);
+  const report = buildDiscoveryReport([discoveryCandidate()], boundOrgTarget());
   assert.deepEqual(report.banners, [DISCOVERY_INVENTORY_BANNER, DISCOVERY_NOT_RS2_BANNER]);
   assert.equal(report.inventoryEqualsSelection, false);
   assert.equal(report.notRs2Evidence, true);
@@ -1155,6 +1417,10 @@ function main(): void {
   testDiscoveryClassification();
   testPlacementProbeGate();
   testPlacementProbeCandidateIsolation();
+  testOrganizationLegacyTargetBinding();
+  testCapabilityBookkeepingState();
+  testSafeRawFailureDiagnostics();
+  testCapabilityOrderingSourceContract();
   testDiscoveryOutputHygiene();
   testHostedLeakageSurface();
   console.log("sl6 authority evidence selftest: ok");
